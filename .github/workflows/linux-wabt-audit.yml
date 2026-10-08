@@ -1,0 +1,33 @@
+name: Build Linux WASM AOT Audit Tools
+on:
+  push:
+    branches: [native-aot-work]
+    paths: [".github/workflows/linux-wabt-audit.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: WebAssembly/wabt
+          ref: b835f1ce49e5803c597a0548099456d6be1d3d11
+          path: thirdparty/wabt
+      - name: Compile pinned WABT tools on Linux
+        run: |
+          cmake -S thirdparty/wabt -B build-wabt -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_TOOLS=ON
+          cmake --build build-wabt --target wasm2c wasm-validate wasm-objdump --parallel 4
+          mkdir -p dist/wasm2c
+          cp build-wabt/wasm2c build-wabt/wasm-validate build-wabt/wasm-objdump dist/
+          cp thirdparty/wabt/wasm2c/*.h dist/wasm2c/
+          echo "WABT commit b835f1ce49e5803c597a0548099456d6be1d3d11" > dist/BUILD_SOURCE.txt
+          file dist/wasm2c
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wabt-linux-engine-audit-tools
+          path: dist/
+          retention-days: 2
