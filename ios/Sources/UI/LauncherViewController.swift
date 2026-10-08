@@ -77,7 +77,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
         dot.widthAnchor.constraint(equalToConstant: 8).isActive = true
         dot.heightAnchor.constraint(equalToConstant: 8).isActive = true
         let wordmark = label("GTAV  /  iOS", size: 13, weight: .bold, color: .white)
-        let build = label("LOCAL RUNTIME  •  0.2", size: 10, weight: .medium, color: muted)
+        let build = label("BUILD  " + (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"), size: 10, weight: .medium, color: muted)
         build.textAlignment = .right
         top.addArrangedSubview(dot)
         top.addArrangedSubview(wordmark)
@@ -410,6 +410,14 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
         storageDetails.text = "No folder selected • Files picker cancelled"
         activePicker = nil
         refresh()
+    }
+
+    // Some Files providers still invoke the deprecated single-URL delegate.
+    // Forward it to the same nonblocking code path; ignore duplicate callbacks.
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
+        LogStore.shared.write("usb-storage", "LEGACY_FILES_CALLBACK: " + url.lastPathComponent)
+        guard !pickerCallbackReceived else { return }
+        documentPicker(controller, didPickDocumentsAt: [url])
     }
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {

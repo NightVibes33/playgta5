@@ -58,6 +58,10 @@ assert "TARGETED_DEVICE_FAMILY: \"1\"" in project
 assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.folder])' in launcher
 assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.html], asCopy: false)' in launcher
 assert 'FILES CALLBACK RECEIVED' in launcher
+assert "didPickDocumentAt url: URL" in launcher, "Legacy single-file provider compatibility"
+assert "LEGACY_FILES_CALLBACK" in launcher
+assert 'infoDictionary?["CFBundleVersion"]' in launcher, "Visible build number needed to detect stale SideStore install"
+assert "<key>CFBundleVersion</key><string>5</string>" in plist
 assert 'Select index.html instead' in launcher
 assert 'self?.openPicker(mode)' in launcher, "Action-sheet dismissal must not swallow the picker"
 assert 'chooseIndexFile(_ chosen: URL)' in storage
