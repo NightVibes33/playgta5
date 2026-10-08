@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Native-only regression contract for the iOS A18 foundation.
+
+This is NOT a gameplay test: proprietary game.wasm and a native ARM64 RAGE
+engine are not checked into the repository. Do not let a green CI build be
+mistaken for native GTA V execution.
+"""
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[2]
+read = lambda p: (root / p).read_text(encoding="utf-8")
+native = read("ios/Sources/Engine/NativeEngineSupport.swift")
+game = read("ios/Sources/UI/GameViewController.swift")
+project = read("ios/project.yml")
+workflow = read(".github/workflows/build-ios-ipa.yml")
+ipa = read("ios/Scripts/check_ipa.sh")
+input_source = read("ios/Sources/Input/ControllerManager.swift")
+usb = read("ios/Sources/Storage/USBStorageManager.swift")
+scene = read("ios/Sources/App/SceneDelegate.swift")
+plist = read("ios/Config/Info.plist")
+
+assert "import MetalKit" in native and "class NativeMetalSurface: MTKView, MTKViewDelegate" in native
+assert "MTLCreateSystemDefaultDevice()" in native
+assert "makeCommandQueue()" in native and "makeRenderCommandEncoder" in native
+assert "import WebKit" not in game, "Game screen may not import WebKit"
+assert "WKWebView" not in game.replace('Browser/WKWebView gameplay disabled', ''), "Native gameplay may not instantiate WebKit"
+assert "AssetHTTPServer" not in game
+assert "NativeEngineStatus.inspect" in game
+assert "nativeEngineLinked = false" in native, "Absent linked engine must not claim playable"
+assert "game.wasm" in native and "shaders/index.json" in native
+assert "Data([0, 97, 115, 109, 1, 0, 0, 0])" in native
+assert "memory64:" in native and "minimumPages:" in native and "maximumPages:" in native
+assert "NativeUSBAssetReader" in native
+assert "NSFileCoordinator" in native and "length <= 4 * 1024 * 1024" in native
+assert "startAccessingSecurityScopedResource()" in usb
+assert "import GameController" in input_source
+for control in ["leftThumbstick", "rightThumbstick", "leftTrigger", "rightTrigger",
+                "buttonA", "buttonB", "buttonX", "buttonY", "buttonMenu",
+                "buttonOptions", "leftThumbstickButton", "rightThumbstickButton"]:
+    assert control in input_source, control
+assert "UIImage(systemName:" in game
+assert "GTAiOS-diagnostics.txt" in read("ios/Sources/Support/LogStore.swift")
+assert "UIWindow(windowScene: windowScene)" in scene
+assert "WebRuntime" not in project, "Do not bundle HTML/JS engine into native IPA"
+assert "Engine/RuntimeDiagnostics.swift" in project and "Storage/AssetHTTPServer.swift" in project
+assert "prepare_runtime.sh" not in workflow
+assert "verify_native_runtime.py" in workflow
+assert 'if [ -e "$app/WebRuntime/index.html" ]' in ipa
+assert "<key>CFBundleVersion</key><string>10</string>" in plist
+
+print("PASS: native Metal command queue and presentation")
+print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
+print("PASS: GameController Bluetooth analog + hardware buttons, native readiness UI, diagnostics")
+print("PASS: no WebKit gameplay or embedded browser runtime; unlinked engine truthfully blocked")
+print("NOT PLAYABLE: compiled ARM64 GTA engine, real Metal renderer/import ABI and on-device gameplay remain outstanding")

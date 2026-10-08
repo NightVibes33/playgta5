@@ -18,9 +18,9 @@ targets:
     platform: iOS
     sources:
       - path: Sources
-      - path: WebRuntime
-        type: folder
-        buildPhase: resources
+        excludes:
+          - Engine/RuntimeDiagnostics.swift
+          - Storage/AssetHTTPServer.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.gtaios

@@ -1,6 +1,8 @@
 import UIKit
 
-/// A settings view backed exclusively by the switches in homepage.html and LOW_ARGS.
+/// Legacy browser-port switches preserved for future native engine ABI mapping.
+/// Only the native Metal frame rate is currently active; other values are
+/// saved presets, NOT functional rendering controls without the ARM64 engine.
 final class SettingsViewController: UITableViewController {
     private let ink = UIColor(red: 0.035, green: 0.051, blue: 0.061, alpha: 1)
     private let panel = UIColor(red: 0.085, green: 0.106, blue: 0.12, alpha: 1)
@@ -21,12 +23,12 @@ final class SettingsViewController: UITableViewController {
 
         let header = UIView(frame: CGRect(x: 0, y: 0, width: 480, height: 76))
         let eyebrow = UILabel()
-        eyebrow.text = "ENGINE CONFIGURATION  /  WEBASSEMBLY + WEBGPU"
+        eyebrow.text = "NATIVE METAL CONFIGURATION  /  ENGINE NOT LINKED"
         eyebrow.font = .monospacedSystemFont(ofSize: 10, weight: .semibold)
         eyebrow.textColor = accent
         eyebrow.translatesAutoresizingMaskIntoConstraints = false
         let title = UILabel()
-        title.text = "REAL RUNTIME CONTROLS"
+        title.text = "REQUESTED ENGINE PRESETS"
         title.font = .systemFont(ofSize: 23, weight: .black)
         title.textColor = .white
         title.translatesAutoresizingMaskIntoConstraints = false
@@ -41,7 +43,7 @@ final class SettingsViewController: UITableViewController {
 
         let footer = UIView(frame: CGRect(x: 0, y: 0, width: 480, height: 118))
         let note = UILabel()
-        note.text = "Every option maps to a parameter used by the repository's homepage.html. Values marked 'test' are exposed engine flags but not validated on iPhone. Changes apply the next time the game starts."
+        note.text = "Only FPS currently adjusts the native Metal surface. The game engine, shaders and remaining gameplay options are NOT connected: settings here do not make GTA playable. Values are saved for a future verified ARM64 engine."
         note.numberOfLines = 0
         note.textColor = UIColor(white: 0.57, alpha: 1)
         note.font = .systemFont(ofSize: 11)
@@ -126,7 +128,7 @@ final class SettingsViewController: UITableViewController {
 
     @objc private func resetPressed() {
         let alert = UIAlertController(title: "Reset engine configuration?",
-                                      message: "Restore the low-memory values used by the original browser port on constrained hardware.",
+                                      message: "Reset staged game settings and native Metal frame-rate preference.",
                                       preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Reset", style: .destructive) { [weak self] _ in

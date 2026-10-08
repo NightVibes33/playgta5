@@ -95,12 +95,12 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         heroCopy.axis = .vertical
         heroCopy.alignment = .leading
         heroCopy.spacing = 4
-        let eyebrow = label("PLAY ON THIS DEVICE", size: 10, weight: .bold, color: mint)
+        let eyebrow = label("NATIVE PORT • UNDER DEVELOPMENT", size: 10, weight: .bold, color: mint)
         let title = label("GRAND THEFT AUTO V", size: 27, weight: .black, color: .white)
         title.adjustsFontSizeToFitWidth = true
         title.minimumScaleFactor = 0.67
         title.numberOfLines = 1
-        let sub = label("A18 • WebAssembly • WebGPU / Metal", size: 12, weight: .regular, color: muted)
+        let sub = label("A18 • NATIVE METAL • ENGINE NOT LINKED", size: 12, weight: .regular, color: muted)
         sub.adjustsFontSizeToFitWidth = true
         sub.minimumScaleFactor = 0.75
         heroCopy.addArrangedSubview(eyebrow)
@@ -188,7 +188,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             modes.addArrangedSubview(button)
         }
         content.addArrangedSubview(modes)
-        style(playButton, title: "LAUNCH GAME", symbol: "play.fill", filled: true)
+        style(playButton, title: "NATIVE RUNTIME CHECK", symbol: "cpu", filled: true)
         playButton.addTarget(self, action: #selector(launch), for: .touchUpInside)
         playButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
         content.addArrangedSubview(playButton)

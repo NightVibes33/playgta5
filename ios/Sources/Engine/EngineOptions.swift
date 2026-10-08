@@ -125,42 +125,5 @@ enum EngineOptions {
         LogStore.shared.write("boot", "Engine settings reset to supported low-memory defaults")
     }
 
-    static func launchURL(port: UInt16) -> URL? {
-        var components = URLComponents()
-        components.scheme = "http"
-        components.host = "127.0.0.1"
-        components.port = Int(port)
-        components.path = "/"
-        let start = value("mode")
-        var params: [URLQueryItem] = [
-            URLQueryItem(name: "mode", value: start == "story" ? "story" : "sandbox"),
-            URLQueryItem(name: "fps", value: value("fps")),
-            URLQueryItem(name: "scale", value: value("scale")),
-            URLQueryItem(name: "low", value: value("low")),
-            URLQueryItem(name: "cores", value: value("cores")),
-            URLQueryItem(name: "nocache", value: value("nocache")),
-            URLQueryItem(name: "nohints", value: value("nohints")),
-            URLQueryItem(name: "nopack", value: value("nopack")),
-            URLQueryItem(name: "syncpipelines", value: value("syncpipelines")),
-            URLQueryItem(name: "verbose", value: value("verbose")),
-            URLQueryItem(name: "trace", value: value("trace")),
-            URLQueryItem(name: "mem", value: value("mem")),
-            URLQueryItem(name: "log", value: "1")
-        ]
-        if start == "sandbox6" {
-            params.append(URLQueryItem(name: "map", value: "env_test"))
-        }
-        if start == "story", value("newgame") == "1" {
-            params.append(URLQueryItem(name: "newgame", value: "1"))
-        }
-        let switches = [
-            "textureQuality", "shadowQuality", "reflectionQuality",
-            "particleQuality", "grassQuality", "cityDensity", "lodScale",
-            "pedVariety", "vehicleVariety", "pedLodBias", "vehicleLodBias"
-        ]
-        let args = switches.map { "-\($0)=\(value($0))" }.joined(separator: ",")
-        params.append(URLQueryItem(name: "args", value: args))
-        components.queryItems = params
-        return components.url
-    }
+
 }

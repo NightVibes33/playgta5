@@ -1,20 +1,18 @@
 import UIKit
-import WebKit
+import MetalKit
 import AVFoundation
 
-/// Native iOS host for the original WebAssembly game runtime.
-/// Performs a lightweight compatibility check before risking a multi-GB game boot.
-final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate {
-    private var webView: WKWebView!
+/// Native-only device and asset readiness screen. No WebKit engine playback.
+/// Only a linked AOT RAGE executable could advance this to true gameplay.
+final class GameViewController: UIViewController {
+    private var surface: NativeMetalSurface!
+    private let heading = UILabel()
     private let status = UILabel()
+    private let controllerStatus = UILabel()
     private let closeButton = UIButton(type: .system)
-    private let utilityButton = UIButton(type: .system)
-    private let modeControl = UISegmentedControl(items: ["On Foot", "Driving", "Flying"])
-    private var serverPort: UInt16?
-    private var engineStarted = false
-    private var preflightComplete = false
-    private var alertVisible = false
-    private var lastPadForward: TimeInterval = 0
+    private let logsButton = UIButton(type: .system)
+    private var inspectStarted = false
+    private var gamepadSnapshot: [String: Double] = [:]
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .landscapeRight }
@@ -23,115 +21,123 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-        let userContent = WKUserContentController()
-        userContent.add(self, name: "gtaDiagnostics")
-        userContent.addUserScript(WKUserScript(source: RuntimeDiagnostics.bootstrap,
-            injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        let config = WKWebViewConfiguration()
-        config.userContentController = userContent
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = self
-        webView.isOpaque = false
-        webView.backgroundColor = .black
-        webView.scrollView.isScrollEnabled = false
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(webView)
-        NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: view.topAnchor),
-            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
 
-        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
-        closeButton.tintColor = UIColor.white.withAlphaComponent(0.9)
-        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.55)
-        closeButton.layer.cornerRadius = 17
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.addTarget(self, action: #selector(closeGame), for: .touchUpInside)
-        view.addSubview(closeButton)
-        utilityButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
-        utilityButton.tintColor = .white
-        utilityButton.backgroundColor = UIColor.black.withAlphaComponent(0.55)
-        utilityButton.layer.cornerRadius = 17
-        utilityButton.translatesAutoresizingMaskIntoConstraints = false
-        utilityButton.addTarget(self, action: #selector(toggleUtilities), for: .touchUpInside)
-        view.addSubview(utilityButton)
+        surface = NativeMetalSurface(frame: .zero)
+        surface.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(surface)
 
-        modeControl.selectedSegmentIndex = 0
-        modeControl.backgroundColor = UIColor.black.withAlphaComponent(0.82)
-        modeControl.selectedSegmentTintColor = .darkGray
-        modeControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-        modeControl.translatesAutoresizingMaskIntoConstraints = false
-        modeControl.addTarget(self, action: #selector(profileChanged), for: .valueChanged)
-        modeControl.isHidden = true
-        view.addSubview(modeControl)
+        heading.text = "GTA V • NATIVE ARM64"
+        heading.textAlignment = .center
+        heading.textColor = .white
+        heading.font = .systemFont(ofSize: 20, weight: .bold)
+        heading.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(heading)
 
-        status.text = "Starting local asset server…"
-        status.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-        status.textColor = .white
-        status.backgroundColor = UIColor.black.withAlphaComponent(0.72)
-        status.numberOfLines = 3
+        status.text = "Validating native Metal device and external game files…"
+        status.textColor = UIColor(white: 0.86, alpha: 1)
         status.textAlignment = .center
-        status.layer.cornerRadius = 7
-        status.clipsToBounds = true
+        status.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
+        status.numberOfLines = 0
         status.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(status)
 
+        controllerStatus.text = "Bluetooth controller: checking…"
+        controllerStatus.textAlignment = .center
+        controllerStatus.textColor = UIColor(white: 0.65, alpha: 1)
+        controllerStatus.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        controllerStatus.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(controllerStatus)
+
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.tintColor = .white
+        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.45)
+        closeButton.layer.cornerRadius = 18
+        closeButton.addTarget(self, action: #selector(closeGame), for: .touchUpInside)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(closeButton)
+
+        logsButton.setTitle("EXPORT NATIVE LOGS", for: .normal)
+        logsButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
+        logsButton.tintColor = .white
+        logsButton.addTarget(self, action: #selector(exportLogs), for: .touchUpInside)
+        logsButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(logsButton)
+
         NSLayoutConstraint.activate([
-            closeButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 7),
-            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 7),
-            closeButton.heightAnchor.constraint(equalToConstant: 34),
-            closeButton.widthAnchor.constraint(equalToConstant: 34),
-            utilityButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -7),
-            utilityButton.topAnchor.constraint(equalTo: closeButton.topAnchor),
-            utilityButton.heightAnchor.constraint(equalToConstant: 34),
-            utilityButton.widthAnchor.constraint(equalToConstant: 34),
-            modeControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            modeControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 7),
-            modeControl.widthAnchor.constraint(equalToConstant: 290),
-            status.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
+            surface.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            surface.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            surface.topAnchor.constraint(equalTo: view.topAnchor),
+            surface.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            heading.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            heading.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 34),
+            heading.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.9),
             status.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            status.widthAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.widthAnchor, multiplier: 0.92),
-            status.heightAnchor.constraint(greaterThanOrEqualToConstant: 30)
+            status.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            status.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.82),
+            controllerStatus.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            controllerStatus.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            controllerStatus.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.82),
+            closeButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 5),
+            closeButton.widthAnchor.constraint(equalToConstant: 36),
+            closeButton.heightAnchor.constraint(equalToConstant: 36),
+            logsButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -10),
+            logsButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 5),
+            logsButton.heightAnchor.constraint(equalToConstant: 36)
         ])
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
-        AssetHTTPServer.shared.start { [weak self] result in
-            guard let self else { return }
-            switch result {
-            case .success(let port):
-                self.serverPort = port
-                self.startPreflight(port: port)
-            case .failure(let error):
-                self.showFailure("Could not start local HTTP server: " + error.localizedDescription)
-                LogStore.shared.write("boot", "Local HTTP server failure: " + error.localizedDescription)
-            }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+            LogStore.shared.write("native", "Native audio session available; game audio engine NOT linked")
+        } catch {
+            LogStore.shared.write("native", "Native audio setup failed: \(error.localizedDescription)")
         }
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         GameOrientation.request(.landscape, from: view)
+        guard !inspectStarted else { return }
+        inspectStarted = true
+        if !surface.gpuReady {
+            status.text = "Metal device or command queue unavailable. Native rendering cannot start."
+            LogStore.shared.write("native", "Metal hardware check failed")
+            return
+        }
+        LogStore.shared.write("native", "Native device boot: Metal ready. Browser/WKWebView gameplay disabled.")
+        NativeEngineStatus.inspect { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let info):
+                let m = info.memory
+                let mem = "\(m.minimumPages) initial pages • \(m.maximumPages.map(String.init) ?? "unbounded") maximum"
+                LogStore.shared.write("native", "Engine asset present (\(info.byteCount) bytes), \(mem)")
+                if !m.memory64 || !m.shared {
+                    self.status.text = "WASM engine requires an unsupported host contract.\nDetected memory64=\(m.memory64), shared=\(m.shared). Native AOT conversion required."
+                } else if !NativeEngineStatus.nativeEngineLinked {
+                    self.status.text = "USB game.wasm and shader index found.\nMetal GPU ready • Bluetooth controller input ready.\n\nNative ARM64 game engine not linked.\nThis is NOT playable yet; no loading sequence is simulated."
+                } else {
+                    // Add actual engine launch only once a verified AOT backend exists.
+                    self.status.text = "Native engine backend linked; initialization pending."
+                }
+            case .failure(let error):
+                self.status.text = "Native asset verification failed:\n" + error.localizedDescription
+                LogStore.shared.write("native", "Asset validation failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
-        ControllerManager.shared.onState = { [weak self] state in
-            guard let self, self.engineStarted else { return }
-            let now = Date.timeIntervalSinceReferenceDate
-            // Preserve native 60Hz input sampling while bounding expensive WKWebView IPC.
-            guard now - self.lastPadForward >= (1.0 / 30.0) || (state["connected"] ?? 0) == 0 else { return }
-            self.lastPadForward = now
-            guard let bytes = try? JSONSerialization.data(withJSONObject: state),
-                  let json = String(data: bytes, encoding: .utf8) else { return }
-            self.webView.evaluateJavaScript("window.__gtaNativePad && window.__gtaNativePad(\(json))")
+        ControllerManager.shared.onConnection = { [weak self] name in
+            self?.controllerStatus.text = "Controller: \(name)"
+            LogStore.shared.write("native", "GameController connected: \(name)")
         }
-        ControllerManager.shared.onConnection = { name in
-            LogStore.shared.write("controller", "Current controller: " + name)
+        ControllerManager.shared.onState = { [weak self] state in
+            // Preserve full analog values for the future native engine ABI.
+            // The current binary has NO native controller-consumer interface.
+            self?.gamepadSnapshot = state
         }
         ControllerManager.shared.begin()
     }
@@ -141,166 +147,17 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         ControllerManager.shared.stop()
     }
 
-    private func startPreflight(port: UInt16) {
-        guard let url = URL(string: "http://127.0.0.1:\(port)/ios/preflight.html") else {
-            showFailure("Invalid local preflight URL"); return
-        }
-        status.text = "Checking WebAssembly, WebGPU and USB files…"
-        LogStore.shared.write("boot", "Preflight started at " + url.absoluteString)
-        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 24) { [weak self] in
-            guard let self, !self.preflightComplete, !self.alertVisible, self.view.window != nil else { return }
-            self.showFailure("Runtime compatibility check timed out. Check the local server and iPhone WebKit diagnostics.")
-        }
-    }
-
-    private func launchEngine() {
-        guard !engineStarted, let port = serverPort, let url = EngineOptions.launchURL(port: port) else {
-            return
-        }
-        engineStarted = true
-        status.text = "Launching original GTA V engine…"
-        LogStore.shared.write("boot", "Loading game runtime: " + url.absoluteString)
-        webView.load(URLRequest(url: url))
-    }
-
-    private func onPreflight(_ raw: String) {
-        guard !preflightComplete else { return }
-        preflightComplete = true
-        LogStore.shared.write("boot", "iPhone 16 runtime preflight: " + raw)
-        guard let data = raw.data(using: .utf8),
-              let result = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-            showFailure("Runtime preflight result could not be decoded"); return
-        }
-        if result["ok"] as? Bool == true {
-            // WebKit accepts a tiny memory64 allocation, but the real engine
-            // still requires 3GiB initially. This is not proof of enough RAM.
-            LogStore.shared.write("boot", "memory64 probe passed: 1 page, max 65536 pages; engine requires 49152 initial pages (3GiB)")
-            launchEngine()
-        } else {
-            let failed = (result["failures"] as? [String] ?? ["unknown compatibility issue"])
-            if failed.contains("memory64Cap") {
-                let cause = result["memory64Error"] as? String ?? "WebKit rejected the memory64 probe"
-                showFailure("This iOS WebKit build cannot create the game's shared WebAssembly memory64 configuration (4GiB maximum). " + cause + ". The engine originally requests a 3GiB initial heap and cannot safely launch without memory64 support.")
-            } else {
-                showFailure("Runtime requirements failed: " + failed.joined(separator: ", "))
-            }
-        }
-    }
-
-    private func showFailure(_ message: String) {
-        LogStore.shared.write("crashes", message)
-        status.isHidden = false
-        status.text = message
-        guard !alertVisible, isViewLoaded, view.window != nil else { return }
-        alertVisible = true
-        let alert = UIAlertController(title: "GTA V startup check", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Export diagnostics", style: .default) { [weak self] _ in
-            self?.alertVisible = false
-            self?.exportLogs()
-        })
-        alert.addAction(UIAlertAction(title: "Attempt engine anyway", style: .default) { [weak self] _ in
-            self?.alertVisible = false
-            self?.preflightComplete = true
-            self?.launchEngine()
-        })
-        alert.addAction(UIAlertAction(title: "Back", style: .cancel) { [weak self] _ in
-            self?.alertVisible = false
-            self?.closeGame()
-        })
-        present(alert, animated: true)
-    }
-
-    @objc private func toggleUtilities() {
-        let sheet = UIAlertController(title: "Game tools", message: "Keep overlays hidden during the original GTA V loading sequence.", preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: modeControl.isHidden ? "Show controller mode" : "Hide controller mode", style: .default) { [weak self] _ in
-            self?.modeControl.isHidden.toggle()
-        })
-        sheet.addAction(UIAlertAction(title: "Export diagnostics", style: .default) { [weak self] _ in self?.exportLogs() })
-        sheet.addAction(UIAlertAction(title: "Close game", style: .destructive) { [weak self] _ in self?.closeGame() })
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        sheet.popoverPresentationController?.sourceView = utilityButton
-        sheet.popoverPresentationController?.sourceRect = utilityButton.bounds
-        present(sheet, animated: true)
-    }
-
-    private func exportLogs() {
-        let url = LogStore.shared.exportURL()
-        let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        if let pop = activity.popoverPresentationController {
-            pop.sourceView = utilityButton
-            pop.sourceRect = utilityButton.bounds
-        }
-        present(activity, animated: true)
-    }
-
-    @objc private func profileChanged() {
-        let profile = ["foot", "drive", "air"][modeControl.selectedSegmentIndex]
-        webView.evaluateJavaScript("window.__gtaNativePadProfile && window.__gtaNativePadProfile('\(profile)')")
-        LogStore.shared.write("controller", "Input profile: " + profile)
-    }
-
     @objc private func closeGame() {
         navigationController?.popViewController(animated: true)
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        guard webView.url?.path != "/ios/preflight.html" else {
-            RuntimeDiagnostics.probe(webView)
-            return
+    @objc private func exportLogs() {
+        let report = LogStore.shared.exportURL()
+        let sheet = UIActivityViewController(activityItems: [report], applicationActivities: nil)
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = logsButton
+            pop.sourceRect = logsButton.bounds
         }
-        status.text = "WebAssembly loader started; waiting for engine events…"
-        RuntimeDiagnostics.probe(webView)
-        let saved = UserDefaults.standard
-        let sensitivity = saved.object(forKey: ControllerManager.sensitivityKey) == nil
-            ? 1.0 : saved.double(forKey: ControllerManager.sensitivityKey)
-        webView.evaluateJavaScript("window.__gtaNativePadSensitivity && window.__gtaNativePadSensitivity(\(sensitivity))")
-        let mappings = saved.dictionary(forKey: ControllerSettingsViewController.bindingKey) as? [String: String]
-            ?? ControllerSettingsViewController.defaults
-        if let data = try? JSONSerialization.data(withJSONObject: mappings),
-           let json = String(data: data, encoding: .utf8) {
-            webView.evaluateJavaScript("window.__gtaNativePadMappings && window.__gtaNativePadMappings(\(json))")
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        showFailure("WebKit navigation failed: " + error.localizedDescription)
-    }
-
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        showFailure("Web content process terminated. The engine may have exceeded the iPhone memory limit.")
-    }
-
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let details = message.body as? [String: Any] else { return }
-        let kind = details["type"] as? String ?? "engine"
-        let text = details["detail"] as? String ?? ""
-        switch kind {
-        case "preflight":
-            onPreflight(text)
-        case "preflightStage":
-            LogStore.shared.write("boot", text)
-            status.text = text
-        case "controllerProfile":
-            if let index = ["foot", "drive", "air"].firstIndex(of: text) {
-                modeControl.selectedSegmentIndex = index
-            }
-            LogStore.shared.write("controller", text)
-        case "gpu", "shaders":
-            LogStore.shared.write(kind, text)
-            if kind == "gpu" { status.text = text }
-        case "error", "promise":
-            LogStore.shared.write("engine", text)
-            status.text = text
-        case "engine":
-            LogStore.shared.write("engine", text)
-            if text.contains("first world frame") { status.isHidden = true }
-        default:
-            LogStore.shared.write(["boot", "warn"].contains(kind) ? "boot" : "engine", text)
-        }
-    }
-
-    deinit {
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "gtaDiagnostics")
+        present(sheet, animated: true)
     }
 }

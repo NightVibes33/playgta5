@@ -13,24 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Verify controller bridge state transitions
-        run: node --test ios/Tests/controller-bridge.test.cjs
-      - name: Verify engine settings match the repository runtime
-        run: python3 ios/Scripts/verify_engine_options.py
-      - name: Verify iPhone preflight and orientation
-        run: python3 ios/Scripts/verify_runtime_preflight.py
-      - name: Prepare first-party runtime files
-        run: bash ios/Scripts/prepare_runtime.sh
-      - name: Verify iOS WebKit memory64 compatibility
-        run: |
-          grep -Fq 'maximum:262144n,shared:true,address:"i64"' game.js
-          grep -Fq 'maximum:65536n,shared:true,address:"i64"' ios/WebRuntime/game.js
-          if grep -Fq 'maximum:262144n,shared:true,address:"i64"' ios/WebRuntime/game.js; then
-            echo 'Unpatched 16GiB maximum in iOS bundle' >&2
-            exit 1
-          fi
-          node --check ios/WebRuntime/game.js
-          echo 'iOS memory64 maximum 65536 pages; original game.js unchanged'
+      - name: Verify native Metal and USB architecture
+        run: python3 ios/Scripts/verify_native_runtime.py
       - name: Generate Xcode project
         run: xcodegen generate --spec ios/project.yml --project ios
       - name: Compile iPhone arm64 app without signing
@@ -68,7 +52,7 @@ jobs:
         run: brew install xcodegen
       - name: Prepare runtime and project
         run: |
-          bash ios/Scripts/prepare_runtime.sh
+          python3 ios/Scripts/verify_native_runtime.py
           xcodegen generate --spec ios/project.yml --project ios
       - name: Find available iPhone simulator
         id: simulator

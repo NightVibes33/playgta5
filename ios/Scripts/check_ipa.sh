@@ -19,21 +19,14 @@ fi
 echo 'Modern full-screen iPhone launch manifest: PASS'
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" | while read -r exe; do test -x "$app/$exe"; done
-test -f "$app/WebRuntime/index.html"
 test -f "$app/LaunchScreen.storyboardc/Info.plist"
-test -f "$app/WebRuntime/game.js"
-# The signed/unsigned IPA must contain the iOS-only memory64 compatibility
-# settings, not the original 16 GiB maximum that crashes WebKit beta 4.
-if grep -Fq 'maximum:262144n,shared:true,address:"i64"' "$app/WebRuntime/game.js"; then
-  echo "ERROR: unpatched 16 GiB memory64 maximum in packaged iOS runtime" >&2
+if [ -e "$app/WebRuntime/index.html" ] || [ -e "$app/WebRuntime/game.js" ]; then
+  echo 'ERROR: browser runtime must not be packaged as native gameplay' >&2
   exit 1
 fi
-grep -Fq 'maximum:65536n,shared:true,address:"i64"' "$app/WebRuntime/game.js"
-echo 'Memory64 max 4 GiB, original initial 3 GiB: PASS'
-test -f "$app/WebRuntime/controller-bridge.js"
-test -f "$app/WebRuntime/data-manifest.json"
+echo 'Native runtime package: no WebKit gameplay or browser assets'
 if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then
   echo "ERROR: proprietary game data must not be bundled in the IPA" >&2
   exit 1
 fi
-echo "IPA payload and lightweight web runtime verified; external game data not included."
+echo "IPA payload and native Metal app verified; proprietary engine not linked or bundled."

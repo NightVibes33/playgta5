@@ -1,295 +1,84 @@
-# GTAiOS — USB-first native host
+# GTAiOS — native ARM64 bring-up (iPhone 16 / iOS 27 beta 4)
 
-This branch adds a separate, unsigned iPhone host without replacing the original browser runtime.
+**Status: NATIVE FOUNDATION ONLY. GTA V IS NOT YET PLAYABLE.**
 
-## Build
+This branch now builds a native Metal/UIKit application rather than packaging a
+WKWebView browser runtime. It verifies game files on a user-selected USB-C
+drive, introspects real WASM memory imports and captures full GameController
+hardware state, without pretending that these operations execute RAGE.
 
-Run the GitHub Actions workflow `Build GTAiOS Unsigned IPA` on `ios-usb-port`. The workflow generates a project with XcodeGen, compiles for a physical iPhone (arm64), packages `Payload/GTAiOS.app`, and uploads the unsigned IPA. The IPA must be signed by SideStore or a compatible signing service before installation.
+## What has been implemented
 
-Local Mac:
-```sh
-bash ios/Scripts/prepare_runtime.sh
+- UIKit iPhone launcher and native Metal-backed landscape diagnostic view.
+- Apple A18 GPU detection, a real Metal command queue and drawable submission.
+  The surface intentionally clears to black; it does *not* render fake GTA.
+- Security-scoped folder picker, bookmark restore and read-only USB-C asset
+  handling. The engine and game assets stay on the user-selected drive.
+- USB byte-range access with NSFileCoordinator and a 4 MiB per-read bound.
+- Native WebAssembly binary-header and import-section inspection of
+  \`b/8b0b5899ed/game.wasm\` (only tiny sections are inspected). It reports the
+  engine's actual minimum/maximum imported memory, shared-memory flag and
+  memory64 requirements.
+- Native GameController polling at 60 Hz, analog stick/triggers/buttons,
+  connect/disconnect, remapping settings and supported controller haptic test.
+  Gameplay-controller ABI wiring is not present yet.
+- Native AVAudioSession setup (no game sound synthesis yet), exported diagnostic
+  logs, physical-device unsigned IPA pipeline and simulator smoke screenshot.
+- CI rejects the WebRuntime/browser resource bundle and verifies the native
+  runtime source contracts.
+
+**There is no ARM64 GTA game engine linked.** \`NativeEngineStatus.nativeEngineLinked\`
+is intentionally false, and the screen displays that fact. Passing the iOS
+ARM64 compile is not evidence that GTA executes.
+
+## What is needed to finish the actual native port
+
+1. **Engine binary & rights:** Supply the authorized
+   \`mirror/playgta5.com/b/8b0b5899ed/game.wasm\` to a controlled macOS build.
+   The GitHub repo deliberately does not contain this binary. The recorded
+   snapshot describes a 63,201,802-byte Emscripten memory64/pthread module
+   with 86 imported functions, a large code section, and a 3 GiB initial
+   shared memory requirement. Preserve the upstream binary unchanged.
+2. **AOT feasibility:** Validate this exact module against a specific compiler
+   that supports shared memory, pthread imports and memory64. Produce/link
+   real ARM64 object code and reproduce thread/TLS/init semantics, or document
+   a specific feature incompatibility. Do not claim wasm2c/LLVM portability
+   merely because an SDK can open a .wasm header.
+3. **Native host ABI:** Implement all imported WASI/Emscripten platform calls,
+   engine-specific USB paging, graphics command submission, audio, pthread
+   lifecycle, clock and save handling. An import-by-import harness must
+   distinguish implemented from unsupported functions.
+4. **Metal graphics:** Adapt WebGPU/D3D-facing command and resource semantics to
+   Metal; translate the actual shader blobs, implement pipelines/textures/
+   depth/render passes, and verify correct in-world frames. A Metal clear pass
+   alone does not make a native renderer.
+5. **Controller mapping:** Bind GameController analog/buttons to the actual
+   engine's native gamepad ABI. Driving analog pedals/steering, gameplay
+   menus, touch controls and haptic events need functional engine testing.
+6. **Original loading and gameplay:** Launch RAGE, load original assets and
+   shader data directly from USB, present only actual engine loading progress
+   and genuine frames, and confirm audio, saves, stable gameplay on the actual
+   iPhone 16. No mocked "game started" screen.
+7. **JIT policy:** AOT is preferred and requires no executable-page allocation.
+   Use Madeira's JIT allocations only if a chosen translation runtime genuinely
+   needs dynamic code and the user's iOS signing/debugger environment permits
+   it. Wine/FEX translates x86 instructions and does not execute WASM modules.
+
+## How to build
+
+Run **Build GTAiOS Unsigned IPA** on branch \`ios-usb-port\`, or on macOS:
+
+\`\`\`sh
+python3 ios/Scripts/verify_native_runtime.py
+brew install xcodegen
 xcodegen generate --spec ios/project.yml --project ios
-xcodebuild -project ios/GTAiOS.xcodeproj -scheme GTAiOS -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
-```
-
-## USB layout
-
-Select the directory containing `data/` (usually `mirror/playgta5.com`) through Files. The external storage layout expected by the original web runtime is:
-
-```
-playgta5.com/
-├── data/                          # game content, large RPF archives
-└── b/8b0b5899ed/
-    ├── game.wasm                 # missing from this public repository
-    ├── shaders/index.json
-    ├── shaders/pack*.bin
-    ├── title/                    # original artwork and loading assets
-    └── ...
-```
-
-Web-facing JavaScript bootstrap files come from the repository and are copied into the small IPA. Game assets stay on the USB drive. A local Network.framework HTTP endpoint on 127.0.0.1 implements GET/HEAD file serving, byte ranges, and `/data/batch`.
-
-## Diagnostic limitations
-
-This is a **compile-target integration build**, not a verified playable GTA V port. The browser snapshot's gameplay was not verified in the repository. iOS WebKit compatibility must be measured on a real device:
-
-* `crossOriginIsolated`, SharedArrayBuffer, worker and OffscreenCanvas support
-* WebGPU/Metal adapter features and shader pipeline creation
-* WebAssembly memory footprint, threading and optional JIT availability
-* Range and batch reads from security-scoped USB folders
-* First actual gameplay frame (not merely the title/loading animation)
-
-ControllerManager reads native analog inputs from Apple's GameController framework at 30 Hz. The injected JavaScript currently **falls back to keyboard/mouse events** because the public engine input block does not expose a proven analog-controller ABI. Full native GTA V analog gameplay, haptics and complete touch controls are not yet implemented and must not be presented as passing tests.
-
-For USB-constrained devices we start with low-memory settings and disable the web runtime's bulk browser data cache. Saves remain under the web origin's IndexedDB. Game assets and proprietary code must be supplied by someone with appropriate rights; this project does not fetch or redistribute them.
-
-## Failure triage
-
-The app exports `GTAiOS-diagnostics.txt` with boot, engine, renderer, shader, JIT probe, USB, controller and crash information. An IPA build passing CI proves native compilation and packaging only, not game execution.
-
-## Exact portable mirror structure (README.md and Launch-Local.cmd)
-
-The original Windows launcher runs `runtime\\python.exe serve_local.py --open`.
-The Python server serves the `mirror/playgta5.com` tree at `http://localhost:8000/`,
-including `data/`, `b/`, `index.html`, `favicon.ico` and `robots.txt`.
-
-The iOS launcher cannot execute a Windows `.cmd` or Windows Python binary.
-Instead, the Swift app starts an equivalent **127.0.0.1 local server** automatically.
-WebKit loads a copy of the repository's audited `homepage.html` at the local
-origin, while the source-level workers, shaders, `game.wasm`, loading-art assets
-and the large GTA file tree are read from the selected external directory.
-
-The iOS folder picker accepts any of:
-
-- `mirror/`
-- `mirror/playgta5.com/`
-- a parent directory containing `mirror/playgta5.com/`
-
-The startup validator checks `data/`, `b/8b0b5899ed/game.wasm`,
-`b/8b0b5899ed/shaders/index.json`, `b/8b0b5899ed/title/`, and
-`b/8b0b5899ed/audio-worklet.js`. It reports missing paths and permits a
-diagnostic boot; it does not block on scanning or duplicating 20 GB of content.
-
-The original repository's `data-manifest.json` is now bundled into the small
-IPA and exposed to the engine as `/data/manifest.json` if the USB directory
-has no corresponding manifest. `shader-index.json` has the same fallback
-behavior. The manifest is an inventory, not a replacement for game bytes.
-
-## Controller changes
-
-The native reader samples extended Bluetooth/wired gamepads at 60 Hz,
-including analog sticks, triggers, L3/R3, Menu and available Options, with
-deadzone and vertical-axis inversion. A native controller setup/test screen
-shows the live state, supports button remapping, and can request haptics on
-devices that advertise controller vibration support. The launcher supports
-D-pad/stick focus and A-button activation.
-
-The gameplay bridge now writes right-stick deltas and aiming/firing buttons to
-the existing WASM mouse input buffer. It also supports on-foot, vehicle and
-aircraft digital-key profiles and remapped buttons. It cannot provide true
-analog steering/throttle or guarantee full in-game controller-only navigation
-without the compiled game engine exposing a native gamepad ABI; that limitation
-remains and must be tested on device. No engine-side XInput interface was
-available in the repository to compile or patch.
-
-
-## Launcher and real engine settings refresh
-
-The fullscreen native dashboard no longer displays the default UINavigationBar above a second giant title. It provides Story Mode, GTA V Sandbox and env_test Sandbox selections, plus a USB data health panel, Game Files, Settings, Controller, and diagnostics. Original GTA loading art is read from the selected external mirror where present. A LaunchScreen.storyboard opts into native full-screen sizing on modern iPhones.
-
-Settings are **only the actual switches present in this repository's homepage.html**: start mode/new game, frame limiter, render scale, low-memory worker behavior, shader packs/synchronous pipeline mode, game data prefetch/cache and trace/verbose/memory diagnostics, and engine quality flags -textureQuality, -shadowQuality, -reflectionQuality, -particleQuality, -grassQuality, -cityDensity, -lodScale, -pedVariety, -vehicleVariety, -pedLodBias and -vehicleLodBias. Higher numeric quality values are explicitly marked experimental, not claimed to be benchmarked, and shader configuration does not imply a native Metal renderer.
-
-EngineOptions.builds the actual runtime URL before each launch; changing settings never requires spoofed on-screen controls. The 60 FPS setting correctly uses ?fps=60 (which homepage.html translates to -frameLimit=1), not ?fps=0 (uncapped). The settings verification script asserts all parameter names exist in the repository's engine entrypoint and CI runs it before the device build.
-
-
-## iPhone 16 runtime hardening
-
-- The source-controlled homepage now receives a real viewport meta tag in \`prepare_runtime.sh\`; its original 1280×720 GTA loading artwork remains unchanged and scales to the iPhone's display.
-- The native launcher requests portrait orientation; gameplay requests landscape through \`UIWindowScene.requestGeometryUpdate\` and a navigation controller that forwards supported orientations.
-- Before starting the approximately 63MB \`game.wasm\`, WebKit loads a tiny \`/ios/preflight.html\` page from the same local server. It checks cross-origin isolation, SharedArrayBuffer/Atomics, OffscreenCanvas, WebAssembly compilation, GPU adapter/device access, and lightweight HEAD/range requests for the engine, shader index, game manifest, title artwork and audio worklet.
-- Failures show a detailed message with **Export diagnostics**, **Attempt engine anyway** and **Back**; the app does not silently load an incompatible game. Preflight logs report detected WebKit capabilities, no ungrounded JIT entitlement claims.
-- Runtime tool controls (input profile and debug export) are hidden behind the small ellipsis control during the original loading screen. The diagnostics banner disappears when the game publishes its world-ready message.
-- Hardware controllers still use Apple's GameController API; the input bridge is *not* a native GTA V gamepad ABI and analog gameplay remains unverified. No game files are downloaded or bundled. This commit cannot itself prove GPU compatibility or the game reaching a playable frame on a real iPhone 16.
-
-CI runs \`ios/Scripts/verify_runtime_preflight.py\` and compiles the iPhone ARM64 IPA without signing. A green run is only proof that the native app compiles and the IPA packages.
-
-
-## iPhone 16 display and USB picker bugfix
-
-The original launcher was observed letterboxed in screenshots, with UIKit button text wrapped vertically. The app now uses a real `UIWindowScene`-owned `UIWindow(windowScene:)` on iPhone rather than creating a window from `UIScreen.main.bounds`, and declares the scene in Info.plist. This is the correct modern iOS window lifecycle; actual full-screen appearance must still be confirmed on an iPhone 16.
-
-The Files/Settings/Controller row now stacks icons above one-line captions. Launch is no longer an inert disabled button when there is no USB folder: pressing it opens Files for selection. The USB status panel is tappable as well.
-
-**External drive selection:** Navigate inside your external drive in the Files picker to `mirror/playgta5.com`. Tap **Open** to select that actual folder (tapping the drive name just opens the drive). The picker also accepts a parent folder or the disk root if iOS grants access to that directory. Root detection checks both `data/` and `b/` and searches up to three folder levels without scanning the 20 GB contents. Rejected selections produce a visible error and `usb-storage.txt` entries with the selected path and reason.
-
-Only a physically installed iPhone build can establish whether the Files provider allows an external folder bookmark to be restored across launches. This update does not claim the GTA runtime itself is playable.
-
-## Root cause of iPhone 16 letterboxing (verified from actual built IPA)
-
-The prior XcodeGen `info.path` generated a new minimal Info.plist and overwrote
-the repository's custom `Config/Info.plist`. Inspection of the *built IPA*
-showed **no** `UILaunchStoryboardName`, **no** `UIApplicationSceneManifest`, and
-a target family of `[1,2]` (iPhone + iPad), despite the source code claiming
-an iPhone-only full-screen UI.
-
-The fixed project deliberately disables generated Info.plists and sets
-`INFOPLIST_FILE: "$(SRCROOT)/Config/Info.plist"` directly in the target.
-`ios/Scripts/check_ipa.sh` now rejects packaging whenever the built app
-lacks the modern launch screen, UIWindowSceneDelegate declaration,
-UIRequiresFullScreen, or an iPhone-only UIDeviceFamily. Native simulator
-screenshots still require review, and a SideStore installation on the
-physical iPhone 16 is the final test.
-
-## External USB folder picker rescue (iPhone 16 / iOS 27)
-
-If Open in the Files directory picker stays stuck, the app cannot assume a directory access grant was returned. The launcher now offers two explicit choices:
-
-1. **Select playgta5.com folder:** Apple's documented folder picker. Navigate to mirror/playgta5.com and tap Open. The app validates both the folder and actual game.wasm access before saving its bookmark.
-2. **Select index.html instead (USB fallback):** The ordinary HTML file picker. Navigate to mirror/playgta5.com, choose index.html and tap Open. A file selection does not necessarily grant access to sibling files. The app independently coordinates a game.wasm read and checks the data directory. Only a successful verification is accepted.
-
-A file provider may decline folder permission or restrict selected-file scope. There is no supported app-side bypass for such a restriction. When a picker delegate returns, its URL and the outcome are recorded in usb-storage.txt; if the provider never invokes the delegate, the app can only log picker presentation or cancellation.
-
-All assets remain on the external drive; nothing is copied into the IPA. CI tests both selection modes and the file-coordinator validation. A real iPhone and USB drive are still required to test provider access.
-
-
-## iPhone 16 USB picker freeze / no-response fix
-
-Both Files folder selection and index.html fallback previously invoked synchronous FileManager, security-scoped bookmark and NSFileCoordinator operations inside UIKit's document picker callback. On an external USB drive these operations can block the main thread indefinitely (Apple's Foundation guidance explicitly warns about this). Worse, loading a saved bookmark in USBStorageManager.init and fetching a logo from USB during view refresh could stall the app even before a selection.
-
-The corrected implementation:
-- returns immediately from documentPicker(didPickDocumentsAt:) and queues validation on gtaios.usb.files;
-- performs bookmark restore and read coordination off the main thread, using an NSLock-protected root/status snapshot and a notification for the launcher;
-- avoids recursively listing thousands of data/ entries and reading USB artwork while laying out buttons;
-- immediately displays 'Verifying drive permissions…', then provides specific success/permission/asset errors;
-- reports an 18-second verification timeout to the UI with exportable log markers FILES CALLBACK RECEIVED, USB_VALIDATION_BEGIN, USB_VALIDATION_OK, USB_VALIDATION_FAILED, USB_VALIDATION_TIMEOUT.
-
-If the system picker itself does not deliver a URL (does not invoke didPickDocumentsAt), the app cannot fabricate permission. In that case usb-storage logs show Files picker presented without a callback; changing the USB file provider or system-side folder selection will be necessary. A physical iPhone/USB test is still required.
-
-
-## Build 6: isolate the Files handoff (iOS 27)
-
-A directory created under On My iPhone also fails to be selected, which
-rules out validating the 20GB mirror as the first failing step.
-
-The app now presents Apple's folder-only document picker directly from FILES;
-it no longer routes through an UIAlertController action sheet and a nested
-dismiss/present chain. No UIAdaptivePresentationControllerDelegate is attached
-to the picker. Normal documentPicker cancellation and selection callbacks remain.
-
-A separate TEST FILE / INDEX.HTML button invokes a plain `UTType.item`
-UIDocumentPickerViewController that can return *any* small file. On receiving a
-regular file it displays and logs PICKER_DIAGNOSTIC_SUCCEEDED without touching
-the USB drive or expecting GTA assets. Choosing index.html instead attempts the
-existing access-verified USB fallback. Logs distinguish PICKER_PRESENT_REQUEST,
-PICKER_PRESENTED, FILES CALLBACK RECEIVED, LEGACY_FILES_CALLBACK,
-PICKER_DIAGNOSTIC_SUCCEEDED, and PICKER_GONE_WITHOUT_CALLBACK.
-
-For diagnosis: install build 6, then tap TEST FILE / INDEX.HTML and select
-a small .txt in On My iPhone. If the app reports "iOS file selection works",
-the system picker delegate is operating and folder permission is the failing
-step. If tapping Open never returns a URL even for a .txt, capture the screen
-state and export usb-storage.txt; no app can read an ungranted path.
-
-The iOS simulator cannot prove external USB-C access, and no CI result can
-substitute for the delegate callback on the user's actual iOS 27 installation.
-
-
-## Build 7 — iPhone 16 on iOS 27 developer beta 4
-
-The observed Files selection issue occurs on an actual iPhone 16 running
-iOS 27 developer beta 4. This is the required on-device test target; the
-GitHub macOS runner's iPhone Simulator does not reproduce the exact OS,
-USB provider, or signing environment.
-
-The FILES picker uses `.folder`, and the intended interaction is to enter
-`mirror/playgta5.com` and then tap the system's **Open** button to grant
-the current directory, not to tap a child file.
-
-The TEST .TXT picker now specifically accepts `.plainText` **with
-`asCopy: true`**, instead of the overly broad `.item`. GTAiOS creates a
-small `Documents/GTAiOS-Picker-Test.txt` fixture on launch. With File Sharing
-and in-place documents enabled, it should appear in the Files app under
-On My iPhone → GTA V iOS. Selecting that .txt tests a standard document
-copy/import without any USB access or game verification.
-
-INDEX.HTML is a separate .html `asCopy: false` picker used to attempt the
-existing read-only USB fallback. The result is only accepted if sibling assets
-can actually be opened under the returned iOS file grant.
-
-Important: iOS 27 beta 4 is not yet proven to contain an OS-level
-UIDocumentPicker bug. A different iOS build, file-provider app, device,
-or simulator may behave differently. Do not claim USB support without a
-successful `didPickDocumentsAt` callback and on-device archive validation.
-
-
-## Build 8: LiveContainer Fix File Picker compatibility (iPhone 16/iOS 27 beta 4)
-
-Root-cause comparison: upstream LiveContainer's guest-app "Fix File Picker"
-option is implemented in TweakLoader/DocumentPicker.m, NOT by swapping normal
-UIKit delegates. Its `hook_initForOpeningContentTypes:asCopy:` replaces
-narrow UTTypes with `@[UTTypeItem, UTTypeFolder]`; with Fix File Picker on,
-it also forces `asCopy:YES` and enables multiple selection for an original
-folder-only picker. Other hooks change security-scope reporting. A distinct
-"Fix File Picker (New)" setting additionally changes the private Files host
-identifier. These hooks apply to guest apps hosted by LiveContainer, not to
-ordinary independently signed SideStore apps.
-
-BUILD 8 adopts the *public API portions* of the working fix: use
-`UIDocumentPickerViewController(forOpeningContentTypes: [.item, .folder], asCopy: false)`
-for the external drive; enable `allowsMultipleSelection=true` for folder
-selection; keep a regular imported .txt fixture with broad accepted types
-and `asCopy:true` for a small-file diagnostic. The HTML picker also accepts
-broad types but still verifies that the selected file is index.html.
-
-**Important difference**: External game folders remain `asCopy:false`.
-Forcing folder copy could duplicate ~21 GB of game data onto internal storage,
-defeating USB streaming. The app doesn't copy game data, touch LiveContainer
-private hooks, or claim to bypass iOS file-provider permissions. If a real
-iOS 27 beta 4 picker still requires the original LiveContainer swizzles to
-select the folder, a standalone publicly supported picker cannot guarantee
-equivalent behavior; log PICKER_PRESENT_REQUEST and callback results and
-compare the explicit selection UI.
-
-Upstream source: https://github.com/LiveContainer/LiveContainer/blob/main/TweakLoader/DocumentPicker.m
-
-
-## Build 9: iOS 27 beta 4 WebAssembly.Memory 16 GiB maximum RangeError
-
-Confirmed in the checked-in upstream `game.js`:
-`INITIAL_MEMORY=3221225472`, `maximum:262144n`, `shared:true`, `address:"i64"`.
-At 65536 bytes/page, the engine requests a 3 GiB initial heap (49152 pages)
-and declares a 16 GiB maximum (262144 pages). An iPhone 16 running
-iOS 27 developer beta 4 reports:
-`RangeError: WebAssembly.Memory 'maximum' page count is too large`
-at engine launch. This is a maximum-declaration validation failure, **not
-proof that actual free device RAM has been exhausted**.
-
-WebKit's memory64 implementation had a historical 4 GiB buffer/page limit;
-WebKit upstream worked on lifting memory64 limits in August 2026. There is
-no proof that these WebKit changes shipped in the user's installed beta 4.
-
-iOS packaging now patches only the copied `ios/WebRuntime/game.js` max from
-262144n (16 GiB) to 65536n (4 GiB). The original root `game.js` remains
-untouched. The 3 GiB initial allocation, shared memory, and 64-bit address
-mode are left **unchanged**; lowering the initial size without inspecting
-the binary WASM memory import could break module linkage. WebAssembly module
-import validation permits a smaller imported memory maximum than a
-module-declared maximum, but the provided initial size must meet its minimum.
-
-The preflight now probes shared memory64 with **one 64 KiB page** and a
-maximum of 65536 pages before initiating the game, recording failures with
-an actionable error. It does **not** attempt a second 3 GiB allocation.
-The engine itself still requires 3 GiB initially and could next fail due to
-memory pressure, unsupported WASM features, worker allocation, or a WASM
-import requirement. If so, export game logs and the exact new error; passing
-preflight is not proof of playable GTA V.
-
-CI and the IPA packaging check reject a stale 16 GiB maximum in the
-bundled iOS runtime and verify game.js parses. Simulator builds do not
-replicate the real iPhone's memory available to WebKit.
-
-References:
-- https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/wasm/WasmLimits.h
-- https://bugs.webkit.org/show_bug.cgi?id=282532
-- https://results.webkit.org/commit?id=318784%40main&repository_id=webkit
+xcodebuild -project ios/GTAiOS.xcodeproj -scheme GTAiOS \
+  -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+  CODE_SIGNING_ALLOWED=NO build
+\`\`\`
+
+Only after a real engine implementation reaches a controllable world frame can
+the deliverable be described as playable GTA V. Until then, this build is a
+native device/storage/graphics-readiness harness. This is deliberate: no
+WebKit loading-screen illusion, no remote streaming, no duplicated game
+archives, no unsupported claims of completed conversion.
