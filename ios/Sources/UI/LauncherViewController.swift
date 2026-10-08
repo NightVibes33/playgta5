@@ -17,12 +17,13 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let controllerButton = UIButton(type: .system)
     private let logsButton = UIButton(type: .system)
     private let filePickerTestButton = UIButton(type: .system)
+    private let indexFileButton = UIButton(type: .system)
     private let modeButtons = [UIButton(type: .system), UIButton(type: .system), UIButton(type: .system)]
     private var focusIndex = 0
     private var heldUp = false
     private var heldDown = false
     private var heldA = false
-    private enum PickerIntent { case folder, diagnosticFile }
+    private enum PickerIntent { case folder, diagnosticText, indexFile }
     private var pickerIntent: PickerIntent = .folder
     private var activePicker: UIDocumentPickerViewController?
     private var lastPickerAction = "None"
@@ -210,10 +211,24 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         // A minimal picker-only diagnostic: no 20GB scan, no bookmark, no disk
         // permissions beyond the chosen file. Distinguishes Files UI handoff
         // failures from issues opening the actual GTA game folder.
-        style(filePickerTestButton, title: "TEST FILE / INDEX.HTML", symbol: "doc.text.magnifyingglass", filled: false)
-        filePickerTestButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 49).isActive = true
+        let pickerTip = label("FOLDER PICKER: OPEN playgta5.com, THEN TAP OPEN AT THE TOP", size: 10, weight: .medium, color: mint)
+        pickerTip.numberOfLines = 2
+        pickerTip.lineBreakMode = .byWordWrapping
+        pickerTip.accessibilityLabel = "For USB game files, enter the playgta5.com folder and tap the Open button in Files"
+        content.addArrangedSubview(pickerTip)
+
+        let probeRow = UIStackView()
+        probeRow.axis = .horizontal
+        probeRow.distribution = .fillEqually
+        probeRow.spacing = 8
+        style(filePickerTestButton, title: "TEST .TXT", symbol: "doc.text", filled: false)
+        style(indexFileButton, title: "INDEX.HTML", symbol: "doc.text.magnifyingglass", filled: false)
         filePickerTestButton.addTarget(self, action: #selector(testFilesPicker), for: .touchUpInside)
-        content.addArrangedSubview(filePickerTestButton)
+        indexFileButton.addTarget(self, action: #selector(chooseIndexFile), for: .touchUpInside)
+        probeRow.addArrangedSubview(filePickerTestButton)
+        probeRow.addArrangedSubview(indexFileButton)
+        content.addArrangedSubview(probeRow)
+        prepareDiagnosticTextFile()
 
         let bottom = UIStackView()
         bottom.axis = .horizontal; bottom.spacing = 8; bottom.alignment = .center
@@ -362,7 +377,23 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     // it could race with Files' own presentation and delegate lifecycle.
     @objc private func chooseFolder() { openPicker(.folder) }
 
-    @objc private func testFilesPicker() { openPicker(.diagnosticFile) }
+    @objc private func testFilesPicker() { openPicker(.diagnosticText) }
+
+    @objc private func chooseIndexFile() { openPicker(.indexFile) }
+
+    private func prepareDiagnosticTextFile() {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let file = documents.appendingPathComponent("GTAiOS-Picker-Test.txt")
+        if !FileManager.default.fileExists(atPath: file.path) {
+            let content = "GTAiOS document picker test. Selecting this file verifies Files -> GTAiOS access.\n"
+            do {
+                try content.write(to: file, atomically: true, encoding: .utf8)
+                LogStore.shared.write("usb-storage", "Created local text picker fixture: GTAiOS-Picker-Test.txt")
+            } catch {
+                LogStore.shared.write("usb-storage", "Failed to create local picker fixture: \(error.localizedDescription)")
+            }
+        }
+    }
 
     private func openPicker(_ mode: PickerIntent) {
         guard presentedViewController == nil else {
@@ -372,18 +403,24 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         }
         pickerIntent = mode
         pickerCallbackReceived = false
-        if mode == .diagnosticFile {
+        if mode == .diagnosticText {
             LogStore.shared.write("usb-storage",
-                "DIAGNOSTIC: select any small file to test handoff, or index.html to check USB game access")
+                "TEXT_DIAGNOSTIC: On My iPhone > GTA V iOS > GTAiOS-Picker-Test.txt (asCopy=true)")
+        } else if mode == .folder {
+            LogStore.shared.write("usb-storage",
+                "FOLDER_HELP: navigate INSIDE playgta5.com then tap the top-right Open button")
         }
         let picker: UIDocumentPickerViewController
         switch mode {
         case .folder:
             picker = UIDocumentPickerViewController(
                 forOpeningContentTypes: [.folder], asCopy: false)
-        case .diagnosticFile:
+        case .diagnosticText:
             picker = UIDocumentPickerViewController(
-                forOpeningContentTypes: [.item], asCopy: false)
+                forOpeningContentTypes: [.plainText], asCopy: true)
+        case .indexFile:
+            picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [.html], asCopy: false)
         }
         picker.delegate = self
         picker.allowsMultipleSelection = false
@@ -431,13 +468,12 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
 
         // This probe tests the Files -> UIKit handoff using any small file.
         // If index.html was chosen, the same picker also tests GTA USB access.
-        let selectedIndex = url.lastPathComponent.lowercased() == "index.html"
-        if method == .diagnosticFile && !selectedIndex {
+        if method == .diagnosticText {
             LogStore.shared.write("usb-storage",
                 "PICKER_DIAGNOSTIC_SUCCEEDED selectedName=\(url.lastPathComponent)")
             storageDetails.text = "Picker works: iOS delivered \(url.lastPathComponent)"
             showPickerResult("iOS file selection works",
-                "Files returned \(url.lastPathComponent) to GTAiOS. Next, select the game folder, or select index.html to try USB access.")
+                "Files returned \(url.lastPathComponent) to GTAiOS. The text-file picker works independently of game-folder access.")
             return
         }
 
@@ -455,7 +491,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         if presentedViewController === controller {
             controller.dismiss(animated: true)
         }
-        USBStorageManager.shared.chooseAsync(url, fromFile: selectedIndex && method == .diagnosticFile) { [weak self] result in
+        USBStorageManager.shared.chooseAsync(url, fromFile: method == .indexFile) { [weak self] result in
             guard let self, self.pendingUSBCheck == token else { return }
             self.pendingUSBCheck = nil
             self.refresh()

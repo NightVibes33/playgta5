@@ -193,3 +193,31 @@ state and export usb-storage.txt; no app can read an ungranted path.
 
 The iOS simulator cannot prove external USB-C access, and no CI result can
 substitute for the delegate callback on the user's actual iOS 27 installation.
+
+
+## Build 7 — iPhone 16 on iOS 27 developer beta 4
+
+The observed Files selection issue occurs on an actual iPhone 16 running
+iOS 27 developer beta 4. This is the required on-device test target; the
+GitHub macOS runner's iPhone Simulator does not reproduce the exact OS,
+USB provider, or signing environment.
+
+The FILES picker uses `.folder`, and the intended interaction is to enter
+`mirror/playgta5.com` and then tap the system's **Open** button to grant
+the current directory, not to tap a child file.
+
+The TEST .TXT picker now specifically accepts `.plainText` **with
+`asCopy: true`**, instead of the overly broad `.item`. GTAiOS creates a
+small `Documents/GTAiOS-Picker-Test.txt` fixture on launch. With File Sharing
+and in-place documents enabled, it should appear in the Files app under
+On My iPhone → GTA V iOS. Selecting that .txt tests a standard document
+copy/import without any USB access or game verification.
+
+INDEX.HTML is a separate .html `asCopy: false` picker used to attempt the
+existing read-only USB fallback. The result is only accepted if sibling assets
+can actually be opened under the returned iOS file grant.
+
+Important: iOS 27 beta 4 is not yet proven to contain an OS-level
+UIDocumentPicker bug. A different iOS build, file-provider app, device,
+or simulator may behave differently. Do not claim USB support without a
+successful `didPickDocumentsAt` callback and on-device archive validation.
