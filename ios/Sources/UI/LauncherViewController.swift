@@ -429,14 +429,15 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             return
         }
 
-        // This probe tests UIKit -> Files -> UIKit delegate delivery only.
-        // It intentionally avoids any game folder validation or bookmark work.
-        if method == .diagnosticFile {
+        // This probe tests the Files -> UIKit handoff using any small file.
+        // If index.html was chosen, the same picker also tests GTA USB access.
+        let selectedIndex = url.lastPathComponent.lowercased() == "index.html"
+        if method == .diagnosticFile && !selectedIndex {
             LogStore.shared.write("usb-storage",
-                "PICKER_DIAGNOSTIC_SUCCEEDED selectedName=(url.lastPathComponent)")
-            storageDetails.text = "Picker works: iOS delivered (url.lastPathComponent)"
+                "PICKER_DIAGNOSTIC_SUCCEEDED selectedName=\(url.lastPathComponent)")
+            storageDetails.text = "Picker works: iOS delivered \(url.lastPathComponent)"
             showPickerResult("iOS file selection works",
-                "The system returned (url.lastPathComponent) to GTAiOS. The remaining problem is game-folder access, not the document picker delegate.")
+                "Files returned \(url.lastPathComponent) to GTAiOS. Next, select the game folder, or select index.html to try USB access.")
             return
         }
 
