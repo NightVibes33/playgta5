@@ -1,60 +1,115 @@
 import Foundation
 
-/// Access to user-selected game files, with no requirement to copy the mirror to the app.
+/// The mirror is never copied to internal storage. Access is held by a picked
+/// security-scoped directory, or by a file picked in the same provider if (and
+/// only if) sibling reads are independently proven to work on that provider.
 final class USBStorageManager {
     static let shared = USBStorageManager()
     private let bookmarkKey = "gtaios.usb.bookmark"
+    private let anchorKindKey = "gtaios.usb.bookmark-kind"
+
     private(set) var root: URL?
+    private(set) var selectionMethod: String = "none"
     private var accessURL: URL?
     private var hasScope = false
 
     private init() { restore() }
 
-    /// Accept USB volume, mirror/, or playgta5.com/ as long as Files grants access.
-    /// A selection is validated while the security-scope remains open.
     func choose(_ chosen: URL) throws {
-        let scope = chosen.startAccessingSecurityScopedResource()
-        LogStore.shared.write("usb-storage", "Folder access: \(chosen.path), scope=\(scope), provider=\(chosen.scheme ?? "?")")
-        guard let resolved = locateMirror(chosen) else {
-            if scope { chosen.stopAccessingSecurityScopedResource() }
-            throw StorageError.invalidLayout(chosen.lastPathComponent)
+        try select(chosen, fromFile: false)
+    }
+
+    /// USB-provider fallback when the Files folder picker doesn't complete.
+    /// This is NOT a sandbox bypass: some providers only grant the picked file,
+    /// in which case this function rejects the selection and explains why.
+    func chooseIndexFile(_ chosen: URL) throws {
+        guard chosen.lastPathComponent.lowercased() == "index.html" else {
+            throw StorageError.invalidMarker(chosen.lastPathComponent)
         }
-        if hasScope { accessURL?.stopAccessingSecurityScopedResource() }
-        accessURL = chosen
-        hasScope = scope
-        root = resolved
+        try select(chosen, fromFile: true)
+    }
+
+    private func select(_ selected: URL, fromFile: Bool) throws {
+        let scope = selected.startAccessingSecurityScopedResource()
+        let kind = fromFile ? "index.html file" : "folder"
+        LogStore.shared.write("usb-storage",
+            "Selected \(kind): \(selected.path), securityScope=\(scope)")
+        let candidate = fromFile ? selected.deletingLastPathComponent() : selected
+        guard let gameRoot = locateMirror(candidate) else {
+            if scope { selected.stopAccessingSecurityScopedResource() }
+            throw StorageError.invalidLayout(candidate.lastPathComponent)
+        }
+        // A file-only security scope may not authorize sibling data/ and b/.
+        // Check real file I/O before storing the URL or claiming readiness.
         do {
-            let bookmark = try chosen.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-            UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
+            try verifyReadable(gameRoot)
         } catch {
-            LogStore.shared.write("usb-storage", "Folder selected, but bookmark persistence failed: \(error)")
+            if scope { selected.stopAccessingSecurityScopedResource() }
+            LogStore.shared.write("usb-storage",
+                "Denied \(kind) access: \(error.localizedDescription)")
+            if fromFile { throw StorageError.fileProviderDeniedSiblingAccess(error.localizedDescription) }
+            throw error
         }
-        LogStore.shared.write("usb-storage", "Resolved game root: \(resolved.path), scope=\(scope)")
+
+        // Do not drop a working selection if the new bookmark cannot be made.
+        if hasScope { accessURL?.stopAccessingSecurityScopedResource() }
+        accessURL = selected
+        hasScope = scope
+        root = gameRoot
+        selectionMethod = kind
+
+        do {
+            let bookmark = try selected.bookmarkData(
+                options: [.minimalBookmark],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil)
+            UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
+            UserDefaults.standard.set(fromFile, forKey: anchorKindKey)
+        } catch {
+            LogStore.shared.write("usb-storage",
+                "Folder access is valid now, but bookmark could not be saved: \(error.localizedDescription)")
+        }
+        LogStore.shared.write("usb-storage",
+            "READY: \(gameRoot.path), selectedVia=\(kind), scope=\(scope)")
     }
 
     func restore() {
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else { return }
         var stale = false
         do {
-            let selected = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+            let selected = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil,
+                bookmarkDataIsStale: &stale)
             let scope = selected.startAccessingSecurityScopedResource()
-            if let resolved = locateMirror(selected) {
-                root = resolved
-                accessURL = selected
-                hasScope = scope
-                LogStore.shared.write("usb-storage", "Restored USB folder: \(resolved.path), stale=\(stale)")
+            let fileBased = UserDefaults.standard.bool(forKey: anchorKindKey)
+            let candidate = fileBased ? selected.deletingLastPathComponent() : selected
+            if let gameRoot = locateMirror(candidate) {
+                do {
+                    try verifyReadable(gameRoot)
+                    root = gameRoot
+                    accessURL = selected
+                    hasScope = scope
+                    selectionMethod = fileBased ? "index.html file" : "folder"
+                    LogStore.shared.write("usb-storage",
+                        "Restored \(selectionMethod) selection: \(gameRoot.path), stale=\(stale)")
+                } catch {
+                    if scope { selected.stopAccessingSecurityScopedResource() }
+                    LogStore.shared.write("usb-storage",
+                        "USB bookmark restored but no longer readable: \(error.localizedDescription)")
+                }
             } else {
                 if scope { selected.stopAccessingSecurityScopedResource() }
-                LogStore.shared.write("usb-storage", "Saved USB path no longer contains playgta5.com; select it again")
+                LogStore.shared.write("usb-storage",
+                    "USB bookmark no longer resolves to playgta5.com (drive detached or permission revoked)")
             }
         } catch {
-            LogStore.shared.write("usb-storage", "USB access restoration failed: \(error)")
+            LogStore.shared.write("usb-storage",
+                "USB bookmark resolve failed: \(error.localizedDescription)")
         }
     }
 
     private func isDirectory(_ url: URL) -> Bool {
         let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
-        if let dir = values?.isDirectory { return dir }
+        if let value = values?.isDirectory { return value }
         var flag: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &flag) && flag.boolValue
     }
@@ -65,7 +120,6 @@ final class USBStorageManager {
     }
 
     private func locateMirror(_ chosen: URL) -> URL? {
-        // Fast-path all documented layouts. A USB disk may be selected at its root.
         let candidates = [
             chosen,
             chosen.appendingPathComponent("playgta5.com"),
@@ -75,8 +129,6 @@ final class USBStorageManager {
         for candidate in candidates where isGameRoot(candidate) {
             return candidate.standardizedFileURL
         }
-        // Some users store the mirror under an extra folder on the external drive.
-        // Traverse directories only, bounded to 3 levels, never inspect 20GB archives.
         var pending: [(URL, Int)] = [(chosen, 0)]
         var scanned = 0
         while !pending.isEmpty && scanned < 250 {
@@ -89,21 +141,66 @@ final class USBStorageManager {
                     at: folder, includingPropertiesForKeys: [.isDirectoryKey],
                     options: [.skipsHiddenFiles, .skipsPackageDescendants])
             } catch {
-                LogStore.shared.write("usb-storage", "Cannot list \(folder.lastPathComponent): \(error.localizedDescription)")
+                LogStore.shared.write("usb-storage",
+                    "Directory access failed \(folder.path): \(error.localizedDescription)")
                 continue
             }
             for child in children where isDirectory(child) {
                 if isGameRoot(child) { return child.standardizedFileURL }
-                // Do not descend into huge game archive/shader subtrees.
-                if ["data", "b", "title", "shaders"].contains(child.lastPathComponent.lowercased()) { continue }
+                if ["data", "b", "title", "shaders"].contains(child.lastPathComponent.lowercased()) {
+                    continue
+                }
                 if level < 2 { pending.append((child, level + 1)) }
             }
         }
-        LogStore.shared.write("usb-storage", "Game root not found within three directory levels of \(chosen.path)")
         return nil
     }
 
-    /// Validate only startup-critical files. The full asset manifest is served separately.
+    /// Validate real USB I/O under the caller's selected scope. File coordination
+    /// is required for externally provided content; fileExists alone isn't proof.
+    /// The archive header check reads FOUR bytes, never copies 63MB of wasm.
+    private func verifyReadable(_ root: URL) throws {
+        let archive = root.appendingPathComponent("b/8b0b5899ed/game.wasm")
+        guard isDirectory(root.appendingPathComponent("data")),
+              isDirectory(root.appendingPathComponent("b")),
+              FileManager.default.fileExists(atPath: archive.path) else {
+            throw StorageError.missingEngine
+        }
+        var coordinationError: NSError?
+        var readingError: Error?
+        var didCoordinate = false
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(readingItemAt: archive, options: [],
+                               error: &coordinationError) { coordinatedURL in
+            didCoordinate = true
+            do {
+                let handle = try FileHandle(forReadingFrom: coordinatedURL)
+                defer { try? handle.close() }
+                let magic = try handle.read(upToCount: 4) ?? Data()
+                guard magic == Data([0, 97, 115, 109]) else {
+                    throw StorageError.invalidEngine
+                }
+                // Metadata only; don't inspect/copy the large data archives.
+                _ = try FileManager.default.contentsOfDirectory(
+                    at: root.appendingPathComponent("data"),
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles]).prefix(1)
+            } catch {
+                readingError = error
+            }
+        }
+        if let error = coordinationError {
+            throw StorageError.inaccessibleEngine("File coordination: " + error.localizedDescription)
+        }
+        guard didCoordinate else {
+            throw StorageError.inaccessibleEngine("File provider did not coordinate game.wasm")
+        }
+        if let error = readingError {
+            if error is StorageError { throw error }
+            throw StorageError.inaccessibleEngine(error.localizedDescription)
+        }
+    }
+
     func missingStartupAssets() -> [String] {
         guard root != nil else { return ["USB game folder not selected"] }
         let required: [(String, String)] = [
@@ -114,29 +211,44 @@ final class USBStorageManager {
             ("b/8b0b5899ed/audio-worklet.js", "b/8b0b5899ed/audio-worklet.js")
         ]
         let missing = required.compactMap { file($0.0) == nil ? $0.1 : nil }
-        LogStore.shared.write("usb-storage", missing.isEmpty
-            ? "All startup paths available"
-            : "Missing game paths: " + missing.joined(separator: ", "))
+        LogStore.shared.write("usb-storage",
+            missing.isEmpty ? "Startup paths present" :
+                "Missing startup paths: " + missing.joined(separator: ", "))
         return missing
     }
 
-    /// Prevent URL traversal, symlinks escaping selected root, and hidden file leaks.
     func file(_ relative: String) -> URL? {
         guard let root, !relative.isEmpty, !relative.hasPrefix("/") else { return nil }
         let base = root.resolvingSymlinksInPath().standardizedFileURL
-        let candidate = base.appendingPathComponent(relative).resolvingSymlinksInPath().standardizedFileURL
-        guard candidate.path.hasPrefix(base.path + "/") && FileManager.default.fileExists(atPath: candidate.path) else {
-            return nil
-        }
+        let candidate = base.appendingPathComponent(relative)
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard candidate.path.hasPrefix(base.path + "/"),
+              FileManager.default.fileExists(atPath: candidate.path) else { return nil }
         return candidate
     }
 
     enum StorageError: LocalizedError {
         case invalidLayout(String)
+        case invalidMarker(String)
+        case missingEngine
+        case invalidEngine
+        case inaccessibleEngine(String)
+        case fileProviderDeniedSiblingAccess(String)
+
         var errorDescription: String? {
             switch self {
-            case .invalidLayout(let name):
-                return "Selected '\(name)' but could not find folders data/ and b/ together. Open the USB drive → mirror → playgta5.com, select the playgta5.com folder and tap Open. You can also select the drive's containing folder."
+            case .invalidLayout(let folder):
+                return "'\(folder)' has no accessible data/ and b/ game folders. Select mirror/playgta5.com."
+            case .invalidMarker(let name):
+                return "Selected \(name), but the USB fallback requires playgta5.com/index.html."
+            case .missingEngine:
+                return "Game root found, but b/8b0b5899ed/game.wasm cannot be found."
+            case .invalidEngine:
+                return "Found game.wasm but its WebAssembly file signature is invalid."
+            case .inaccessibleEngine(let details):
+                return "Cannot read game.wasm or the data directory: \(details)"
+            case .fileProviderDeniedSiblingAccess(let reason):
+                return "iOS accepted index.html, but this app could not read the other required game files. A file selection might not grant access to its siblings. Reason: \(reason). Try Select Folder, or check the USB layout."
             }
         }
     }

@@ -21,6 +21,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private var heldUp = false
     private var heldDown = false
     private var heldA = false
+    private enum PickerIntent { case folder, indexFile }
+    private var pickerIntent: PickerIntent = .folder
+    private var activePicker: UIDocumentPickerViewController?
+    private var lastPickerAction = "None"
+
     private let mint = UIColor(red: 0.67, green: 0.92, blue: 0.66, alpha: 1)
     private let muted = UIColor(red: 0.63, green: 0.68, blue: 0.69, alpha: 1)
     private let panel = UIColor(red: 0.085, green: 0.105, blue: 0.115, alpha: 1)
@@ -273,7 +278,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             let missing = USBStorageManager.shared.missingStartupAssets()
             storageTitle.text = root.lastPathComponent + "  /  USB"
             storageDetails.text = missing.isEmpty ? "Files detected • Ready for engine check"
-                : "Missing \(missing.count) required startup resources • Tap GAME FILES"
+                : "Missing \(missing.count) required startup resources • Tap FILES"
             storageDetails.textColor = missing.isEmpty ? mint : UIColor.systemOrange
             fileIndicator.backgroundColor = missing.isEmpty ? mint : UIColor.systemOrange
             playButton.isEnabled = true
@@ -285,7 +290,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             }
         } else {
             storageTitle.text = "GAME DATA NOT SELECTED"
-            storageDetails.text = "Connect your USB-C drive • Select mirror/playgta5.com"
+            storageDetails.text = "Connect USB-C • Tap FILES for folder or index.html fallback"
             storageDetails.textColor = muted
             fileIndicator.backgroundColor = .systemOrange
             playButton.isEnabled = true
@@ -334,35 +339,115 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         heldUp = up; heldDown = down; heldA = a
     }
     @objc private func chooseFolder() {
-        // Opening a drive in Files merely navigates inside it; the user must select
-        // the final playgta5.com folder and tap Open at the top of the picker.
-        LogStore.shared.write("usb-storage", "Opening Files document picker for mirror/playgta5.com")
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+        let choices = UIAlertController(
+            title: "Connect game files",
+            message: "Choose the USB game folder. If tapping Open does nothing, use the index.html fallback to test this drive's file access.",
+            preferredStyle: .actionSheet)
+        choices.addAction(UIAlertAction(title: "Select playgta5.com folder", style: .default) { [weak self] _ in
+            self?.openPicker(.folder)
+        })
+        choices.addAction(UIAlertAction(title: "Select index.html instead (USB fallback)", style: .default) { [weak self] _ in
+            self?.openPicker(.indexFile)
+        })
+        choices.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        choices.popoverPresentationController?.sourceView = folderButton
+        choices.popoverPresentationController?.sourceRect = folderButton.bounds
+        present(choices, animated: true)
+    }
+
+    private func openPicker(_ mode: PickerIntent) {
+        if let shown = presentedViewController {
+            // UIAlertController actions can run before the sheet finishes dismissal.
+            // Never swallow the picker action just because that sheet is still visible.
+            shown.dismiss(animated: true) { [weak self] in
+                self?.openPicker(mode)
+            }
+            return
+        }
+        pickerIntent = mode
+        lastPickerAction = "Opened " + (mode == .folder ? "folder" : "index.html") + " picker"
+        // Apple documents [.folder] as the sole content type for recursive USB
+        // directory grants. The alternate picker is file-only, never a claim that
+        // choosing one file grants permission to its sibling archives.
+        let picker: UIDocumentPickerViewController
+        switch mode {
+        case .folder:
+            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+        case .indexFile:
+            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.html], asCopy: false)
+        }
         picker.delegate = self
         picker.allowsMultipleSelection = false
-        picker.modalPresentationStyle = .fullScreen
-        present(picker, animated: true)
+        picker.shouldShowFileExtensions = true
+        // Don't force fullScreen: the Files extension owns the selection UI.
+        // Keeping a strong delegate/host reference prevents premature teardown.
+        activePicker = picker
+        LogStore.shared.write("usb-storage", "Files picker presented, mode=\(lastPickerAction)")
+        present(picker, animated: true) { [weak self] in
+            self?.storageDetails.text = "Choose in Files and tap Open. For USB problems, use the index.html fallback."
+        }
     }
+
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        LogStore.shared.write("usb-storage", "Files picker cancelled without choosing a folder")
+        let message = "Files picker cancelled, intent=\(pickerIntent), last=\(lastPickerAction). No URL was granted."
+        LogStore.shared.write("usb-storage", message)
+        storageDetails.text = "No folder selected • Files picker cancelled"
+        activePicker = nil
+        refresh()
     }
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        let method = pickerIntent
+        activePicker = nil
+        LogStore.shared.write("usb-storage",
+            "documentPicker didPickDocumentsAt invoked: urls=\(urls.count), mode=\(method)")
         guard let url = urls.first else {
-            LogStore.shared.write("usb-storage", "Picker returned no URLs")
+            LogStore.shared.write("usb-storage", "Folder picker returned an empty selection")
+            showPickerResult("No selection", "Files returned no URL. Retry or use the index.html fallback.")
             return
         }
-        LogStore.shared.write("usb-storage", "Picker selected: " + url.path)
+        LogStore.shared.write("usb-storage",
+            "Picker URL: \(url.path), isFileURL=\(url.isFileURL)")
+        let result: Result<URL, Error>
         do {
-            try USBStorageManager.shared.choose(url)
-            refresh()
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            switch method {
+            case .folder:
+                try USBStorageManager.shared.choose(url)
+            case .indexFile:
+                try USBStorageManager.shared.chooseIndexFile(url)
+            }
+            result = .success(url)
         } catch {
-            LogStore.shared.write("usb-storage", "Folder selection failed: " + error.localizedDescription)
-            let alert = UIAlertController(title: "Game folder not found",
-                message: error.localizedDescription + "\n\nIn Files, open your USB drive, then mirror, then select the playgta5.com folder itself using Open.",
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            result = .failure(error)
+        }
+        refresh()
+        switch result {
+        case .success:
+            LogStore.shared.write("usb-storage",
+                "Picker accepted, game root=\(USBStorageManager.shared.root?.path ?? "nil")")
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showPickerResult("USB game files connected",
+                "Verified game.wasm signature and access to the data directory. The game will continue reading assets from USB-C, not internal storage.")
+        case .failure(let error):
+            LogStore.shared.write("usb-storage",
+                "Picker selection rejected: \(error.localizedDescription)")
+            showPickerResult("Could not access game files",
+                error.localizedDescription + "\n\nIf the folder picker won't grant access, try the index.html fallback. If that fails too, iOS has not granted this app permission to read the entire USB game folder.")
+        }
+    }
+
+    private func showPickerResult(_ title: String, _ message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: "Export USB logs", style: .default) { [weak self] _ in
+            self?.exportLogs()
+        })
+        // UIKit sometimes hasn't fully dismissed Files when its delegate runs.
+        if let picker = presentedViewController as? UIDocumentPickerViewController {
+            picker.dismiss(animated: true) { [weak self] in
+                self?.present(alert, animated: true)
+            }
+        } else {
             present(alert, animated: true)
         }
     }

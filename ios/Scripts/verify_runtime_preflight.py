@@ -53,5 +53,17 @@ assert "GENERATE_INFOPLIST_FILE: NO" in project, "Use the committed Info.plist, 
 assert 'INFOPLIST_FILE: "$(SRCROOT)/Config/Info.plist"' in project
 assert "    info:" not in project, "XcodeGen info.path would overwrite the committed launch plist"
 assert "TARGETED_DEVICE_FAMILY: \"1\"" in project
+# Regression: a Files folder tap that does not deliver its delegate URL must not
+# be confused with a successful security-scoped folder grant.
+assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.folder])' in launcher
+assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.html], asCopy: false)' in launcher
+assert 'documentPicker didPickDocumentsAt invoked' in launcher
+assert 'Select index.html instead' in launcher
+assert 'self?.openPicker(mode)' in launcher, "Action-sheet dismissal must not swallow the picker"
+assert 'chooseIndexFile(_ chosen: URL)' in storage
+assert 'NSFileCoordinator(filePresenter: nil)' in storage
+assert 'read(upToCount: 4)' in storage
+assert 'case fileProviderDeniedSiblingAccess(String)' in storage
+print("PASS: dual USB Files pickers, delegate trace, coordinated file access, actionable fallback")
 print("PASS: native iPhone scene sizing, compact toolbar layout, USB folder traversal, and picker recovery")
 print("PASS: runtime prereq probes, original asset HEAD/range checks, iPhone portrait/landscape policy, JavaScript syntax")

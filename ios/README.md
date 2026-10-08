@@ -140,3 +140,14 @@ lacks the modern launch screen, UIWindowSceneDelegate declaration,
 UIRequiresFullScreen, or an iPhone-only UIDeviceFamily. Native simulator
 screenshots still require review, and a SideStore installation on the
 physical iPhone 16 is the final test.
+
+## External USB folder picker rescue (iPhone 16 / iOS 27)
+
+If Open in the Files directory picker stays stuck, the app cannot assume a directory access grant was returned. The launcher now offers two explicit choices:
+
+1. **Select playgta5.com folder:** Apple's documented folder picker. Navigate to mirror/playgta5.com and tap Open. The app validates both the folder and actual game.wasm access before saving its bookmark.
+2. **Select index.html instead (USB fallback):** The ordinary HTML file picker. Navigate to mirror/playgta5.com, choose index.html and tap Open. A file selection does not necessarily grant access to sibling files. The app independently coordinates a game.wasm read and checks the data directory. Only a successful verification is accepted.
+
+A file provider may decline folder permission or restrict selected-file scope. There is no supported app-side bypass for such a restriction. When a picker delegate returns, its URL and the outcome are recorded in usb-storage.txt; if the provider never invokes the delegate, the app can only log picker presentation or cancellation.
+
+All assets remain on the external drive; nothing is copied into the IPA. CI tests both selection modes and the file-coordinator validation. A real iPhone and USB drive are still required to test provider access.
