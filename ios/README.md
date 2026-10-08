@@ -82,3 +82,18 @@ the deliverable be described as playable GTA V. Until then, this build is a
 native device/storage/graphics-readiness harness. This is deliberate: no
 WebKit loading-screen illusion, no remote streaming, no duplicated game
 archives, no unsupported claims of completed conversion.
+
+
+## Native WASM → ARM64 AOT tooling (tested separately)
+
+The `ios/Scripts/aot_compile.sh` and `aot_import_audit.py` tools now
+offer a reproducible native code-generation path for an authorized WASM
+module. `.github/workflows/native-aot.yml` has successfully cross-compiled
+a synthetic shared-memory64 WASM module into an iPhone ARM64 Mach-O object
+in GitHub Actions (run 37860594587). See `ios/Scripts/AOT_README.md`.
+
+This CI success tests the toolchain only. The actual 63 MB GTA `game.wasm`
+is not in this repository or CI, has not been converted, and cannot yet be
+linked to native Emscripten/WASI host functions or the real Metal renderer.
+No JIT executor or playable engine is included. The native IPA remains a
+hardware/USB/format readiness harness, NOT a GTA V port.
