@@ -1,0 +1,42 @@
+name: Build GTAiOS Unsigned IPA
+on:
+  push:
+    branches: [ios-usb-port]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Prepare first-party runtime files
+        run: bash ios/Scripts/prepare_runtime.sh
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml --project ios
+      - name: Compile iPhone arm64 app without signing
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/GTAiOS.xcodeproj -scheme GTAiOS -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Build unsigned SideStore IPA
+        run: |
+          set -euo pipefail
+          mkdir -p Payload
+          ditto "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/GTAiOS.app" Payload/GTAiOS.app
+          zip -qry GTAiOS-unsigned.ipa Payload
+          bash ios/Scripts/check_ipa.sh GTAiOS-unsigned.ipa
+      - name: Upload IPA and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAiOS-unsigned-and-logs
+          path: |
+            GTAiOS-unsigned.ipa
+            ${{ runner.temp }}/build.log
+          if-no-files-found: warn
