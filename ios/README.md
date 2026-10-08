@@ -124,3 +124,19 @@ The Files/Settings/Controller row now stacks icons above one-line captions. Laun
 **External drive selection:** Navigate inside your external drive in the Files picker to `mirror/playgta5.com`. Tap **Open** to select that actual folder (tapping the drive name just opens the drive). The picker also accepts a parent folder or the disk root if iOS grants access to that directory. Root detection checks both `data/` and `b/` and searches up to three folder levels without scanning the 20 GB contents. Rejected selections produce a visible error and `usb-storage.txt` entries with the selected path and reason.
 
 Only a physically installed iPhone build can establish whether the Files provider allows an external folder bookmark to be restored across launches. This update does not claim the GTA runtime itself is playable.
+
+## Root cause of iPhone 16 letterboxing (verified from actual built IPA)
+
+The prior XcodeGen `info.path` generated a new minimal Info.plist and overwrote
+the repository's custom `Config/Info.plist`. Inspection of the *built IPA*
+showed **no** `UILaunchStoryboardName`, **no** `UIApplicationSceneManifest`, and
+a target family of `[1,2]` (iPhone + iPad), despite the source code claiming
+an iPhone-only full-screen UI.
+
+The fixed project deliberately disables generated Info.plists and sets
+`INFOPLIST_FILE: "$(SRCROOT)/Config/Info.plist"` directly in the target.
+`ios/Scripts/check_ipa.sh` now rejects packaging whenever the built app
+lacks the modern launch screen, UIWindowSceneDelegate declaration,
+UIRequiresFullScreen, or an iPhone-only UIDeviceFamily. Native simulator
+screenshots still require review, and a SideStore installation on the
+physical iPhone 16 is the final test.

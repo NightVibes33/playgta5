@@ -21,13 +21,14 @@ targets:
       - path: WebRuntime
         type: folder
         buildPhase: resources
-    info:
-      path: Config/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.gtaios
         PRODUCT_NAME: GTAiOS
         SWIFT_EMIT_LOC_STRINGS: NO
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: "$(SRCROOT)/Config/Info.plist"
+        TARGETED_DEVICE_FAMILY: "1"
 schemes:
   GTAiOS:
     build:
