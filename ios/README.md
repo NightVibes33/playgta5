@@ -165,3 +165,31 @@ The corrected implementation:
 - reports an 18-second verification timeout to the UI with exportable log markers FILES CALLBACK RECEIVED, USB_VALIDATION_BEGIN, USB_VALIDATION_OK, USB_VALIDATION_FAILED, USB_VALIDATION_TIMEOUT.
 
 If the system picker itself does not deliver a URL (does not invoke didPickDocumentsAt), the app cannot fabricate permission. In that case usb-storage logs show Files picker presented without a callback; changing the USB file provider or system-side folder selection will be necessary. A physical iPhone/USB test is still required.
+
+
+## Build 6: isolate the Files handoff (iOS 27)
+
+A directory created under On My iPhone also fails to be selected, which
+rules out validating the 20GB mirror as the first failing step.
+
+The app now presents Apple's folder-only document picker directly from FILES;
+it no longer routes through an UIAlertController action sheet and a nested
+dismiss/present chain. No UIAdaptivePresentationControllerDelegate is attached
+to the picker. Normal documentPicker cancellation and selection callbacks remain.
+
+A separate TEST FILE / INDEX.HTML button invokes a plain `UTType.item`
+UIDocumentPickerViewController that can return *any* small file. On receiving a
+regular file it displays and logs PICKER_DIAGNOSTIC_SUCCEEDED without touching
+the USB drive or expecting GTA assets. Choosing index.html instead attempts the
+existing access-verified USB fallback. Logs distinguish PICKER_PRESENT_REQUEST,
+PICKER_PRESENTED, FILES CALLBACK RECEIVED, LEGACY_FILES_CALLBACK,
+PICKER_DIAGNOSTIC_SUCCEEDED, and PICKER_GONE_WITHOUT_CALLBACK.
+
+For diagnosis: install build 6, then tap TEST FILE / INDEX.HTML and select
+a small .txt in On My iPhone. If the app reports "iOS file selection works",
+the system picker delegate is operating and folder permission is the failing
+step. If tapping Open never returns a URL even for a .txt, capture the screen
+state and export usb-storage.txt; no app can read an ungranted path.
+
+The iOS simulator cannot prove external USB-C access, and no CI result can
+substitute for the delegate callback on the user's actual iOS 27 installation.

@@ -2,7 +2,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 /// Compact game-first dashboard. Intentionally no duplicate UIKit navigation title.
-final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
+final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let background = CAGradientLayer()
     private let scrollView = UIScrollView()
     private let content = UIStackView()
@@ -16,12 +16,13 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
     private let settingsButton = UIButton(type: .system)
     private let controllerButton = UIButton(type: .system)
     private let logsButton = UIButton(type: .system)
+    private let filePickerTestButton = UIButton(type: .system)
     private let modeButtons = [UIButton(type: .system), UIButton(type: .system), UIButton(type: .system)]
     private var focusIndex = 0
     private var heldUp = false
     private var heldDown = false
     private var heldA = false
-    private enum PickerIntent { case folder, indexFile }
+    private enum PickerIntent { case folder, diagnosticFile }
     private var pickerIntent: PickerIntent = .folder
     private var activePicker: UIDocumentPickerViewController?
     private var lastPickerAction = "None"
@@ -206,6 +207,14 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
         toolRow.addArrangedSubview(controllerButton)
         content.addArrangedSubview(toolRow)
 
+        // A minimal picker-only diagnostic: no 20GB scan, no bookmark, no disk
+        // permissions beyond the chosen file. Distinguishes Files UI handoff
+        // failures from issues opening the actual GTA game folder.
+        style(filePickerTestButton, title: "TEST FILE / INDEX.HTML", symbol: "doc.text.magnifyingglass", filled: false)
+        filePickerTestButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 49).isActive = true
+        filePickerTestButton.addTarget(self, action: #selector(testFilesPicker), for: .touchUpInside)
+        content.addArrangedSubview(filePickerTestButton)
+
         let bottom = UIStackView()
         bottom.axis = .horizontal; bottom.spacing = 8; bottom.alignment = .center
         deviceLabel.font = .systemFont(ofSize: 10)
@@ -233,6 +242,12 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         GameOrientation.request(.portrait, from: view)
+        if activePicker != nil && !pickerCallbackReceived && presentedViewController == nil {
+            LogStore.shared.write("usb-storage",
+                "PICKER_GONE_WITHOUT_CALLBACK: document picker disappeared; no URL or cancel delegate fired")
+            activePicker = nil
+            storageDetails.text = "Files closed without returning a selection"
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -342,65 +357,46 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
         }
         heldUp = up; heldDown = down; heldA = a
     }
-    @objc private func chooseFolder() {
-        let choices = UIAlertController(
-            title: "Connect game files",
-            message: "Choose the USB game folder. If tapping Open does nothing, use the index.html fallback to test this drive's file access.",
-            preferredStyle: .actionSheet)
-        choices.addAction(UIAlertAction(title: "Select playgta5.com folder", style: .default) { [weak self] _ in
-            self?.openPicker(.folder)
-        })
-        choices.addAction(UIAlertAction(title: "Select index.html instead (USB fallback)", style: .default) { [weak self] _ in
-            self?.openPicker(.indexFile)
-        })
-        choices.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        choices.popoverPresentationController?.sourceView = folderButton
-        choices.popoverPresentationController?.sourceRect = folderButton.bounds
-        present(choices, animated: true)
-    }
+    // Direct, unwrapped directory picker following Apple's documented pattern.
+    // We intentionally removed the action-sheet -> dismiss -> repesent chain;
+    // it could race with Files' own presentation and delegate lifecycle.
+    @objc private func chooseFolder() { openPicker(.folder) }
+
+    @objc private func testFilesPicker() { openPicker(.diagnosticFile) }
 
     private func openPicker(_ mode: PickerIntent) {
-        if let shown = presentedViewController {
-            // UIAlertController actions can run before the sheet finishes dismissal.
-            // Never swallow the picker action just because that sheet is still visible.
-            shown.dismiss(animated: true) { [weak self] in
-                self?.openPicker(mode)
-            }
+        guard presentedViewController == nil else {
+            LogStore.shared.write("usb-storage",
+                "PICKER_NOT_OPENED: another modal was still presented")
             return
         }
         pickerIntent = mode
-        lastPickerAction = "Opened " + (mode == .folder ? "folder" : "index.html") + " picker"
-        // Apple documents [.folder] as the sole content type for recursive USB
-        // directory grants. The alternate picker is file-only, never a claim that
-        // choosing one file grants permission to its sibling archives.
+        pickerCallbackReceived = false
+        if mode == .diagnosticFile {
+            LogStore.shared.write("usb-storage",
+                "DIAGNOSTIC: select any small file to test handoff, or index.html to check USB game access")
+        }
         let picker: UIDocumentPickerViewController
         switch mode {
         case .folder:
-            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
-        case .indexFile:
-            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.html], asCopy: false)
+            picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [.folder], asCopy: false)
+        case .diagnosticFile:
+            picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [.item], asCopy: false)
         }
         picker.delegate = self
         picker.allowsMultipleSelection = false
         picker.shouldShowFileExtensions = true
-        // Don't force fullScreen: the Files extension owns the selection UI.
-        // Keeping a strong delegate/host reference prevents premature teardown.
         activePicker = picker
-        pickerCallbackReceived = false
-        picker.presentationController?.delegate = self
-        LogStore.shared.write("usb-storage", "Files picker presented, mode=\(lastPickerAction)")
-        present(picker, animated: true) { [weak self] in
-            self?.storageDetails.text = "Choose in Files and tap Open. For USB problems, use the index.html fallback."
-        }
-    }
-
-    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
-        guard activePicker != nil else { return }
-        if !pickerCallbackReceived {
+        lastPickerAction = String(describing: mode)
+        LogStore.shared.write("usb-storage",
+            "PICKER_PRESENT_REQUEST mode=\(lastPickerAction), self=\(type(of: self))")
+        present(picker, animated: true) { [weak self, weak picker] in
+            guard let self else { return }
             LogStore.shared.write("usb-storage",
-                "Files UI disappeared without didPickDocumentsAt or cancel callback")
+                "PICKER_PRESENTED mode=\(self.lastPickerAction), pickerAlive=\(picker != nil)")
         }
-        activePicker = nil
     }
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
@@ -410,6 +406,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
         storageDetails.text = "No folder selected • Files picker cancelled"
         activePicker = nil
         refresh()
+        storageDetails.text = "Files cancelled • No selection URL was received"
     }
 
     // Some Files providers still invoke the deprecated single-URL delegate.
@@ -432,6 +429,17 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
             return
         }
 
+        // This probe tests UIKit -> Files -> UIKit delegate delivery only.
+        // It intentionally avoids any game folder validation or bookmark work.
+        if method == .diagnosticFile {
+            LogStore.shared.write("usb-storage",
+                "PICKER_DIAGNOSTIC_SUCCEEDED selectedName=(url.lastPathComponent)")
+            storageDetails.text = "Picker works: iOS delivered (url.lastPathComponent)"
+            showPickerResult("iOS file selection works",
+                "The system returned (url.lastPathComponent) to GTAiOS. The remaining problem is game-folder access, not the document picker delegate.")
+            return
+        }
+
         // The callback MUST return immediately. No FileManager, bookmark
         // resolution, NSFileCoordinator or USB access on UIKit's main queue.
         let token = UUID()
@@ -446,7 +454,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
         if presentedViewController === controller {
             controller.dismiss(animated: true)
         }
-        USBStorageManager.shared.chooseAsync(url, fromFile: method == .indexFile) { [weak self] result in
+        USBStorageManager.shared.chooseAsync(url, fromFile: selectedIndex && method == .diagnosticFile) { [weak self] result in
             guard let self, self.pendingUSBCheck == token else { return }
             self.pendingUSBCheck = nil
             self.refresh()
@@ -502,7 +510,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, 
             let alert = UIAlertController(title: "Missing game resources",
                 message: missing.joined(separator: "\n") + "\n\nThe local server runs inside the app; Launch-Local.cmd is Windows-only.",
                 preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "Change folder", style: .default) { [weak self] _ in self?.chooseFolder() })
+            alert.addAction(UIAlertAction(title: "Change folder", style: .default) { [weak self] _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    self?.chooseFolder()
+                }
+            })
             alert.addAction(UIAlertAction(title: "Diagnostics boot", style: .default) { [weak self] _ in self?.openGame() })
             alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
             present(alert, animated: true)

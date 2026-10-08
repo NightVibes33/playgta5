@@ -55,15 +55,18 @@ assert "    info:" not in project, "XcodeGen info.path would overwrite the commi
 assert "TARGETED_DEVICE_FAMILY: \"1\"" in project
 # Regression: a Files folder tap that does not deliver its delegate URL must not
 # be confused with a successful security-scoped folder grant.
-assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.folder])' in launcher
-assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.html], asCopy: false)' in launcher
+assert 'forOpeningContentTypes: [.folder], asCopy: false' in launcher
+assert 'forOpeningContentTypes: [.item], asCopy: false' in launcher
 assert 'FILES CALLBACK RECEIVED' in launcher
 assert "didPickDocumentAt url: URL" in launcher, "Legacy single-file provider compatibility"
 assert "LEGACY_FILES_CALLBACK" in launcher
 assert 'infoDictionary?["CFBundleVersion"]' in launcher, "Visible build number needed to detect stale SideStore install"
-assert "<key>CFBundleVersion</key><string>5</string>" in plist
-assert 'Select index.html instead' in launcher
-assert 'self?.openPicker(mode)' in launcher, "Action-sheet dismissal must not swallow the picker"
+assert "<key>CFBundleVersion</key><string>6</string>" in plist
+assert '@objc private func chooseFolder() { openPicker(.folder) }' in launcher
+assert '@objc private func testFilesPicker() { openPicker(.diagnosticFile) }' in launcher
+assert 'PICKER_DIAGNOSTIC_SUCCEEDED' in launcher
+assert 'PICKER_GONE_WITHOUT_CALLBACK' in launcher
+assert 'UIAlertController(\n            title: "Connect game files"' not in launcher
 assert 'chooseIndexFile(_ chosen: URL)' in storage
 assert 'NSFileCoordinator(filePresenter: nil)' in storage
 assert 'read(upToCount: 4)' in storage
@@ -81,6 +84,6 @@ assert "private func scanStartupAssets(in gameRoot:" in storage
 assert "contentsOfDirectory(\\n                    at: root.appendingPathComponent(\\\"data\\\")" not in storage, "Do not enumerate huge data folder"
 assert 'UIImage(contentsOfFile: file.path)' not in launcher, "No blocking USB artwork reads from UI refresh"
 print("PASS: nonblocking USB validation, immediate picker callback, timed recovery")
-print("PASS: dual USB Files pickers, delegate trace, coordinated file access, actionable fallback")
+print("PASS: direct folder picker, file handoff diagnostic, indexed fallback, delegate trace")
 print("PASS: native iPhone scene sizing, compact toolbar layout, USB folder traversal, and picker recovery")
 print("PASS: runtime prereq probes, original asset HEAD/range checks, iPhone portrait/landscape policy, JavaScript syntax")
