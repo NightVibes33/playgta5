@@ -11,6 +11,8 @@ test -f "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" | while read -r exe; do test -x "$app/$exe"; done
 test -f "$app/WebRuntime/index.html"
 test -f "$app/WebRuntime/game.js"
+test -f "$app/WebRuntime/controller-bridge.js"
+test -f "$app/WebRuntime/data-manifest.json"
 if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then
   echo "ERROR: proprietary game data must not be bundled in the IPA" >&2
   exit 1

@@ -85,8 +85,15 @@ final class AssetHTTPServer {
         let prefix = "/b/8b0b5899ed/"
         let bundled = Bundle.main.resourceURL?.appendingPathComponent("WebRuntime")
         if path == "/" || path == "/index.html" { return bundled?.appendingPathComponent("index.html") }
+        // The repository's data-manifest.json is the exact input for io_worker.js.
+        // On USB, /data/manifest.json takes precedence; bundled manifest is fallback.
+        if path == "/data/manifest.json" {
+            return USBStorageManager.shared.file("data/manifest.json") ??
+                bundled?.appendingPathComponent("data-manifest.json")
+        }
         if path.hasPrefix(prefix) {
             let name = String(path.dropFirst(prefix.count))
+            if name == "ios_controller.js" { return bundled?.appendingPathComponent("controller-bridge.js") }
             if ["loader.js", "game.js", "wgpu_worker.js", "io_worker.js"].contains(name) {
                 return bundled?.appendingPathComponent(name)
             }

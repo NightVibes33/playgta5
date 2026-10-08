@@ -47,3 +47,48 @@ For USB-constrained devices we start with low-memory settings and disable the we
 ## Failure triage
 
 The app exports `GTAiOS-diagnostics.txt` with boot, engine, renderer, shader, JIT probe, USB, controller and crash information. An IPA build passing CI proves native compilation and packaging only, not game execution.
+
+## Exact portable mirror structure (README.md and Launch-Local.cmd)
+
+The original Windows launcher runs `runtime\\python.exe serve_local.py --open`.
+The Python server serves the `mirror/playgta5.com` tree at `http://localhost:8000/`,
+including `data/`, `b/`, `index.html`, `favicon.ico` and `robots.txt`.
+
+The iOS launcher cannot execute a Windows `.cmd` or Windows Python binary.
+Instead, the Swift app starts an equivalent **127.0.0.1 local server** automatically.
+WebKit loads a copy of the repository's audited `homepage.html` at the local
+origin, while the source-level workers, shaders, `game.wasm`, loading-art assets
+and the large GTA file tree are read from the selected external directory.
+
+The iOS folder picker accepts any of:
+
+- `mirror/`
+- `mirror/playgta5.com/`
+- a parent directory containing `mirror/playgta5.com/`
+
+The startup validator checks `data/`, `b/8b0b5899ed/game.wasm`,
+`b/8b0b5899ed/shaders/index.json`, `b/8b0b5899ed/title/`, and
+`b/8b0b5899ed/audio-worklet.js`. It reports missing paths and permits a
+diagnostic boot; it does not block on scanning or duplicating 20 GB of content.
+
+The original repository's `data-manifest.json` is now bundled into the small
+IPA and exposed to the engine as `/data/manifest.json` if the USB directory
+has no corresponding manifest. `shader-index.json` has the same fallback
+behavior. The manifest is an inventory, not a replacement for game bytes.
+
+## Controller changes
+
+The native reader samples extended Bluetooth/wired gamepads at 60 Hz,
+including analog sticks, triggers, L3/R3, Menu and available Options, with
+deadzone and vertical-axis inversion. A native controller setup/test screen
+shows the live state, supports button remapping, and can request haptics on
+devices that advertise controller vibration support. The launcher supports
+D-pad/stick focus and A-button activation.
+
+The gameplay bridge now writes right-stick deltas and aiming/firing buttons to
+the existing WASM mouse input buffer. It also supports on-foot, vehicle and
+aircraft digital-key profiles and remapped buttons. It cannot provide true
+analog steering/throttle or guarantee full in-game controller-only navigation
+without the compiled game engine exposing a native gamepad ABI; that limitation
+remains and must be tested on device. No engine-side XInput interface was
+available in the repository to compile or patch.

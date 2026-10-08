@@ -6,6 +6,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
     private var webView: WKWebView!
     private let status = UILabel()
     private var initialLoad = false
+    private let modeControl = UISegmentedControl(items: ["On Foot", "Driving", "Flying"])
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -45,6 +46,18 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         status.backgroundColor = UIColor.black.withAlphaComponent(0.55)
         status.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(status)
+        modeControl.selectedSegmentIndex = 0
+        modeControl.backgroundColor = UIColor.black.withAlphaComponent(0.65)
+        modeControl.selectedSegmentTintColor = UIColor.darkGray
+        modeControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
+        modeControl.translatesAutoresizingMaskIntoConstraints = false
+        modeControl.addTarget(self, action: #selector(profileChanged), for: .valueChanged)
+        view.addSubview(modeControl)
+        NSLayoutConstraint.activate([
+            modeControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            modeControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            modeControl.widthAnchor.constraint(equalToConstant: 275)
+        ])
         NSLayoutConstraint.activate([
             back.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             back.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
@@ -76,12 +89,12 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
         ControllerManager.shared.onState = { [weak self] state in
-            guard !state.isEmpty, let data = try? JSONSerialization.data(withJSONObject: state),
+            guard let data = try? JSONSerialization.data(withJSONObject: state),
                   let json = String(data: data, encoding: .utf8) else { return }
             self?.webView?.evaluateJavaScript("window.__gtaNativePad && window.__gtaNativePad(\(json))")
         }
         ControllerManager.shared.onConnection = { [weak self] name in
-            self?.status.text = name == "No controller" ? "Touch controls not yet implemented" : "Controller: \(name)"
+            self?.status.text = name == "No controller" ? "No controller connected" : "Controller: \(name)"
         }
         ControllerManager.shared.begin()
     }
@@ -92,12 +105,28 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         ControllerManager.shared.stop()
     }
 
+    @objc private func profileChanged() {
+        let profile = ["foot", "drive", "air"][modeControl.selectedSegmentIndex]
+        webView.evaluateJavaScript("window.__gtaNativePadProfile && window.__gtaNativePadProfile('\(profile)')")
+        LogStore.shared.write("controller", "Selected gameplay profile: \(profile)")
+    }
+
     @objc private func closeGame() { navigationController?.popViewController(animated: true) }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         initialLoad = true
         status.text = "Checking CPU / WebGPU / shared-memory support"
         RuntimeDiagnostics.probe(webView)
+        let saved = UserDefaults.standard
+        let sensitivity = saved.object(forKey: ControllerManager.sensitivityKey) == nil
+            ? 1.0 : saved.double(forKey: ControllerManager.sensitivityKey)
+        webView.evaluateJavaScript("window.__gtaNativePadSensitivity && window.__gtaNativePadSensitivity(\(sensitivity))")
+        let mappings = UserDefaults.standard.dictionary(forKey: ControllerSettingsViewController.bindingKey) as? [String: String]
+            ?? ControllerSettingsViewController.defaults
+        if let data = try? JSONSerialization.data(withJSONObject: mappings),
+           let json = String(data: data, encoding: .utf8) {
+            webView.evaluateJavaScript("window.__gtaNativePadMappings && window.__gtaNativePadMappings(\(json))")
+        }
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
@@ -118,6 +147,10 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         let channel = ["gpu", "shaders", "jit", "boot"].contains(kind) ? kind : "engine"
         LogStore.shared.write(channel, text)
         if kind == "gpu" || kind == "error" { status.text = text }
+        if kind == "controllerProfile", let index = ["foot", "drive", "air"].firstIndex(of: text) {
+            modeControl.selectedSegmentIndex = index
+            LogStore.shared.write("controller", "Controller selected input profile: " + text)
+        }
     }
 
     deinit { webView?.configuration.userContentController.removeScriptMessageHandler(forName: "gtaDiagnostics") }

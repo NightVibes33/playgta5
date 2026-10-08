@@ -55,6 +55,25 @@ final class USBStorageManager {
         return nil
     }
 
+    /// Validate only boot-critical assets; do not scan or copy the full 20 GB.
+    func missingStartupAssets() -> [String] {
+        guard root != nil else { return ["mirror/playgta5.com folder not selected"] }
+        let required: [(String, String)] = [
+            ("data", "data/ game archives"),
+            ("b/8b0b5899ed/game.wasm", "b/8b0b5899ed/game.wasm"),
+            ("b/8b0b5899ed/shaders/index.json", "b/8b0b5899ed/shaders/index.json"),
+            ("b/8b0b5899ed/title", "b/8b0b5899ed/title/ artwork"),
+            ("b/8b0b5899ed/audio-worklet.js", "b/8b0b5899ed/audio-worklet.js")
+        ]
+        let missing = required.compactMap { entry -> String? in
+            file(entry.0) == nil ? entry.1 : nil
+        }
+        LogStore.shared.write("usb-storage", missing.isEmpty
+            ? "External mirror startup files found"
+            : "Missing external files: " + missing.joined(separator: ", "))
+        return missing
+    }
+
     func file(_ relative: String) -> URL? {
         guard let root = root else { return nil }
         let base = root.resolvingSymlinksInPath().standardizedFileURL

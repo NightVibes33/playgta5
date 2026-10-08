@@ -10,6 +10,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let choose = UIButton(type: .system)
     private let settings = UIButton(type: .system)
     private let export = UIButton(type: .system)
+    private let controllerButton = UIButton(type: .system)
+    private var focusedButton = 0
+    private var lastA = false
+    private var lastUp = false
+    private var lastDown = false
     private let scroll = UIScrollView()
     private let stack = UIStackView()
 
@@ -64,6 +69,10 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         settings.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
         stack.addArrangedSubview(settings)
 
+        style(controllerButton, title: "CONTROLLER SETUP & LIVE TEST", color: .darkGray)
+        controllerButton.addTarget(self, action: #selector(openControllerSetup), for: .touchUpInside)
+        stack.addArrangedSubview(controllerButton)
+
         style(export, title: "EXPORT FULL DEBUG LOGS", color: .darkGray)
         export.addTarget(self, action: #selector(exportLogs), for: .touchUpInside)
         stack.addArrangedSubview(export)
@@ -75,6 +84,54 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         statusLabel.textAlignment = .center
         stack.addArrangedSubview(statusLabel)
         refresh()
+        highlightControllerFocus()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        ControllerManager.shared.onConnection = { [weak self] name in
+            self?.statusLabel.text = name == "No controller"
+                ? "No controller connected. Pair Bluetooth controllers in iOS Settings."
+                : "Controller: \(name). D-pad and A navigate the launcher."
+        }
+        ControllerManager.shared.onState = { [weak self] state in
+            self?.handleController(state)
+        }
+        ControllerManager.shared.begin()
+        refresh()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        ControllerManager.shared.stop()
+    }
+
+    private var controlButtons: [UIButton] { [choose, play, settings, controllerButton, export] }
+
+    private func highlightControllerFocus() {
+        for (index, button) in controlButtons.enumerated() {
+            button.layer.borderColor = UIColor.systemGreen.cgColor
+            button.layer.borderWidth = index == focusedButton ? 3 : 0
+        }
+    }
+
+    private func handleController(_ state: [String: Double]) {
+        guard presentedViewController == nil else { return }
+        let up = (state["up"] ?? 0) > 0.5 || (state["ly"] ?? 0) > 0.6
+        let down = (state["down"] ?? 0) > 0.5 || (state["ly"] ?? 0) < -0.6
+        let a = (state["a"] ?? 0) > 0.5
+        if up && !lastUp {
+            focusedButton = max(0, focusedButton - 1)
+            highlightControllerFocus()
+        }
+        if down && !lastDown {
+            focusedButton = min(controlButtons.count - 1, focusedButton + 1)
+            highlightControllerFocus()
+        }
+        if a && !lastA && controlButtons[focusedButton].isEnabled {
+            controlButtons[focusedButton].sendActions(for: .touchUpInside)
+        }
+        lastUp = up; lastDown = down; lastA = a
     }
 
     private func text(_ string: String, size: CGFloat) -> UILabel {
@@ -126,11 +183,33 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
 
     @objc private func launch() {
         guard USBStorageManager.shared.root != nil else { return }
+        let missing = USBStorageManager.shared.missingStartupAssets()
+        if !missing.isEmpty {
+            let alert = UIAlertController(
+                title: "Game files missing",
+                message: "The selected mirror/playgta5.com folder is missing:\n" +
+                    missing.joined(separator: "\n") +
+                    "\n\nThe README's Windows Launch-Local.cmd is not used on iOS. This app starts its own local server.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "Select Folder", style: .cancel) { [weak self] _ in
+                self?.chooseFolder()
+            })
+            alert.addAction(UIAlertAction(title: "Run Diagnostics Anyway", style: .default) { [weak self] _ in
+                self?.navigationController?.pushViewController(GameViewController(), animated: true)
+            })
+            present(alert, animated: true)
+            return
+        }
         navigationController?.pushViewController(GameViewController(), animated: true)
     }
 
     @objc private func openSettings() {
         navigationController?.pushViewController(SettingsViewController(), animated: true)
+    }
+
+    @objc private func openControllerSetup() {
+        navigationController?.pushViewController(ControllerSettingsViewController(), animated: true)
     }
 
     @objc private func exportLogs() {
