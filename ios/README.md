@@ -252,3 +252,44 @@ equivalent behavior; log PICKER_PRESENT_REQUEST and callback results and
 compare the explicit selection UI.
 
 Upstream source: https://github.com/LiveContainer/LiveContainer/blob/main/TweakLoader/DocumentPicker.m
+
+
+## Build 9: iOS 27 beta 4 WebAssembly.Memory 16 GiB maximum RangeError
+
+Confirmed in the checked-in upstream `game.js`:
+`INITIAL_MEMORY=3221225472`, `maximum:262144n`, `shared:true`, `address:"i64"`.
+At 65536 bytes/page, the engine requests a 3 GiB initial heap (49152 pages)
+and declares a 16 GiB maximum (262144 pages). An iPhone 16 running
+iOS 27 developer beta 4 reports:
+`RangeError: WebAssembly.Memory 'maximum' page count is too large`
+at engine launch. This is a maximum-declaration validation failure, **not
+proof that actual free device RAM has been exhausted**.
+
+WebKit's memory64 implementation had a historical 4 GiB buffer/page limit;
+WebKit upstream worked on lifting memory64 limits in August 2026. There is
+no proof that these WebKit changes shipped in the user's installed beta 4.
+
+iOS packaging now patches only the copied `ios/WebRuntime/game.js` max from
+262144n (16 GiB) to 65536n (4 GiB). The original root `game.js` remains
+untouched. The 3 GiB initial allocation, shared memory, and 64-bit address
+mode are left **unchanged**; lowering the initial size without inspecting
+the binary WASM memory import could break module linkage. WebAssembly module
+import validation permits a smaller imported memory maximum than a
+module-declared maximum, but the provided initial size must meet its minimum.
+
+The preflight now probes shared memory64 with **one 64 KiB page** and a
+maximum of 65536 pages before initiating the game, recording failures with
+an actionable error. It does **not** attempt a second 3 GiB allocation.
+The engine itself still requires 3 GiB initially and could next fail due to
+memory pressure, unsupported WASM features, worker allocation, or a WASM
+import requirement. If so, export game logs and the exact new error; passing
+preflight is not proof of playable GTA V.
+
+CI and the IPA packaging check reject a stale 16 GiB maximum in the
+bundled iOS runtime and verify game.js parses. Simulator builds do not
+replicate the real iPhone's memory available to WebKit.
+
+References:
+- https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/wasm/WasmLimits.h
+- https://bugs.webkit.org/show_bug.cgi?id=282532
+- https://results.webkit.org/commit?id=318784%40main&repository_id=webkit

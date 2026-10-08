@@ -22,6 +22,14 @@ echo 'Modern full-screen iPhone launch manifest: PASS'
 test -f "$app/WebRuntime/index.html"
 test -f "$app/LaunchScreen.storyboardc/Info.plist"
 test -f "$app/WebRuntime/game.js"
+# The signed/unsigned IPA must contain the iOS-only memory64 compatibility
+# settings, not the original 16 GiB maximum that crashes WebKit beta 4.
+if grep -Fq 'maximum:262144n,shared:true,address:"i64"' "$app/WebRuntime/game.js"; then
+  echo "ERROR: unpatched 16 GiB memory64 maximum in packaged iOS runtime" >&2
+  exit 1
+fi
+grep -Fq 'maximum:65536n,shared:true,address:"i64"' "$app/WebRuntime/game.js"
+echo 'Memory64 max 4 GiB, original initial 3 GiB: PASS'
 test -f "$app/WebRuntime/controller-bridge.js"
 test -f "$app/WebRuntime/data-manifest.json"
 if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then

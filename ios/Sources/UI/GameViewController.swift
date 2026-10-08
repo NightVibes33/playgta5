@@ -173,10 +173,18 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
             showFailure("Runtime preflight result could not be decoded"); return
         }
         if result["ok"] as? Bool == true {
+            // WebKit accepts a tiny memory64 allocation, but the real engine
+            // still requires 3GiB initially. This is not proof of enough RAM.
+            LogStore.shared.write("boot", "memory64 probe passed: 1 page, max 65536 pages; engine requires 49152 initial pages (3GiB)")
             launchEngine()
         } else {
             let failed = (result["failures"] as? [String] ?? ["unknown compatibility issue"])
-            showFailure("Runtime requirements failed: " + failed.joined(separator: ", "))
+            if failed.contains("memory64Cap") {
+                let cause = result["memory64Error"] as? String ?? "WebKit rejected the memory64 probe"
+                showFailure("This iOS WebKit build cannot create the game's shared WebAssembly memory64 configuration (4GiB maximum). " + cause + ". The engine originally requests a 3GiB initial heap and cannot safely launch without memory64 support.")
+            } else {
+                showFailure("Runtime requirements failed: " + failed.joined(separator: ", "))
+            }
         }
     }
 

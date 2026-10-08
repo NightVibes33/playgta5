@@ -21,6 +21,16 @@ jobs:
         run: python3 ios/Scripts/verify_runtime_preflight.py
       - name: Prepare first-party runtime files
         run: bash ios/Scripts/prepare_runtime.sh
+      - name: Verify iOS WebKit memory64 compatibility
+        run: |
+          grep -Fq 'maximum:262144n,shared:true,address:"i64"' game.js
+          grep -Fq 'maximum:65536n,shared:true,address:"i64"' ios/WebRuntime/game.js
+          if grep -Fq 'maximum:262144n,shared:true,address:"i64"' ios/WebRuntime/game.js; then
+            echo 'Unpatched 16GiB maximum in iOS bundle' >&2
+            exit 1
+          fi
+          node --check ios/WebRuntime/game.js
+          echo 'iOS memory64 maximum 65536 pages; original game.js unchanged'
       - name: Generate Xcode project
         run: xcodegen generate --spec ios/project.yml --project ios
       - name: Compile iPhone arm64 app without signing

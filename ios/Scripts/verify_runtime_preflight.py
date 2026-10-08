@@ -17,6 +17,10 @@ plist=(root/"ios/Config/Info.plist").read_text()
 for required in ["crossOriginIsolated","sharedArrayBuffer","offscreenTransfer","gpuAdapter","wasmCompile","wasmHeader","shaderIndex","gameManifest","titleLogo","audioWorklet"]:
     assert required in asset, required
 assert 'name="viewport"' in asset
+assert 'memory64Cap' in asset
+assert 'maximum: 65536n, shared: true, address: "i64"' in asset
+assert 'initial: 1n' in asset, "Preflight must never allocate an additional 3GiB heap"
+assert 'memory64Cap' in game and '3GiB initial heap' in game
 assert '/ios/preflight.html' in server
 assert 'preflight.html' in prepare
 assert 'viewport-fit=cover' in prepare
@@ -66,7 +70,7 @@ assert 'FILES CALLBACK RECEIVED' in launcher
 assert "didPickDocumentAt url: URL" in launcher, "Legacy single-file provider compatibility"
 assert "LEGACY_FILES_CALLBACK" in launcher
 assert 'infoDictionary?["CFBundleVersion"]' in launcher, "Visible build number needed to detect stale SideStore install"
-assert "<key>CFBundleVersion</key><string>8</string>" in plist
+assert "<key>CFBundleVersion</key><string>9</string>" in plist
 assert '@objc private func chooseFolder() { openPicker(.folder) }' in launcher
 assert '@objc private func testFilesPicker() { openPicker(.diagnosticText) }' in launcher
 assert '@objc private func chooseIndexFile() { openPicker(.indexFile) }' in launcher
