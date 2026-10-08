@@ -19,7 +19,7 @@ jobs:
           path: thirdparty/wabt
       - name: Compile pinned WABT tools on Linux
         run: |
-          cmake -S thirdparty/wabt -B build-wabt -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_TOOLS=ON
+          cmake -S thirdparty/wabt -B build-wabt -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=OFF -DBUILD_TOOLS=ON
           cmake --build build-wabt --target wasm2c wasm-validate wasm-objdump --parallel 4
           mkdir -p dist/runtime_headers
           cp build-wabt/wasm2c build-wabt/wasm-validate build-wabt/wasm-objdump dist/
@@ -28,6 +28,6 @@ jobs:
           file dist/wasm2c
       - uses: actions/upload-artifact@v4
         with:
-          name: wabt-linux-engine-audit-tools
+          name: wabt-linux-debug-audit-tools
           path: dist/
           retention-days: 2
