@@ -57,7 +57,7 @@ assert "TARGETED_DEVICE_FAMILY: \"1\"" in project
 # be confused with a successful security-scoped folder grant.
 assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.folder])' in launcher
 assert 'UIDocumentPickerViewController(forOpeningContentTypes: [.html], asCopy: false)' in launcher
-assert 'documentPicker didPickDocumentsAt invoked' in launcher
+assert 'FILES CALLBACK RECEIVED' in launcher
 assert 'Select index.html instead' in launcher
 assert 'self?.openPicker(mode)' in launcher, "Action-sheet dismissal must not swallow the picker"
 assert 'chooseIndexFile(_ chosen: URL)' in storage
