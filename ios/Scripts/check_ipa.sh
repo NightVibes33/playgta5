@@ -10,6 +10,7 @@ test -f "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" | while read -r exe; do test -x "$app/$exe"; done
 test -f "$app/WebRuntime/index.html"
+test -f "$app/LaunchScreen.storyboardc/Info.plist"
 test -f "$app/WebRuntime/game.js"
 test -f "$app/WebRuntime/controller-bridge.js"
 test -f "$app/WebRuntime/data-manifest.json"

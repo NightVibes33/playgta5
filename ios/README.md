@@ -92,3 +92,12 @@ analog steering/throttle or guarantee full in-game controller-only navigation
 without the compiled game engine exposing a native gamepad ABI; that limitation
 remains and must be tested on device. No engine-side XInput interface was
 available in the repository to compile or patch.
+
+
+## Launcher and real engine settings refresh
+
+The fullscreen native dashboard no longer displays the default UINavigationBar above a second giant title. It provides Story Mode, GTA V Sandbox and env_test Sandbox selections, plus a USB data health panel, Game Files, Settings, Controller, and diagnostics. Original GTA loading art is read from the selected external mirror where present. A LaunchScreen.storyboard opts into native full-screen sizing on modern iPhones.
+
+Settings are **only the actual switches present in this repository's homepage.html**: start mode/new game, frame limiter, render scale, low-memory worker behavior, shader packs/synchronous pipeline mode, game data prefetch/cache and trace/verbose/memory diagnostics, and engine quality flags -textureQuality, -shadowQuality, -reflectionQuality, -particleQuality, -grassQuality, -cityDensity, -lodScale, -pedVariety, -vehicleVariety, -pedLodBias and -vehicleLodBias. Higher numeric quality values are explicitly marked experimental, not claimed to be benchmarked, and shader configuration does not imply a native Metal renderer.
+
+EngineOptions.builds the actual runtime URL before each launch; changing settings never requires spoofed on-screen controls. The 60 FPS setting correctly uses ?fps=60 (which homepage.html translates to -frameLimit=1), not ?fps=0 (uncapped). The settings verification script asserts all parameter names exist in the repository's engine entrypoint and CI runs it before the device build.

@@ -72,12 +72,12 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         AssetHTTPServer.shared.start { [weak self] result in
             switch result {
             case .success(let port):
-                let options = UserDefaults.standard
-                let fps = options.integer(forKey: "gtaios.fps") == 60 ? "0" : "30"
-                let scale = options.double(forKey: "gtaios.scale")
-                let actualScale = scale == 0 ? 0.65 : scale
-                let urlString = "http://127.0.0.1:\(port)/?low=1&cores=2&nocache=1&log=1&fps=\(fps)&scale=\(actualScale)"
-                if let url = URL(string: urlString) { self?.webView.load(URLRequest(url: url)) }
+                guard let url = EngineOptions.launchURL(port: port) else {
+                    LogStore.shared.write("boot", "Engine options generated invalid URL")
+                    return
+                }
+                LogStore.shared.write("boot", "Starting embedded server: " + url.absoluteString)
+                self?.webView.load(URLRequest(url: url))
             case .failure(let error):
                 self?.status.text = "Local server failed: \(error.localizedDescription)"
                 LogStore.shared.write("boot", "Local server failure: \(error)")
