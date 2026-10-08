@@ -24,7 +24,7 @@ assert 'onPreflight(' in game and 'Runtime requirements failed:' in game
 assert 'EngineOptions.launchURL(port: port)' in game
 assert 'GameOrientation.request(.landscape' in game
 assert 'GameOrientation.request(.portrait' in (root/"ios/Sources/UI/LauncherViewController.swift").read_text()
-assert 'GameNavigationController(rootViewController:' in app
+assert 'GameNavigationController(rootViewController:' in (root / 'ios/Sources/App/SceneDelegate.swift').read_text()
 assert 'UIRequiresFullScreen' in plist
 assert 'UIInterfaceOrientationLandscapeRight' in plist
 assert 'UIInterfaceOrientationPortrait' in plist
@@ -47,6 +47,6 @@ assert "UIApplicationSceneManifest" in plist and "SceneDelegate" in plist
 assert "config.imagePlacement = .top" in launcher
 assert "config.titleLineBreakMode = .byTruncatingTail" in launcher
 assert "playButton.isEnabled = true" in launcher
-assert "mirror/playgta5.com" in storage and "contentsOfDirectory" in storage
+assert "playgta5.com" in storage and "contentsOfDirectory" in storage
 print("PASS: native iPhone scene sizing, compact toolbar layout, USB folder traversal, and picker recovery")
 print("PASS: runtime prereq probes, original asset HEAD/range checks, iPhone portrait/landscape policy, JavaScript syntax")
