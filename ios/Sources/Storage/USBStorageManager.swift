@@ -5,15 +5,57 @@ import Foundation
 /// only if) sibling reads are independently proven to work on that provider.
 final class USBStorageManager {
     static let shared = USBStorageManager()
+    static let changedNotification = Notification.Name("gtaios.usb-storage.changed")
     private let bookmarkKey = "gtaios.usb.bookmark"
     private let anchorKindKey = "gtaios.usb.bookmark-kind"
 
-    private(set) var root: URL?
+    private let worker = DispatchQueue(label: "gtaios.usb.files", qos: .userInitiated)
+    private let stateLock = NSLock()
+    private var storedRoot: URL?
+    private var startupMissing: [String] = ["USB game folder not selected"]
+    var root: URL? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return storedRoot
+    }
     private(set) var selectionMethod: String = "none"
     private var accessURL: URL?
     private var hasScope = false
 
-    private init() { restore() }
+    // Bookmark resolution / disk probing must never block viewDidLoad or the
+    // document-picker delegate. iOS USB providers can take arbitrary time.
+    private init() {
+        worker.async { [weak self] in self?.restore() }
+    }
+
+    func chooseAsync(_ chosen: URL, fromFile: Bool,
+                     completion: @escaping (Result<URL, Error>) -> Void) {
+        worker.async { [weak self] in
+            guard let self else { return }
+            let result: Result<URL, Error>
+            do {
+                if fromFile {
+                    try self.chooseIndexFile(chosen)
+                } else {
+                    try self.choose(chosen)
+                }
+                result = .success(self.root ?? chosen)
+            } catch {
+                result = .failure(error)
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    private func saveRoot(_ url: URL, missing: [String]) {
+        stateLock.lock()
+        storedRoot = url
+        startupMissing = missing
+        stateLock.unlock()
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Self.changedNotification, object: nil)
+        }
+    }
 
     func choose(_ chosen: URL) throws {
         try select(chosen, fromFile: false)
@@ -55,7 +97,10 @@ final class USBStorageManager {
         if hasScope { accessURL?.stopAccessingSecurityScopedResource() }
         accessURL = selected
         hasScope = scope
-        root = gameRoot
+        // Compute startup status once on the worker; UI refreshes must never
+        // perform thousands of external Files-provider calls.
+        let missing = scanStartupAssets(in: gameRoot)
+        saveRoot(gameRoot, missing: missing)
         selectionMethod = kind
 
         do {
@@ -85,7 +130,8 @@ final class USBStorageManager {
             if let gameRoot = locateMirror(candidate) {
                 do {
                     try verifyReadable(gameRoot)
-                    root = gameRoot
+                    let missing = scanStartupAssets(in: gameRoot)
+                    saveRoot(gameRoot, missing: missing)
                     accessURL = selected
                     hasScope = scope
                     selectionMethod = fileBased ? "index.html file" : "folder"
@@ -180,11 +226,8 @@ final class USBStorageManager {
                 guard magic == Data([0, 97, 115, 109]) else {
                     throw StorageError.invalidEngine
                 }
-                // Metadata only; don't inspect/copy the large data archives.
-                _ = try FileManager.default.contentsOfDirectory(
-                    at: root.appendingPathComponent("data"),
-                    includingPropertiesForKeys: nil,
-                    options: [.skipsHiddenFiles]).prefix(1)
+                // data/ directory existence was checked above. Never enumerate
+                // its thousands of entries just to validate a picked folder.
             } catch {
                 readingError = error
             }
@@ -201,8 +244,14 @@ final class USBStorageManager {
         }
     }
 
+    /// UI reads only a cached snapshot; no synchronous USB file I/O.
     func missingStartupAssets() -> [String] {
-        guard root != nil else { return ["USB game folder not selected"] }
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return startupMissing
+    }
+
+    private func scanStartupAssets(in gameRoot: URL) -> [String] {
         let required: [(String, String)] = [
             ("data", "data/ game archives"),
             ("b/8b0b5899ed/game.wasm", "b/8b0b5899ed/game.wasm"),
@@ -210,10 +259,13 @@ final class USBStorageManager {
             ("b/8b0b5899ed/title", "b/8b0b5899ed/title/ artwork"),
             ("b/8b0b5899ed/audio-worklet.js", "b/8b0b5899ed/audio-worklet.js")
         ]
-        let missing = required.compactMap { file($0.0) == nil ? $0.1 : nil }
-        LogStore.shared.write("usb-storage",
-            missing.isEmpty ? "Startup paths present" :
-                "Missing startup paths: " + missing.joined(separator: ", "))
+        let missing = required.compactMap { item -> String? in
+            let path = gameRoot.appendingPathComponent(item.0)
+            return FileManager.default.fileExists(atPath: path.path) ? nil : item.1
+        }
+        LogStore.shared.write("usb-storage", missing.isEmpty ?
+            "Required startup paths detected" :
+            "Missing startup paths: " + missing.joined(separator: ", "))
         return missing
     }
 

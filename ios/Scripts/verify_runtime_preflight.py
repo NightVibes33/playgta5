@@ -64,6 +64,19 @@ assert 'chooseIndexFile(_ chosen: URL)' in storage
 assert 'NSFileCoordinator(filePresenter: nil)' in storage
 assert 'read(upToCount: 4)' in storage
 assert 'case fileProviderDeniedSiblingAccess(String)' in storage
+# No blocking external drive reads from UIKit picker callbacks or launcher refresh.
+callback = launcher.split("func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL])")[1].split("private func showPickerResult")[0]
+assert "chooseAsync(url, fromFile:" in callback
+assert "USB_VALIDATION_BEGIN" in callback and "USB_VALIDATION_TIMEOUT" in callback
+assert "USBStorageManager.shared.choose(url)" not in callback
+assert "USBStorageManager.shared.chooseIndexFile(url)" not in callback
+assert "FileManager.default" not in callback and "NSFileCoordinator" not in callback.replace("// resolution, NSFileCoordinator", ""), "USB I/O must stay off UIKit main"
+assert "worker.async" in storage and "private init()" in storage
+assert "stateLock" in storage and "scanStartupAssets(in:" in storage
+assert "private func scanStartupAssets(in gameRoot:" in storage
+assert "contentsOfDirectory(\\n                    at: root.appendingPathComponent(\\\"data\\\")" not in storage, "Do not enumerate huge data folder"
+assert 'UIImage(contentsOfFile: file.path)' not in launcher, "No blocking USB artwork reads from UI refresh"
+print("PASS: nonblocking USB validation, immediate picker callback, timed recovery")
 print("PASS: dual USB Files pickers, delegate trace, coordinated file access, actionable fallback")
 print("PASS: native iPhone scene sizing, compact toolbar layout, USB folder traversal, and picker recovery")
 print("PASS: runtime prereq probes, original asset HEAD/range checks, iPhone portrait/landscape policy, JavaScript syntax")

@@ -2,7 +2,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 /// Compact game-first dashboard. Intentionally no duplicate UIKit navigation title.
-final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
+final class LauncherViewController: UIViewController, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
     private let background = CAGradientLayer()
     private let scrollView = UIScrollView()
     private let content = UIStackView()
@@ -25,6 +25,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private var pickerIntent: PickerIntent = .folder
     private var activePicker: UIDocumentPickerViewController?
     private var lastPickerAction = "None"
+    private var pickerCallbackReceived = false
+    private var pendingUSBCheck: UUID?
+
 
     private let mint = UIColor(red: 0.67, green: 0.92, blue: 0.66, alpha: 1)
     private let muted = UIColor(red: 0.63, green: 0.68, blue: 0.69, alpha: 1)
@@ -217,8 +220,12 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         bottom.addArrangedSubview(flexible)
         bottom.addArrangedSubview(logsButton)
         content.addArrangedSubview(bottom)
+        NotificationCenter.default.addObserver(self, selector: #selector(storageChanged),
+            name: USBStorageManager.changedNotification, object: nil)
         refresh()
     }
+
+    @objc private func storageChanged() { refresh() }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
@@ -283,11 +290,8 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             fileIndicator.backgroundColor = missing.isEmpty ? mint : UIColor.systemOrange
             playButton.isEnabled = true
             playButton.alpha = 1
-            if let file = USBStorageManager.shared.file("b/8b0b5899ed/title/logo.png"),
-               let image = UIImage(contentsOfFile: file.path) {
-                gameIcon.image = image
-                gameIcon.tintColor = .white
-            }
+            // Do not decode external artwork synchronously on the main thread.
+            // USB can block for seconds in a Files provider.
         } else {
             storageTitle.text = "GAME DATA NOT SELECTED"
             storageDetails.text = "Connect USB-C • Tap FILES for folder or index.html fallback"
@@ -382,13 +386,25 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         // Don't force fullScreen: the Files extension owns the selection UI.
         // Keeping a strong delegate/host reference prevents premature teardown.
         activePicker = picker
+        pickerCallbackReceived = false
+        picker.presentationController?.delegate = self
         LogStore.shared.write("usb-storage", "Files picker presented, mode=\(lastPickerAction)")
         present(picker, animated: true) { [weak self] in
             self?.storageDetails.text = "Choose in Files and tap Open. For USB problems, use the index.html fallback."
         }
     }
 
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        guard activePicker != nil else { return }
+        if !pickerCallbackReceived {
+            LogStore.shared.write("usb-storage",
+                "Files UI disappeared without didPickDocumentsAt or cancel callback")
+        }
+        activePicker = nil
+    }
+
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        pickerCallbackReceived = true
         let message = "Files picker cancelled, intent=\(pickerIntent), last=\(lastPickerAction). No URL was granted."
         LogStore.shared.write("usb-storage", message)
         storageDetails.text = "No folder selected • Files picker cancelled"
@@ -397,42 +413,59 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     }
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        pickerCallbackReceived = true
         let method = pickerIntent
         activePicker = nil
         LogStore.shared.write("usb-storage",
-            "documentPicker didPickDocumentsAt invoked: urls=\(urls.count), mode=\(method)")
+            "FILES CALLBACK RECEIVED: selected count=\(urls.count), intent=\(method)")
         guard let url = urls.first else {
-            LogStore.shared.write("usb-storage", "Folder picker returned an empty selection")
-            showPickerResult("No selection", "Files returned no URL. Retry or use the index.html fallback.")
+            LogStore.shared.write("usb-storage", "Files sent an empty selection")
+            showPickerResult("Files returned nothing", "The picker did not provide a file URL.")
             return
         }
+
+        // The callback MUST return immediately. No FileManager, bookmark
+        // resolution, NSFileCoordinator or USB access on UIKit's main queue.
+        let token = UUID()
+        pendingUSBCheck = token
+        storageTitle.text = "CHECKING EXTERNAL USB"
+        storageDetails.text = "Files selection received • Verifying drive permissions…"
+        storageDetails.textColor = UIColor.systemOrange
+        fileIndicator.backgroundColor = UIColor.systemOrange
         LogStore.shared.write("usb-storage",
-            "Picker URL: \(url.path), isFileURL=\(url.isFileURL)")
-        let result: Result<URL, Error>
-        do {
-            switch method {
-            case .folder:
-                try USBStorageManager.shared.choose(url)
-            case .indexFile:
-                try USBStorageManager.shared.chooseIndexFile(url)
-            }
-            result = .success(url)
-        } catch {
-            result = .failure(error)
+            "USB_VALIDATION_BEGIN token=\(token) path=\(url.lastPathComponent), method=\(method)")
+
+        if presentedViewController === controller {
+            controller.dismiss(animated: true)
         }
-        refresh()
-        switch result {
-        case .success:
+        USBStorageManager.shared.chooseAsync(url, fromFile: method == .indexFile) { [weak self] result in
+            guard let self, self.pendingUSBCheck == token else { return }
+            self.pendingUSBCheck = nil
+            self.refresh()
+            switch result {
+            case .success(let root):
+                LogStore.shared.write("usb-storage",
+                    "USB_VALIDATION_OK root=\(root.lastPathComponent)")
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                self.showPickerResult("USB game files connected",
+                    "Verified access to game.wasm and the data directory. No game assets were copied to internal storage.")
+            case .failure(let error):
+                LogStore.shared.write("usb-storage",
+                    "USB_VALIDATION_FAILED \(error.localizedDescription)")
+                self.showPickerResult("USB file access failed",
+                    error.localizedDescription + "\n\nExport the USB logs so we can distinguish a Files permission problem from a missing game asset.")
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 18) { [weak self] in
+            guard let self, self.pendingUSBCheck == token else { return }
+            // Ignore a late callback from the operation. A stalled external drive
+            // must not freeze the UI, and the next attempt remains possible.
+            self.pendingUSBCheck = nil
             LogStore.shared.write("usb-storage",
-                "Picker accepted, game root=\(USBStorageManager.shared.root?.path ?? "nil")")
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showPickerResult("USB game files connected",
-                "Verified game.wasm signature and access to the data directory. The game will continue reading assets from USB-C, not internal storage.")
-        case .failure(let error):
-            LogStore.shared.write("usb-storage",
-                "Picker selection rejected: \(error.localizedDescription)")
-            showPickerResult("Could not access game files",
-                error.localizedDescription + "\n\nIf the folder picker won't grant access, try the index.html fallback. If that fails too, iOS has not granted this app permission to read the entire USB game folder.")
+                "USB_VALIDATION_TIMEOUT after 18 seconds, token=\(token)")
+            self.refresh()
+            self.showPickerResult("USB verification timed out",
+                "iOS returned your file selection, but opening the USB game data took more than 18 seconds. The Files provider may be stalled. Export the USB logs.")
         }
     }
 
@@ -447,8 +480,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             picker.dismiss(animated: true) { [weak self] in
                 self?.present(alert, animated: true)
             }
-        } else {
+        } else if presentedViewController == nil {
             present(alert, animated: true)
+        } else {
+            LogStore.shared.write("usb-storage",
+                "Result alert deferred: another modal was presented")
         }
     }
     @objc private func launch() {

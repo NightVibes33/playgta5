@@ -151,3 +151,17 @@ If Open in the Files directory picker stays stuck, the app cannot assume a direc
 A file provider may decline folder permission or restrict selected-file scope. There is no supported app-side bypass for such a restriction. When a picker delegate returns, its URL and the outcome are recorded in usb-storage.txt; if the provider never invokes the delegate, the app can only log picker presentation or cancellation.
 
 All assets remain on the external drive; nothing is copied into the IPA. CI tests both selection modes and the file-coordinator validation. A real iPhone and USB drive are still required to test provider access.
+
+
+## iPhone 16 USB picker freeze / no-response fix
+
+Both Files folder selection and index.html fallback previously invoked synchronous FileManager, security-scoped bookmark and NSFileCoordinator operations inside UIKit's document picker callback. On an external USB drive these operations can block the main thread indefinitely (Apple's Foundation guidance explicitly warns about this). Worse, loading a saved bookmark in USBStorageManager.init and fetching a logo from USB during view refresh could stall the app even before a selection.
+
+The corrected implementation:
+- returns immediately from documentPicker(didPickDocumentsAt:) and queues validation on gtaios.usb.files;
+- performs bookmark restore and read coordination off the main thread, using an NSLock-protected root/status snapshot and a notification for the launcher;
+- avoids recursively listing thousands of data/ entries and reading USB artwork while laying out buttons;
+- immediately displays 'Verifying drive permissions…', then provides specific success/permission/asset errors;
+- reports an 18-second verification timeout to the UI with exportable log markers FILES CALLBACK RECEIVED, USB_VALIDATION_BEGIN, USB_VALIDATION_OK, USB_VALIDATION_FAILED, USB_VALIDATION_TIMEOUT.
+
+If the system picker itself does not deliver a URL (does not invoke didPickDocumentsAt), the app cannot fabricate permission. In that case usb-storage logs show Files picker presented without a callback; changing the USB file provider or system-side folder selection will be necessary. A physical iPhone/USB test is still required.
