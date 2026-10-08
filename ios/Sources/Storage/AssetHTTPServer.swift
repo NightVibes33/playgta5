@@ -85,6 +85,7 @@ final class AssetHTTPServer {
         let prefix = "/b/8b0b5899ed/"
         let bundled = Bundle.main.resourceURL?.appendingPathComponent("WebRuntime")
         if path == "/" || path == "/index.html" { return bundled?.appendingPathComponent("index.html") }
+        if path == "/ios/preflight.html" { return bundled?.appendingPathComponent("preflight.html") }
         // The repository's data-manifest.json is the exact input for io_worker.js.
         // On USB, /data/manifest.json takes precedence; bundled manifest is fallback.
         if path == "/data/manifest.json" {

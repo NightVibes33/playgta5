@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>GTAiOS Runtime Check</title>
+<style>
+body{background:#070c0f;color:#fff;font:14px -apple-system,BlinkMacSystemFont,sans-serif;
+margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center}
+main{padding:24px;max-width:400px}h1{font-size:20px;letter-spacing:.03em}
+small{color:#9db7aa}#stage{color:#afe4a5;font:12px monospace;line-height:1.5}
+</style></head>
+<body><main><h1>Preparing GTA V</h1><p id="stage">Checking iPhone runtime...</p><small>Game files stay on USB-C storage</small></main>
+<script>
+(async () => {
+  const status = document.getElementById('stage');
+  const results = {};
+  const log = (message) => {
+    status.textContent = message;
+    try { window.webkit.messageHandlers.gtaDiagnostics.postMessage({type:"preflightStage",detail:message}); } catch (_) {}
+  };
+  const check = (key, value) => { results[key] = value; return value; };
+  const withTimeout = (promise, ms) => Promise.race([
+    promise, new Promise((_, reject) => setTimeout(() => reject(Error('timeout after '+ms+'ms')), ms))
+  ]);
+  try {
+    check("origin", location.origin);
+    check("userAgent", navigator.userAgent);
+    check("secureContext", isSecureContext);
+    check("crossOriginIsolated", crossOriginIsolated);
+    check("wasm", typeof WebAssembly === "object");
+    check("sharedArrayBuffer", typeof SharedArrayBuffer === "function");
+    check("atomicsWait", !!(self.Atomics && Atomics.wait));
+    check("offscreenCanvas", typeof OffscreenCanvas !== "undefined");
+    check("offscreenTransfer", typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function");
+    check("workers", typeof Worker === "function");
+    check("audioWorklet", !!(self.AudioWorkletNode));
+    check("webgpu", !!navigator.gpu);
+    check("devicePixelRatio", devicePixelRatio);
+    check("hardwareConcurrency", navigator.hardwareConcurrency);
+    log("Checking WebAssembly and Apple GPU…");
+    if (results.wasm) {
+      try {
+        const minimal = Uint8Array.from([0,97,115,109,1,0,0,0]);
+        check("wasmCompile", (await WebAssembly.compile(minimal)) instanceof WebAssembly.Module);
+      } catch (error) { check("wasmCompile", String(error)); }
+    }
+    if (results.webgpu) {
+      try {
+        const adapter = await withTimeout(navigator.gpu.requestAdapter({powerPreference:"high-performance"}), 6000);
+        check("gpuAdapter", !!adapter);
+        if (adapter) {
+          check("gpuFeatures", [...adapter.features].join(","));
+          check("gpuMaxBufferSize", adapter.limits.maxBufferSize);
+          const device = await withTimeout(adapter.requestDevice(), 6000);
+          check("gpuDevice", !!device);
+          if (device) device.destroy();
+        }
+      } catch (error) { check("gpuAdapter", false); check("gpuError", String(error)); }
+    } else check("gpuAdapter", false);
+    log("Validating external GTA V engine and asset indexes…");
+    const probes = [
+      ["wasmHeader","/b/8b0b5899ed/game.wasm",true],
+      ["shaderIndex","/b/8b0b5899ed/shaders/index.json",false],
+      ["gameManifest","/data/manifest.json",false],
+      ["titleLogo","/b/8b0b5899ed/title/logo.png",false],
+      ["audioWorklet","/b/8b0b5899ed/audio-worklet.js",false]
+    ];
+    for (const [name, url, isWasm] of probes) {
+      try {
+        const options = isWasm ? {headers:{Range:"bytes=0-7"},cache:"no-store"} : {method:"HEAD",cache:"no-store"};
+        const response = await withTimeout(fetch(url,options), 5500);
+        let ok = response.ok;
+        if (isWasm && response.status === 206) {
+          const magic = new Uint8Array(await response.arrayBuffer());
+          ok = magic.length >= 4 && magic[0] === 0 && magic[1] === 97 && magic[2] === 115 && magic[3] === 109;
+        } else if (isWasm) ok = false; // Never download the entire 63MB binary to test its signature.
+        check(name, {ok,status:response.status});
+      } catch (error) { check(name,{ok:false,error:String(error)}); }
+    }
+    const requirements = ["crossOriginIsolated","sharedArrayBuffer","atomicsWait","offscreenTransfer","webgpu","gpuAdapter","gpuDevice","wasmCompile","workers"];
+    const failed = requirements.filter(k=>results[k] !== true);
+    const assets = probes.filter(([key])=>!results[key] || !results[key].ok).map(([key])=>key);
+    results.ok = failed.length===0 && assets.length===0;
+    results.failures = [...failed,...assets];
+    log(results.ok ? "Runtime ready — starting GTA V…" : "Compatibility check found issues: " + results.failures.join(", "));
+  } catch (error) {
+    results.ok = false;
+    results.failures = ["unexpected preflight error: "+String(error)];
+  }
+  try {
+    window.webkit.messageHandlers.gtaDiagnostics.postMessage({type:"preflight",detail:JSON.stringify(results)});
+  } catch (_) {}
+})();
+</script></body></html>

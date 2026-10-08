@@ -210,6 +210,14 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         refresh()
     }
 
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        GameOrientation.request(.portrait, from: view)
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         background.frame = view.bounds
@@ -287,7 +295,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         }
     }
     private func updateDevice(_ name: String) {
-        deviceLabel.text = name == "No controller" ? "◯  NO CONTROLLER  ·  TOUCH AVAILABLE" : "●  " + name.uppercased()
+        deviceLabel.text = name == "No controller" ? "◯  NO CONTROLLER  ·  PAIR IN IOS SETTINGS" : "●  " + name.uppercased()
     }
     @objc private func selectMode(_ sender: UIButton) {
         EngineOptions.set("mode", value: ["story", "sandbox5", "sandbox6"][sender.tag])

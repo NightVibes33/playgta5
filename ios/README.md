@@ -101,3 +101,15 @@ The fullscreen native dashboard no longer displays the default UINavigationBar a
 Settings are **only the actual switches present in this repository's homepage.html**: start mode/new game, frame limiter, render scale, low-memory worker behavior, shader packs/synchronous pipeline mode, game data prefetch/cache and trace/verbose/memory diagnostics, and engine quality flags -textureQuality, -shadowQuality, -reflectionQuality, -particleQuality, -grassQuality, -cityDensity, -lodScale, -pedVariety, -vehicleVariety, -pedLodBias and -vehicleLodBias. Higher numeric quality values are explicitly marked experimental, not claimed to be benchmarked, and shader configuration does not imply a native Metal renderer.
 
 EngineOptions.builds the actual runtime URL before each launch; changing settings never requires spoofed on-screen controls. The 60 FPS setting correctly uses ?fps=60 (which homepage.html translates to -frameLimit=1), not ?fps=0 (uncapped). The settings verification script asserts all parameter names exist in the repository's engine entrypoint and CI runs it before the device build.
+
+
+## iPhone 16 runtime hardening
+
+- The source-controlled homepage now receives a real viewport meta tag in \`prepare_runtime.sh\`; its original 1280×720 GTA loading artwork remains unchanged and scales to the iPhone's display.
+- The native launcher requests portrait orientation; gameplay requests landscape through \`UIWindowScene.requestGeometryUpdate\` and a navigation controller that forwards supported orientations.
+- Before starting the approximately 63MB \`game.wasm\`, WebKit loads a tiny \`/ios/preflight.html\` page from the same local server. It checks cross-origin isolation, SharedArrayBuffer/Atomics, OffscreenCanvas, WebAssembly compilation, GPU adapter/device access, and lightweight HEAD/range requests for the engine, shader index, game manifest, title artwork and audio worklet.
+- Failures show a detailed message with **Export diagnostics**, **Attempt engine anyway** and **Back**; the app does not silently load an incompatible game. Preflight logs report detected WebKit capabilities, no ungrounded JIT entitlement claims.
+- Runtime tool controls (input profile and debug export) are hidden behind the small ellipsis control during the original loading screen. The diagnostics banner disappears when the game publishes its world-ready message.
+- Hardware controllers still use Apple's GameController API; the input bridge is *not* a native GTA V gamepad ABI and analog gameplay remains unverified. No game files are downloaded or bundled. This commit cannot itself prove GPU compatibility or the game reaching a playable frame on a real iPhone 16.
+
+CI runs \`ios/Scripts/verify_runtime_preflight.py\` and compiles the iPhone ARM64 IPA without signing. A green run is only proof that the native app compiles and the IPA packages.

@@ -17,6 +17,8 @@ jobs:
         run: node --test ios/Tests/controller-bridge.test.cjs
       - name: Verify engine settings match the repository runtime
         run: python3 ios/Scripts/verify_engine_options.py
+      - name: Verify iPhone preflight and orientation
+        run: python3 ios/Scripts/verify_runtime_preflight.py
       - name: Prepare first-party runtime files
         run: bash ios/Scripts/prepare_runtime.sh
       - name: Generate Xcode project
