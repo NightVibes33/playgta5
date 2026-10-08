@@ -34,4 +34,19 @@ assert scripts, "No preflight script"
 with tempfile.NamedTemporaryFile(mode="w",suffix=".js") as f:
     f.write("\n".join(scripts)); f.flush()
     subprocess.run(["node","--check",f.name],check=True)
+
+# iPhone 16 regression: use a scene-owned fullscreen UIWindow, not legacy UIScreen.bounds.
+scene = (root / "ios/Sources/App/SceneDelegate.swift").read_text()
+app_delegate = (root / "ios/Sources/App/AppDelegate.swift").read_text()
+launcher = (root / "ios/Sources/UI/LauncherViewController.swift").read_text()
+plist = (root / "ios/Config/Info.plist").read_text()
+storage = (root / "ios/Sources/Storage/USBStorageManager.swift").read_text()
+assert "UIWindow(windowScene: windowScene)" in scene
+assert "UIWindow(frame: UIScreen.main.bounds)" not in app_delegate
+assert "UIApplicationSceneManifest" in plist and "SceneDelegate" in plist
+assert "config.imagePlacement = .top" in launcher
+assert "config.titleLineBreakMode = .byTruncatingTail" in launcher
+assert "playButton.isEnabled = true" in launcher
+assert "mirror/playgta5.com" in storage and "contentsOfDirectory" in storage
+print("PASS: native iPhone scene sizing, compact toolbar layout, USB folder traversal, and picker recovery")
 print("PASS: runtime prereq probes, original asset HEAD/range checks, iPhone portrait/landscape policy, JavaScript syntax")

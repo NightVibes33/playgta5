@@ -153,6 +153,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         srow.addArrangedSubview(stateText)
         srow.addArrangedSubview(fileIndicator)
         content.addArrangedSubview(storage)
+        let tapStorage = UITapGestureRecognizer(target: self, action: #selector(chooseFolder))
+        storage.addGestureRecognizer(tapStorage)
+        storage.isUserInteractionEnabled = true
+        storage.accessibilityLabel = "Choose USB game files folder"
+        storage.accessibilityTraits = .button
 
         content.addArrangedSubview(label("START SESSION", size: 10, weight: .bold, color: muted))
         let modes = UIStackView()
@@ -182,9 +187,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         toolRow.axis = .horizontal
         toolRow.distribution = .fillEqually
         toolRow.spacing = 8
-        style(folderButton, title: "GAME FILES", symbol: "folder", filled: false)
+        style(folderButton, title: "FILES", symbol: "folder", filled: false)
         style(settingsButton, title: "SETTINGS", symbol: "slider.horizontal.3", filled: false)
-        style(controllerButton, title: "CONTROLLER", symbol: "gamecontroller", filled: false)
+        style(controllerButton, title: "GAMEPAD", symbol: "gamecontroller", filled: false)
         folderButton.addTarget(self, action: #selector(chooseFolder), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
         controllerButton.addTarget(self, action: #selector(openControllerSetup), for: .touchUpInside)
@@ -246,20 +251,24 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         var config = UIButton.Configuration.plain()
         config.title = title
         config.image = UIImage(systemName: symbol)
-        config.imagePadding = 6
-        config.imagePlacement = .leading
+        config.imagePadding = 5
+        config.imagePlacement = .top
+        config.titleLineBreakMode = .byTruncatingTail
         config.baseForegroundColor = filled ? UIColor.black : .white
         config.background.backgroundColor = filled ? mint : panel
         config.cornerStyle = .medium
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8)
+        config.contentInsets = NSDirectionalEdgeInsets(top: 9, leading: 4, bottom: 9, trailing: 4)
         b.configuration = config
-        b.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
+        b.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
+        b.titleLabel?.numberOfLines = 1
+        b.titleLabel?.lineBreakMode = .byTruncatingTail
         b.titleLabel?.adjustsFontSizeToFitWidth = true
-        b.titleLabel?.minimumScaleFactor = 0.8
-        b.heightAnchor.constraint(greaterThanOrEqualToConstant: 43).isActive = true
+        b.titleLabel?.minimumScaleFactor = 0.75
+        b.heightAnchor.constraint(greaterThanOrEqualToConstant: filled ? 45 : 68).isActive = true
     }
     private func refresh() {
         updateMode()
+        playButton.configuration?.title = "LAUNCH GAME"
         if let root = USBStorageManager.shared.root {
             let missing = USBStorageManager.shared.missingStartupAssets()
             storageTitle.text = root.lastPathComponent + "  /  USB"
@@ -279,8 +288,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             storageDetails.text = "Connect your USB-C drive • Select mirror/playgta5.com"
             storageDetails.textColor = muted
             fileIndicator.backgroundColor = .systemOrange
-            playButton.isEnabled = false
-            playButton.alpha = 0.43
+            playButton.isEnabled = true
+            playButton.alpha = 1
+            playButton.configuration?.title = "SELECT GAME FILES"
         }
         updateDevice(ControllerManager.shared.currentName)
         highlightFocus()
@@ -324,19 +334,34 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         heldUp = up; heldDown = down; heldA = a
     }
     @objc private func chooseFolder() {
+        // Opening a drive in Files merely navigates inside it; the user must select
+        // the final playgta5.com folder and tap Open at the top of the picker.
+        LogStore.shared.write("usb-storage", "Opening Files document picker for mirror/playgta5.com")
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
         picker.delegate = self
         picker.allowsMultipleSelection = false
+        picker.modalPresentationStyle = .fullScreen
         present(picker, animated: true)
     }
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        LogStore.shared.write("usb-storage", "Files picker cancelled without choosing a folder")
+    }
+
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        guard let url = urls.first else { return }
+        guard let url = urls.first else {
+            LogStore.shared.write("usb-storage", "Picker returned no URLs")
+            return
+        }
+        LogStore.shared.write("usb-storage", "Picker selected: " + url.path)
         do {
             try USBStorageManager.shared.choose(url)
             refresh()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } catch {
-            let alert = UIAlertController(title: "Choose game directory",
-                message: error.localizedDescription, preferredStyle: .alert)
+            LogStore.shared.write("usb-storage", "Folder selection failed: " + error.localizedDescription)
+            let alert = UIAlertController(title: "Game folder not found",
+                message: error.localizedDescription + "\n\nIn Files, open your USB drive, then mirror, then select the playgta5.com folder itself using Open.",
+                preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default))
             present(alert, animated: true)
         }

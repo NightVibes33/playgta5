@@ -46,3 +46,54 @@ jobs:
             GTAiOS-unsigned.ipa
             ${{ runner.temp }}/build.log
           if-no-files-found: warn
+
+  ui-smoke:
+    name: iPhone simulator UI snapshot
+    runs-on: macos-15
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Prepare runtime and project
+        run: |
+          bash ios/Scripts/prepare_runtime.sh
+          xcodegen generate --spec ios/project.yml --project ios
+      - name: Find available iPhone simulator
+        id: simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; r=json.load(sys.stdin)["devices"]; v=[d for group in r.values() for d in group if "iPhone" in d["name"] and d["state"] != "unavailable"]; v.sort(key=lambda x: (x["name"] != "iPhone 16", x["name"])); print(v[0]["udid"] if v else "")')
+          if [ -z "$DEVICE" ]; then
+            echo "No iPhone simulator installed on this runner"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "udid=$DEVICE" >> "$GITHUB_OUTPUT"
+            echo "Testing simulator $DEVICE"
+          fi
+      - name: Compile and capture launch screen
+        if: steps.simulator.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          UDID="${{ steps.simulator.outputs.udid }}"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcodebuild -project ios/GTAiOS.xcodeproj -scheme GTAiOS -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/SimDerived" CODE_SIGNING_ALLOWED=NO build \
+            > "$RUNNER_TEMP/simulator-build.log" 2>&1
+          xcrun simctl install "$UDID" "$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/GTAiOS.app"
+          xcrun simctl launch "$UDID" com.nightvibes33.gtaios
+          sleep 6
+          xcrun simctl io "$UDID" screenshot iphone-launcher.png
+          test -s iphone-launcher.png
+      - name: Upload visual smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAiOS-iphone-simulator-screenshot
+          path: |
+            iphone-launcher.png
+            ${{ runner.temp }}/simulator-build.log
+          if-no-files-found: warn

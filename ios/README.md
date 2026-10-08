@@ -113,3 +113,14 @@ EngineOptions.builds the actual runtime URL before each launch; changing setting
 - Hardware controllers still use Apple's GameController API; the input bridge is *not* a native GTA V gamepad ABI and analog gameplay remains unverified. No game files are downloaded or bundled. This commit cannot itself prove GPU compatibility or the game reaching a playable frame on a real iPhone 16.
 
 CI runs \`ios/Scripts/verify_runtime_preflight.py\` and compiles the iPhone ARM64 IPA without signing. A green run is only proof that the native app compiles and the IPA packages.
+
+
+## iPhone 16 display and USB picker bugfix
+
+The original launcher was observed letterboxed in screenshots, with UIKit button text wrapped vertically. The app now uses a real `UIWindowScene`-owned `UIWindow(windowScene:)` on iPhone rather than creating a window from `UIScreen.main.bounds`, and declares the scene in Info.plist. This is the correct modern iOS window lifecycle; actual full-screen appearance must still be confirmed on an iPhone 16.
+
+The Files/Settings/Controller row now stacks icons above one-line captions. Launch is no longer an inert disabled button when there is no USB folder: pressing it opens Files for selection. The USB status panel is tappable as well.
+
+**External drive selection:** Navigate inside your external drive in the Files picker to `mirror/playgta5.com`. Tap **Open** to select that actual folder (tapping the drive name just opens the drive). The picker also accepts a parent folder or the disk root if iOS grants access to that directory. Root detection checks both `data/` and `b/` and searches up to three folder levels without scanning the 20 GB contents. Rejected selections produce a visible error and `usb-storage.txt` entries with the selected path and reason.
+
+Only a physically installed iPhone build can establish whether the Files provider allows an external folder bookmark to be restored across launches. This update does not claim the GTA runtime itself is playable.
