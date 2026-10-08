@@ -211,10 +211,10 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         // A minimal picker-only diagnostic: no 20GB scan, no bookmark, no disk
         // permissions beyond the chosen file. Distinguishes Files UI handoff
         // failures from issues opening the actual GTA game folder.
-        let pickerTip = label("FOLDER PICKER: OPEN playgta5.com, THEN TAP OPEN AT THE TOP", size: 10, weight: .medium, color: mint)
+        let pickerTip = label("FOLDER PICKER: TAP SELECT, CHOOSE playgta5.com, THEN OPEN", size: 10, weight: .medium, color: mint)
         pickerTip.numberOfLines = 2
         pickerTip.lineBreakMode = .byWordWrapping
-        pickerTip.accessibilityLabel = "For USB game files, enter the playgta5.com folder and tap the Open button in Files"
+        pickerTip.accessibilityLabel = "Select the playgta5.com folder with the Files selection control, then confirm Open; this does not copy the game"
         content.addArrangedSubview(pickerTip)
 
         let probeRow = UIStackView()
@@ -411,24 +411,32 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
                 "FOLDER_HELP: navigate INSIDE playgta5.com then tap the top-right Open button")
         }
         let picker: UIDocumentPickerViewController
+        // LiveContainer's working "Fix File Picker" hook replaces narrow UTTypes
+        // with [.item, .folder]. It also forces asCopy=true and multi-selection
+        // for folder-only pickers. For a 21 GB USB game we MUST keep the original
+        // file open in place; a copy-based folder import would fill device storage.
+        // We use the publicly supported broad types + selection controls, while
+        // deliberately preserving asCopy=false for USB access.
         switch mode {
         case .folder:
             picker = UIDocumentPickerViewController(
-                forOpeningContentTypes: [.folder], asCopy: false)
+                forOpeningContentTypes: [.item, .folder], asCopy: false)
         case .diagnosticText:
             picker = UIDocumentPickerViewController(
-                forOpeningContentTypes: [.plainText], asCopy: true)
+                forOpeningContentTypes: [.item, .folder], asCopy: true)
         case .indexFile:
             picker = UIDocumentPickerViewController(
-                forOpeningContentTypes: [.html], asCopy: false)
+                forOpeningContentTypes: [.item, .folder], asCopy: false)
         }
         picker.delegate = self
-        picker.allowsMultipleSelection = false
+        // LiveContainer forces this true for a folder-only picker, which permits
+        // explicit row selection instead of only navigating inside directories.
+        picker.allowsMultipleSelection = mode == .folder
         picker.shouldShowFileExtensions = true
         activePicker = picker
         lastPickerAction = String(describing: mode)
         LogStore.shared.write("usb-storage",
-            "PICKER_PRESENT_REQUEST mode=\(lastPickerAction), self=\(type(of: self))")
+            "PICKER_PRESENT_REQUEST mode=\(lastPickerAction) livecontainer_public_compat=1 types=item+folder asCopy=\(mode == .diagnosticText) multiselect=\(picker.allowsMultipleSelection)")
         present(picker, animated: true) { [weak self, weak picker] in
             guard let self else { return }
             LogStore.shared.write("usb-storage",
@@ -460,7 +468,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         activePicker = nil
         LogStore.shared.write("usb-storage",
             "FILES CALLBACK RECEIVED: selected count=\(urls.count), intent=\(method)")
-        guard let url = urls.first else {
+        // With multi-selection enabled, prefer the explicit game folder over a
+        // random child asset; never attempt to copy or inspect all selected items.
+        guard let url = urls.first(where: { $0.lastPathComponent == "playgta5.com" }) ?? urls.first else {
             LogStore.shared.write("usb-storage", "Files sent an empty selection")
             showPickerResult("Files returned nothing", "The picker did not provide a file URL.")
             return

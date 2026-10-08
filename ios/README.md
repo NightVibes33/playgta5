@@ -221,3 +221,34 @@ Important: iOS 27 beta 4 is not yet proven to contain an OS-level
 UIDocumentPicker bug. A different iOS build, file-provider app, device,
 or simulator may behave differently. Do not claim USB support without a
 successful `didPickDocumentsAt` callback and on-device archive validation.
+
+
+## Build 8: LiveContainer Fix File Picker compatibility (iPhone 16/iOS 27 beta 4)
+
+Root-cause comparison: upstream LiveContainer's guest-app "Fix File Picker"
+option is implemented in TweakLoader/DocumentPicker.m, NOT by swapping normal
+UIKit delegates. Its `hook_initForOpeningContentTypes:asCopy:` replaces
+narrow UTTypes with `@[UTTypeItem, UTTypeFolder]`; with Fix File Picker on,
+it also forces `asCopy:YES` and enables multiple selection for an original
+folder-only picker. Other hooks change security-scope reporting. A distinct
+"Fix File Picker (New)" setting additionally changes the private Files host
+identifier. These hooks apply to guest apps hosted by LiveContainer, not to
+ordinary independently signed SideStore apps.
+
+BUILD 8 adopts the *public API portions* of the working fix: use
+`UIDocumentPickerViewController(forOpeningContentTypes: [.item, .folder], asCopy: false)`
+for the external drive; enable `allowsMultipleSelection=true` for folder
+selection; keep a regular imported .txt fixture with broad accepted types
+and `asCopy:true` for a small-file diagnostic. The HTML picker also accepts
+broad types but still verifies that the selected file is index.html.
+
+**Important difference**: External game folders remain `asCopy:false`.
+Forcing folder copy could duplicate ~21 GB of game data onto internal storage,
+defeating USB streaming. The app doesn't copy game data, touch LiveContainer
+private hooks, or claim to bypass iOS file-provider permissions. If a real
+iOS 27 beta 4 picker still requires the original LiveContainer swizzles to
+select the folder, a standalone publicly supported picker cannot guarantee
+equivalent behavior; log PICKER_PRESENT_REQUEST and callback results and
+compare the explicit selection UI.
+
+Upstream source: https://github.com/LiveContainer/LiveContainer/blob/main/TweakLoader/DocumentPicker.m
