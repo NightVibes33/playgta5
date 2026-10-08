@@ -41,7 +41,7 @@ jobs:
               i64.add)
           )
           WAT
-          "$WABT_BIN_DIR/wat2wasm" --enable-all "$RUNNER_TEMP/test.wat" -o "$RUNNER_TEMP/test.wasm"
+          "$WABT_BIN_DIR/wat2wasm" --enable-threads --enable-memory64 "$RUNNER_TEMP/test.wat" -o "$RUNNER_TEMP/test.wasm"
           bash ios/Scripts/aot_compile.sh "$RUNNER_TEMP/test.wasm" "$RUNNER_TEMP/smoke-aot"
           python3 - "$RUNNER_TEMP/smoke-aot/engine-imports.json" <<'PY'
           import json,sys
