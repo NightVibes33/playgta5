@@ -12,21 +12,32 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Install native Wasmtime 49 ARM64 runtime and headers
+      - name: Resolve pinned Wasmtime iOS static runtime (rebuild on artifact expiry)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/wasmtime-artifact" ios/Vendor/Wasmtime/include
-          gh run download 37863716790 -R "$GITHUB_REPOSITORY" \
-            -n ios-wasmtime49-threads-runtime-arm64 \
-            -D "$RUNNER_TEMP/wasmtime-artifact"
-          cp "$RUNNER_TEMP/wasmtime-artifact/wasmtime/target/aarch64-apple-ios/release/libwasmtime.a" ios/Vendor/Wasmtime/
-          cp -R "$RUNNER_TEMP/wasmtime-artifact/wasmtime/crates/c-api/include/." ios/Vendor/Wasmtime/include/
+          LATEST=$(gh run list -R "$GITHUB_REPOSITORY" -w ios-wasmtime-host.yml \
+            --branch ios-usb-port --limit 30 --json databaseId,conclusion \
+            --jq '[.[] | select(.conclusion == "success")][0].databaseId // empty')
+          if [ -n "$LATEST" ] && gh run download "$LATEST" -R "$GITHUB_REPOSITORY" \
+               -n ios-wasmtime49-threads-runtime-arm64 \
+               -D "$RUNNER_TEMP/wasmtime-artifact"; then
+            cp "$RUNNER_TEMP/wasmtime-artifact/wasmtime/target/aarch64-apple-ios/release/libwasmtime.a" ios/Vendor/Wasmtime/
+            cp -R "$RUNNER_TEMP/wasmtime-artifact/wasmtime/crates/c-api/include/." ios/Vendor/Wasmtime/include/
+          else
+            echo 'No cached Wasmtime runtime artifact available; compiling pinned source.'
+            git clone --depth 1 --branch v49.0.2 https://github.com/bytecodealliance/wasmtime.git "$RUNNER_TEMP/wasmtime-source"
+            rustup target add aarch64-apple-ios
+            (cd "$RUNNER_TEMP/wasmtime-source" && cargo build --locked --release -p wasmtime-c-api \
+              --target aarch64-apple-ios --no-default-features --features threads)
+            cp "$RUNNER_TEMP/wasmtime-source/target/aarch64-apple-ios/release/libwasmtime.a" ios/Vendor/Wasmtime/
+            cp -R "$RUNNER_TEMP/wasmtime-source/crates/c-api/include/." ios/Vendor/Wasmtime/include/
+          fi
           test -s ios/Vendor/Wasmtime/libwasmtime.a
           test -s ios/Vendor/Wasmtime/include/wasm.h
-          file ios/Vendor/Wasmtime/libwasmtime.a
-          echo 'Wasmtime native staticlib + C API installed; GTA engine code stays on USB'
+          echo 'Wasmtime iPhone static host + C API ready; no GTA game code in IPA.'
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Verify native Metal and USB architecture

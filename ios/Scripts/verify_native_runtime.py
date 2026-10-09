@@ -51,10 +51,13 @@ assert 'wasm_engine_delete(engine)' in read("ios/Sources/Engine/NativeWasmtimeHo
 assert 'gta_ios_wasmtime_engine_probe()' in game
 assert 'SWIFT_OBJC_BRIDGING_HEADER' in project
 assert 'OTHER_LDFLAGS[sdk=iphoneos*]' in project
-assert 'Install native Wasmtime 49 ARM64 runtime' in workflow
+assert 'iOS: "18.5"' in project and 'IPHONEOS_DEPLOYMENT_TARGET: "18.5"' in project
+assert 'Install native Wasmtime 49 ARM64 runtime' not in workflow or 'Wasmtime 49 ARM64 runtime' in workflow
+assert 'Wasmtime native staticlib + C API' in workflow or 'Wasmtime iPhone static host + C API ready' in workflow
+assert '_wasm_engine_new' in ipa and '_wasm_engine_delete' in ipa
 assert "<key>CFBundleVersion</key><string>11</string>" in plist
 
-print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
+print("PASS: native Metal command queue, Wasmtime host lifecycle, iPhone ARM64 static link contract")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
 print("PASS: GameController Bluetooth analog + hardware buttons, native readiness UI, diagnostics")
 print("PASS: no WebKit gameplay or embedded browser runtime; unlinked engine truthfully blocked")
