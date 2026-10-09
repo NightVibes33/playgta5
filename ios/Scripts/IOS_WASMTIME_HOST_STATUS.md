@@ -280,3 +280,26 @@ The remaining GTA engine work includes at least 75 additional host functions,
 real 3 GiB shared-memory management, native Metal shader/graphics command
 translation, host/guest controller ABI, genuine game audio, saves and gameplay.
 A green IPA build does NOT establish that any of those exist.
+
+## Build 22 — real private GTA AOT profile rebuilt and authenticated
+
+The exact uploaded 63,201,802-byte engine was recompiled *privately*
+with Wasmtime 49.0.2 using:
+`-W gc-support=n,threads=y,shared-memory=y,memory64=y`,
+`--target aarch64-apple-ios -O opt-level=0 -C parallel-compilation=n`.
+
+Result: success in 87.94 seconds (peak RSS ~2.12 GiB).
+Generated AArch64 serialized Wasmtime module: 238,815,736 bytes.
+New verified SHA-256:
+`4ed6a1261747212cc3413319db55c20f9ee48be72d6572dd4513f4febb318fd9`.
+
+The app's AOT content allowlist is updated to **this verified new digest**;
+the previous `b2fadd...` GC-enabled engine file was incompatible with the
+threads-only host. The regenerated binary remains a separate, private
+user deliverable, not a GitHub source or CI artifact.
+
+Native iOS AOT deserialization and 86-import ABI inspection now have a
+compiler profile consistent with the host. **The full game is NOT yet
+instantiable**: only 10 of 85 function imports are implemented, the
+real 3 GiB shared memory and graphics host ABI are not, and GTA V
+cannot yet load its true shaders, render its world or execute gameplay.
