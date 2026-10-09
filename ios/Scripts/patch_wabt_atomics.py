@@ -59,7 +59,7 @@ s=s.replace(old,new)
 anchor='  Write(s_source_includes);'
 if s.count(anchor)!=1:
     raise SystemExit('Pinned WABT include emission changed; refusing patch')
-included='  Write(Newline(), "#include ' + chr(92) + '"gta-native-atomics.h' + chr(92) + '", Newline());'
+included='  Write(Newline(), "#include <gta-native-atomics.h>", Newline());'
 s=s.replace(anchor,anchor+'\n'+included)
 p.write_text(s)
 print('Patched atomic wait32/wait64/notify C generation with real portable sidecar API')
