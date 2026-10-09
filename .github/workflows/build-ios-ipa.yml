@@ -50,6 +50,13 @@ jobs:
           test -s ios/Vendor/Wasmtime/include/wasm.h
           test -s ios/Vendor/Wasmtime/include/wasmtime/conf.h
           echo 'Wasmtime iPhone static host + C API ready; no GTA game code in IPA.'
+      - name: Verify verified native WASM keyboard/mouse input ABI
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror \
+            ios/Sources/Input/NativeGameInputABI.c \
+            ios/Tests/native-input-abi.test.c -lm -lpthread \
+            -o "$RUNNER_TEMP/native-input-abi-test"
+          "$RUNNER_TEMP/native-input-abi-test"
       - name: Compile signed-device ARM64 AOT execution smoke fixture
         run: |
           set -euo pipefail

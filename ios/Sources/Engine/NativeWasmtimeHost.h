@@ -1,6 +1,7 @@
 #ifndef GTA_IOS_NATIVE_WASMTIME_HOST_H
 #define GTA_IOS_NATIVE_WASMTIME_HOST_H
 #include <stddef.h>
+#include "../Input/NativeGameInputABI.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

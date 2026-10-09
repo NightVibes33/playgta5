@@ -78,6 +78,34 @@ static wasm_trap_t *gta_basic_callback(
     }
 }
 
+/* The original WASM engine's env.wasm_input_publish_js(i64)->void
+ * publishes the address of its real WasmInputBlock in shared memory.
+ * No fake gamepad ABI is invented; this is the verified keyboard/mouse ABI.
+ */
+static wasm_trap_t *gta_native_input_callback(
+    void *env, wasmtime_caller_t *caller, const wasmtime_val_t *args,
+    size_t nargs, wasmtime_val_t *results, size_t nresults
+) {
+    (void)env; (void)caller; (void)results;
+    if (nargs == 1 && nresults == 0 && args[0].kind == WASMTIME_I64)
+        gta_native_input_publish_block((uint64_t)args[0].of.i64);
+    return NULL;
+}
+
+static int gta_define_input_callback(wasmtime_linker_t *linker) {
+    wasm_valtype_t *param = wasm_valtype_new(WASM_I64);
+    if (!param) return -1;
+    wasm_functype_t *type = wasm_functype_new_1_0(param);
+    if (!type) return -2;
+    const char *name = "wasm_input_publish_js";
+    wasmtime_error_t *error = wasmtime_linker_define_func(
+        linker, "env", 3, name, strlen(name), type,
+        gta_native_input_callback, NULL, NULL);
+    wasm_functype_delete(type);
+    if (error) { wasmtime_error_delete(error); return -3; }
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -166,10 +194,16 @@ int gta_ios_wasmtime_register_host_basics(
                              GTA_BLOCKING_ALLOWED_CHECK, message, capacity);
     if (rc != 0) return rc;
     if (installed) ++*installed;
+    rc = gta_define_input_callback(linker);
+    if (rc != 0) {
+        gta_host_message(message, capacity, "Native WASM shared-memory input callback registration failed");
+        return rc;
+    }
+    if (installed) ++*installed;
     return 0;
 }
 
-/* Returns 0 only when all eight ABI-matched host functions are registered
+/* Returns 0 only when all nine ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -214,7 +248,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
             gta_host_message(message, capacity, "Monotonic clock callback failed");
         } else {
             gta_host_message(message, capacity,
-                "Eight native GTA host callbacks registered; monotonic function invoked correctly");
+                "Nine native GTA host callbacks registered; monotonic function invoked correctly");
         }
         if (error) wasmtime_error_delete(error);
         if (trap) wasm_trap_delete(trap);
@@ -241,12 +275,45 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "WASM memory64 logical maximum host callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Eight native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
+                    "Nine native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
         }
         if (heap.kind == WASMTIME_EXTERN_FUNC) wasmtime_extern_delete(&heap);
+    }
+    if (result == 0) {
+        /* Exercise the exact engine-published input-block callback; no 3GiB
+         * memory allocated and no unsupported GTA function is invoked. */
+        wasmtime_extern_t input_export = {0};
+        const char *name = "wasm_input_publish_js";
+        if (!wasmtime_linker_get(linker, context, "env", 3,
+                name, strlen(name), &input_export)
+                || input_export.kind != WASMTIME_EXTERN_FUNC) {
+            result = -25;
+            gta_host_message(message, capacity,
+                             "Native game input linker resolution failed");
+        } else {
+            wasmtime_val_t address = {0};
+            address.kind = WASMTIME_I64;
+            address.of.i64 = 256;
+            wasm_trap_t *trap = NULL;
+            wasmtime_error_t *error = wasmtime_func_call(context,
+                &input_export.of.func, &address, 1, NULL, 0, &trap);
+            if (error || trap || gta_native_input_block_offset() != 256) {
+                result = -26;
+                gta_host_message(message, capacity,
+                    "Actual WASM input block publish callback failed");
+            } else {
+                gta_host_message(message, capacity,
+                    "Nine verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
+            }
+            if (error) wasmtime_error_delete(error);
+            if (trap) wasm_trap_delete(trap);
+            gta_native_input_unbind();
+        }
+        if (input_export.kind == WASMTIME_EXTERN_FUNC)
+            wasmtime_extern_delete(&input_export);
     }
     wasmtime_store_delete(store);
 finish:
