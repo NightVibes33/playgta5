@@ -17,6 +17,7 @@ jobs:
           repository: WebAssembly/wabt
           ref: b835f1ce49e5803c597a0548099456d6be1d3d11
           path: thirdparty/wabt
+          submodules: true
       - name: Apply portable atomic wait-notify wasm2c patch
         run: python3 ios/Scripts/patch_wabt_atomics.py thirdparty/wabt/src/c-writer.cc
       - name: Compile pinned WABT tools on Linux
@@ -26,6 +27,8 @@ jobs:
           mkdir -p dist/runtime_headers
           cp build-wabt/wasm2c build-wabt/wasm-validate build-wabt/wasm-objdump build-wabt/wat2wasm dist/
           cp thirdparty/wabt/wasm2c/*.h dist/runtime_headers/
+          test -s thirdparty/wabt/third_party/simde/simde/wasm/simd128.h
+          cp -R thirdparty/wabt/third_party/simde/simde dist/runtime_headers/simde
           echo "WABT commit b835f1ce49e5803c597a0548099456d6be1d3d11" > dist/BUILD_SOURCE.txt
           file dist/wasm2c
       - name: Verify atomic memory64 WASM code generation and C compile
@@ -46,8 +49,8 @@ jobs:
           WAT
           build-wabt/wat2wasm --enable-threads "$RUNNER_TEMP/atomic.wat" -o "$RUNNER_TEMP/atomic.wasm"
           build-wabt/wasm2c --enable-threads --no-debug-names -n atomic_test -o "$RUNNER_TEMP/atomic.c" "$RUNNER_TEMP/atomic.wasm"
-          clang -std=c11 -pthread -Ithirdparty/wabt/wasm2c -Iios/NativeRuntime -c "$RUNNER_TEMP/atomic.c" -o "$RUNNER_TEMP/atomic.o"
-          clang -std=c11 -pthread -Ithirdparty/wabt/wasm2c -Iios/NativeRuntime -c ios/NativeRuntime/gta-native-atomics.c -o "$RUNNER_TEMP/atomics.o"
+          clang -std=c11 -pthread -Ithirdparty/wabt/wasm2c -Ithirdparty/wabt/third_party/simde -Iios/NativeRuntime -c "$RUNNER_TEMP/atomic.c" -o "$RUNNER_TEMP/atomic.o"
+          clang -std=c11 -pthread -Ithirdparty/wabt/wasm2c -Ithirdparty/wabt/third_party/simde -Iios/NativeRuntime -c ios/NativeRuntime/gta-native-atomics.c -o "$RUNNER_TEMP/atomics.o"
           grep -Fq 'gta_wasm_atomic_wait32' "$RUNNER_TEMP/atomic.c"
           grep -Fq 'gta_wasm_atomic_notify' "$RUNNER_TEMP/atomic.c"
           echo 'PASS: shared memory64 atomic wait32/notify -> compiled native C objects'
