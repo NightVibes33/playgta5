@@ -94,7 +94,12 @@ jobs:
               i32.const 42
               i32.store
               local.get 0
-              i32.load))
+              i32.load)
+            ;; Device test reads the actual 444-byte keyboard/mouse input
+            ;; block populated by NativeGameInputABI.c. Not GTA gameplay.
+            (func (export "input_w") (param i64) (result i32)
+              local.get 0
+              i32.load8_u))
           WAT
           "$WASMTIME" compile --target aarch64-apple-ios -O opt-level=0 \
             -C parallel-compilation=n \

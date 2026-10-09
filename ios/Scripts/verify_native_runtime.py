@@ -126,6 +126,13 @@ assert 'wasmtime_linker_define' in memory_probe
 assert 'wasmtime_linker_instantiate' in memory_probe
 assert 'wasmtime_sharedmemory_data_size(memory) != 65536' in memory_probe
 assert 'answer.of.i32 != 42 || observed != 42' in memory_probe
+assert 'gta_native_input_bind_memory(wasmtime_sharedmemory_data(memory)' in memory_probe
+assert 'gta_native_input_publish_block(INPUT_BLOCK)' in memory_probe
+assert 'gta_native_input_apply(&pad)' in memory_probe
+assert 'key_pressed.of.i32 != 0x80' in memory_probe
+assert 'key_released.of.i32 != 0' in memory_probe
+assert 'gta_native_input_unbind()' in memory_probe
+assert '(func (export "input_w")' in workflow
 assert 'wasmtime_sharedmemory_delete(memory)' in memory_probe
 assert 'gta_ios_wasmtime_memory64_smoke' in game
 assert 'native-memory64-smoke.cwasm' in workflow
@@ -150,9 +157,9 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>18</string>" in plist
+assert "<key>CFBundleVersion</key><string>19</string>" in plist
 
-print("PASS: native Metal/Wasmtime and imported shared memory64 AOT execution probe compiled into device app")
+print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
 print("PASS: native Bluetooth and touch control capture, runtime controls, thermal/UI tick diagnostics")
 print("PASS: atomic native saves and PCM audio output service present, not yet engine-bound")
