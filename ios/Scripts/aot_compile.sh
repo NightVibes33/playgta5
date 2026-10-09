@@ -12,6 +12,9 @@ out="$(cd "$out" && pwd)"
 wasm="$(cd "$(dirname "$wasm")" && pwd)/$(basename "$wasm")"
 "$WABT_BIN_DIR/wasm-validate" --enable-threads "$wasm"
 python3 "$(dirname "$0")/aot_import_audit.py" "$wasm" --json "$out/engine-imports.json"
+# The real GTA V engine uses memory.atomic.wait32/notify. WABT's CWriter
+# aborts on these; reject them BEFORE producing truncated proprietary C output.
+python3 "$(dirname "$0")/aot_feature_gate.py" "$wasm" --objdump "$WABT_BIN_DIR/wasm-objdump"
 "$WABT_BIN_DIR/wasm2c" --enable-threads --no-debug-names -n native_engine -o "$out/native_engine.c" "$wasm"
 test -s "$out/native_engine.c"
 test -s "$out/native_engine.h"

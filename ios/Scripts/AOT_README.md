@@ -41,3 +41,20 @@ supported runtime and permitted under the user's signing/debugging setup.
 Never advertise this binary compiler, a black Metal surface, or the
 native-foundation IPA as a finished game until the genuine GTA world renders,
 loads its assets and accepts gameplay input.
+
+
+## Real engine was received and tested
+
+The authorized 63,201,802-byte `game.wasm` was privately uploaded and
+its SHA-256 matched the existing investigation. WABT `wasm-validate`
+succeeded. **But `wasm2c` is not yet compatible with this game**: it
+aborts at `src/c-writer.cc:4417` on unsupported thread wait/notify
+codegen. We confirmed `memory.atomic.notify` and
+`memory.atomic.wait32` in the actual code. See
+`ios/Scripts/ENGINE_REAL_AOT_REPORT.md`. `aot_feature_gate.py`
+now rejects this unsupported path deterministically. Synthetic AOT
+success is not real engine conversion.
+
+A compatible AOT backend or semantics-correct atomic wait/notify
+compiler/runtime implementation is necessary before compiling to ARM64.
+The engine has not been linked or run on iPhone.
