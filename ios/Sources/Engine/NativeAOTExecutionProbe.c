@@ -45,6 +45,9 @@ int gta_ios_wasmtime_execute_smoke(const char *aot_path, char *message, size_t c
     }
     wasm_config_t *cfg = wasm_config_new();
     if (!cfg) return -2;
+    // Require exactly the GC-disabled profile used when compiling our
+    // signed iOS AOT modules; the static Wasmtime host has no GC feature.
+    wasmtime_config_gc_support_set(cfg, false);
     wasmtime_config_wasm_threads_set(cfg, true);
     wasmtime_config_shared_memory_set(cfg, true);
     wasmtime_config_wasm_memory64_set(cfg, true);

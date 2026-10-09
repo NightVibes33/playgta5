@@ -12,11 +12,11 @@ enum NativeAOTModuleProbe {
         case failed(String)
     }
 
-    // The verified, private Wasmtime 49.0.2 compiler output generated from
-    // exact SHA256-matched game.wasm. Deserialization is UNSAFE for arbitrary
+    // GC-disabled Wasmtime 49.0.2 compiler output verified from
+    // exact SHA256-matched game.wasm. This supersedes the old GC-enabled\n    // serialized module that iOS beta 4 rejected. Deserialization is UNSAFE for arbitrary
     // data: never remove this content allowlist.
     static let allowedSHA256 =
-        "b2fadd0881302505388104a0ff6b428db65106edd81a8e5a64fcfa905a4febb0"
+        "4ed6a1261747212cc3413319db55c20f9ee48be72d6572dd4513f4febb318fd9"
     static let expectedBytes: Int64 = 238_815_736
     private static let worker = DispatchQueue(label: "gtaios.native.aot-imports", qos: .userInitiated)
 

@@ -144,7 +144,16 @@ final class GameViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        GameOrientation.request(.landscape, from: view)
+        // iOS 27 can reject an immediate geometry request while a portrait
+        // navigation push is still resolving. Invalidate UIKit's orientation
+        // masks and request landscape on the next run loop after presentation.
+        setNeedsUpdateOfSupportedInterfaceOrientations()
+        navigationController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.view.window != nil else { return }
+            self.navigationController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            GameOrientation.request(.landscape, from: self.view)
+        }
         guard !inspectStarted else { return }
         inspectStarted = true
         #if targetEnvironment(simulator)

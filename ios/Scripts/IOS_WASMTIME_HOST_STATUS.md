@@ -246,3 +246,60 @@ AOT executable pages, even for this signed fixture.
   shared memory64) and the Metal renderer are implemented.
 - This is not engine execution or gameplay. It only provides a genuine
   prerequisite for loading the original game archives.
+
+
+## Build 21 — iPhone 16 / iOS 27 beta 4: compatibility corrections
+
+Real user logs from BUILD 20 confirm the USB folder was granted and passed
+validation. Metal A18 GPU creation and native host C-API initialization both
+succeeded, along with a 10/85 genuine host-function registration smoke.
+
+Two signed-bundle native AOT fixtures failed Wasmtime deserialization:
+`module was compiled with GC however GC is disabled in the host`.
+The v49.0.2 host was built with `--no-default-features --features threads`.
+The v49.0.2 CLI defaults to GC-enabled support even for basic modules.
+Build 21 therefore compiles both iOS fixtures with
+`-W gc-support=n,threads=y,shared-memory=y,memory64=y` and explicitly
+sets `wasmtime_config_gc_support_set(false)` in the three deserializing
+C-API engines. This aligns serialized artifact configuration with the
+actual installed runtime rather than enabling a missing runtime feature.
+
+The same compatible flag is set in `aot_compile_wasmtime.sh` for a
+user-authorized private GTA engine build. The original
+`real-gta-ios.cwasm` SHA allowlist is NOT updated speculatively: an
+actual newly compiled engine would have a different digest and size,
+which must be verified before the app can deserialize it. No GTA
+engine instantiation or actual gameplay is claimed.
+
+A separate `None of the requested orientations are supported` diagnostic
+indicates a race during portrait-launcher to landscape-native-view navigation.
+Build 21 refreshes UIKit orientation support during the navigation
+transition and schedules geometry selection after presentation.
+
+The remaining GTA engine work includes at least 75 additional host functions,
+real 3 GiB shared-memory management, native Metal shader/graphics command
+translation, host/guest controller ABI, genuine game audio, saves and gameplay.
+A green IPA build does NOT establish that any of those exist.
+
+## Build 22 — real private GTA AOT profile rebuilt and authenticated
+
+The exact uploaded 63,201,802-byte engine was recompiled *privately*
+with Wasmtime 49.0.2 using:
+`-W gc-support=n,threads=y,shared-memory=y,memory64=y`,
+`--target aarch64-apple-ios -O opt-level=0 -C parallel-compilation=n`.
+
+Result: success in 87.94 seconds (peak RSS ~2.12 GiB).
+Generated AArch64 serialized Wasmtime module: 238,815,736 bytes.
+New verified SHA-256:
+`4ed6a1261747212cc3413319db55c20f9ee48be72d6572dd4513f4febb318fd9`.
+
+The app's AOT content allowlist is updated to **this verified new digest**;
+the previous `b2fadd...` GC-enabled engine file was incompatible with the
+threads-only host. The regenerated binary remains a separate, private
+user deliverable, not a GitHub source or CI artifact.
+
+Native iOS AOT deserialization and 86-import ABI inspection now have a
+compiler profile consistent with the host. **The full game is NOT yet
+instantiable**: only 10 of 85 function imports are implemented, the
+real 3 GiB shared memory and graphics host ABI are not, and GTA V
+cannot yet load its true shaders, render its world or execute gameplay.

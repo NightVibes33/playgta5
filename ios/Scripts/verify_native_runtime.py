@@ -129,6 +129,12 @@ assert 'wasm_userdata_page_js' in host
 assert 'emscripten_check_blocking_allowed' in host
 assert 'gta_define_void' in host
 assert 'native-aot-smoke.cwasm' in workflow
+assert workflow.count('-W gc-support=n,threads=y,shared-memory=y,memory64=y') == 2
+assert '-W gc-support=n,threads=y,shared-memory=y,memory64=y' in read('ios/Scripts/aot_compile_wasmtime.sh')
+for name in ['NativeAOTExecutionProbe.c', 'NativeAOTMemoryProbe.c', 'NativeAOTModuleProbe.c']:
+    assert 'wasmtime_config_gc_support_set(' in read('ios/Sources/Engine/' + name)
+assert 'setNeedsUpdateOfSupportedInterfaceOrientations()' in game
+assert '.allButUpsideDown' in read('ios/Sources/UI/GameNavigationController.swift')
 memory_probe = read("ios/Sources/Engine/NativeAOTMemoryProbe.c")
 assert 'wasmtime_memorytype_new(1, true, 2, true, true, 16' in memory_probe
 assert 'wasmtime_sharedmemory_new' in memory_probe
@@ -148,6 +154,7 @@ assert 'gta_ios_wasmtime_memory64_smoke' in game
 assert 'native-memory64-smoke.cwasm' in workflow
 assert 'gta_ios_wasmtime_memory64_smoke' in read("ios/Sources/Engine/NativeWasmtimeHost.h")
 assert '_gta_ios_wasmtime_memory64_smoke' in ipa
+assert '4ed6a1261747212cc3413319db55c20f9ee48be72d6572dd4513f4febb318fd9' in read('ios/Sources/Engine/NativeAOTModuleProbe.swift')
 assert 'case .deserialized(let imports, let linked, let details)' in game
 assert 'gta_ios_wasmtime_register_host_basics' in host
 assert 'emscripten_get_heap_max' in host
@@ -167,7 +174,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>20</string>" in plist
+assert "<key>CFBundleVersion</key><string>22</string>" in plist
 
 print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
