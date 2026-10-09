@@ -1,0 +1,34 @@
+name: Build pinned Wasmtime compiler for private engine feasibility tests
+on:
+  push:
+    branches: [native-aot-work]
+    paths:
+      - ".github/workflows/wasmtime-compiler-examiner.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-tool:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Download and verify official Wasmtime 49.0.2 x86_64 Linux CLI
+        run: |
+          set -euo pipefail
+          curl -fL --retry 4 --retry-delay 3 \
+            https://github.com/bytecodealliance/wasmtime/releases/download/v49.0.2/wasmtime-v49.0.2-x86_64-linux.tar.xz \
+            -o "$RUNNER_TEMP/wasmtime.tar.xz"
+          echo 'a4d6e9e3a5a60f527cf7793d674c48930c80c2e8977995b8a275cad3254b9322  '"$RUNNER_TEMP/wasmtime.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/unpacked" dist
+          tar -xJf "$RUNNER_TEMP/wasmtime.tar.xz" -C "$RUNNER_TEMP/unpacked"
+          bin="$(find "$RUNNER_TEMP/unpacked" -type f -name wasmtime -print -quit)"
+          test -n "$bin"
+          cp "$bin" dist/wasmtime
+          chmod 755 dist/wasmtime
+          dist/wasmtime --version
+          file dist/wasmtime
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinned-wasmtime-cli-linux-x86_64
+          path: dist/wasmtime
+          retention-days: 2

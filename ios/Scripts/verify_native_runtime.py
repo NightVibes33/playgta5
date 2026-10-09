@@ -69,7 +69,11 @@ assert 'gta_ios_wasmtime_engine_probe()' in game
 assert 'SWIFT_OBJC_BRIDGING_HEADER' in project
 assert 'OTHER_LDFLAGS[sdk=iphoneos*]' in project
 assert 'Resolve pinned Wasmtime iOS static runtime' in workflow
-assert "<key>CFBundleVersion</key><string>11</string>" in plist
+assert 'generate_wasmtime_conf.py' in workflow
+assert 'conf.h.in' in workflow
+assert 'xcrun nm "' in ipa
+assert '_gta_ios_wasmtime_aot_probe' in ipa
+assert "<key>CFBundleVersion</key><string>12</string>" in plist
 
 print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
