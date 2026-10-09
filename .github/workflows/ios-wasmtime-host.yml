@@ -1,0 +1,53 @@
+name: Probe iPhone ARM64 Wasmtime native runtime
+on:
+  push:
+    branches: [native-aot-work]
+    paths: [".github/workflows/ios-wasmtime-host.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-host:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      CARGO_BUILD_JOBS: 4
+    steps:
+      - name: Checkout pinned Wasmtime 49.0.2 source
+        uses: actions/checkout@v4
+        with:
+          repository: bytecodealliance/wasmtime
+          ref: v49.0.2
+          path: wasmtime
+      - name: Install the official iPhone ARM64 Rust target
+        run: |
+          rustc --version
+          cargo --version
+          rustup target add aarch64-apple-ios
+          xcodebuild -version
+      - name: Cross-compile native Wasmtime C API with thread support
+        working-directory: wasmtime
+        run: |
+          set -euo pipefail
+          cargo build --locked --release -p wasmtime-c-api \
+            --target aarch64-apple-ios --no-default-features --features threads
+          test -s target/aarch64-apple-ios/release/libwasmtime.a
+          file target/aarch64-apple-ios/release/libwasmtime.a
+          du -h target/aarch64-apple-ios/release/libwasmtime.a
+      - name: Record native host library provenance
+        run: |
+          set -euo pipefail
+          mkdir -p report
+          {
+            echo 'Wasmtime 49.0.2 C API'
+            echo 'Target: aarch64-apple-ios'
+            echo 'Features: threads; cranelift disabled (runtime intended for AOT deserialize)'
+            echo 'This test does not prove executable-memory or code-signing compatibility on iOS.'
+            shasum -a 256 wasmtime/target/aarch64-apple-ios/release/libwasmtime.a
+            file wasmtime/target/aarch64-apple-ios/release/libwasmtime.a
+          } > report/ios-wasmtime-runtime.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-wasmtime-host-compile-report
+          path: report/ios-wasmtime-runtime.txt
+          retention-days: 3
