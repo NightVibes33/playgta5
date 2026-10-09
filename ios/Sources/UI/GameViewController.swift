@@ -192,7 +192,7 @@ final class GameViewController: UIViewController {
         let hostDetail = String(cString: hostMessage)
         LogStore.shared.write("native",
             "Real GTA native host callbacks: result=\(basicProbe), registered=\(registered)/85, message=\(hostDetail)")
-        if basicProbe != 0 || registered != 8 {
+        if basicProbe != 0 || registered != 9 {
             status.text = "Native Wasmtime host callback test failed (\(basicProbe)). \(hostDetail)"
             return
         }

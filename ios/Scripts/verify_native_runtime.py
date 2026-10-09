@@ -90,6 +90,16 @@ assert 'wasm_engine_delete(engine)' in read("ios/Sources/Engine/NativeWasmtimeHo
 assert 'gta_ios_wasmtime_engine_probe()' in game
 host = read("ios/Sources/Engine/NativeWasmHostBasics.c")
 assert 'gta_ios_wasmtime_basic_host_probe' in host
+input_abi = read("ios/Sources/Input/NativeGameInputABI.c")
+input_header = read("ios/Sources/Input/NativeGameInputABI.h")
+assert 'GTA_WASM_INPUT_BLOCK_BYTES 444' in input_header
+assert 'gta_native_input_publish_block' in input_abi and 'gta_native_input_bind_memory' in input_abi
+assert 'gta_native_input_apply' in input_abi and 'WORD_BUTTONS' in input_abi
+assert 'gta_define_input_callback' in host and 'wasm_input_publish_js' in host
+assert 'gta_native_input_apply(&pad)' in game
+assert 'registered != 9' in game
+assert 'native-input-abi.test.c' in workflow
+
 assert 'wasmtime_linker_define_func' in host
 assert 'wasmtime_linker_get' in host
 assert 'wasmtime_func_call' in host
@@ -140,7 +150,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>17</string>" in plist
+assert "<key>CFBundleVersion</key><string>18</string>" in plist
 
 print("PASS: native Metal/Wasmtime and imported shared memory64 AOT execution probe compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

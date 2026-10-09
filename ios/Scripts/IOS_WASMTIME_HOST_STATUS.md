@@ -169,3 +169,34 @@ No device execution is claimed based on CI alone. It is intentionally a
 49152-page (3 GiB) minimum. The remaining unimplemented 77 host imports,
 memory-size validation on hardware, native Metal shader bridge, audio, save
 and input binding still block actual gameplay.
+
+
+## Build 18: verified native GTA keyboard/mouse input ABI (not gameplay)
+
+The actual game.wasm imports `env.wasm_input_publish_js(i64)->void`
+(type 1). The original homepage installer documents a **444-byte**
+shared-memory WasmInputBlock: 256 virtual-key bytes, 10 int32 words,
+64 UTF-16 queue entries and debug/viewport/start-mode fields.
+The native app now registers the ninth signature-correct Wasmtime callback
+for this real engine import and tests it with a 64-bit block offset.
+
+`NativeGameInputABI.c` binds a user-provided shared-memory base and safely
+writes only inside the 444-byte region, using atomic key/mouse writes and
+bounds/alignment validation. It maps merged GameController + touch controls
+into the engine's actual keyboard/mouse ABI, including movement keys, camera
+delta, mouse fire/aim, menu, foot/vehicle/air mapping and release on disconnect.
+The native frame loop sends a staged frame every display-link tick.
+A deterministic 1024-byte memory fixture tests the original layout, camera
+deltas, buttons, driving input, bounds and key release; it never allocates
+the GTA engine's 3GiB memory.
+
+The engine is **not instantiated**: the real `env.memory` import remains
+unprovided, so the native writer correctly returns "pending guest memory"
+until its bind/publish contract is satisfied. This is tangible engine-level
+input ABI implementation, not analog GTA controller support. The binary
+only exposes keyboard/mouse controls, so true analog steering/throttles
+still require a new engine interface or adaptation.
+
+GTA V gameplay, original loading, native Metal shaders, original audio and
+saves remain unverified and unfinished. CI passing means the host ABI code
+compiles, not that an in-world engine received these inputs.
