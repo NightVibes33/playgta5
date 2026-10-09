@@ -1,7 +1,7 @@
 name: Build GTAiOS Unsigned IPA
 on:
   push:
-    branches: [ios-usb-port, native-aot-work]
+    branches: [ios-usb-port, native-aot-work, native-game-input-test]
   workflow_dispatch:
 permissions:
   contents: read
