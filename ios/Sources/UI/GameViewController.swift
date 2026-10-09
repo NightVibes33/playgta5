@@ -20,6 +20,7 @@ final class GameViewController: UIViewController {
     private var lastStats: TimeInterval = 0
     private var inspectStarted = false
     private var gamepadSnapshot: [String: Double] = [:]
+    private var lastInputBridgeResult: Int32 = Int32.min
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .landscapeRight }
@@ -279,7 +280,39 @@ final class GameViewController: UIViewController {
         LogStore.shared.write("native", "Native touch overlay visible=\(!touchControls.isHidden)")
     }
 
+    private func syncNativeInput() {
+        // Verified original wasm_input_publish_js block: hardware/touch merged
+        // into the existing keyboard + mouse shared-memory input ABI.
+        let state = NativeInputState.shared.snapshot
+        func axis(_ name: String) -> Float {
+            Float(max(-1, min(1, state[name] ?? 0)))
+        }
+        var pad = gta_native_pad_frame_t()
+        pad.lx = axis("lx"); pad.ly = axis("ly")
+        pad.rx = axis("rx"); pad.ry = axis("ry")
+        pad.lt = axis("lt"); pad.rt = axis("rt")
+        let names = ["a","b","x","y","lb","rb","l3","r3",
+                     "up","down","left","right","menu","options"]
+        var mask: UInt32 = 0
+        for (index,name) in names.enumerated() where (state[name] ?? 0) > 0.5 {
+            mask |= UInt32(1) << UInt32(index)
+        }
+        pad.buttons = mask
+        pad.profile = (state["drivingProfile"] ?? 0) > 0.5 ? 1 : 0
+        pad.active = (state["connected"] ?? 0) > 0.5 ||
+            (state["touchActive"] ?? 0) > 0.5 ? 1 : 0
+        pad.width = UInt32(max(1, min(8192, surface.drawableSize.width)))
+        pad.height = UInt32(max(1, min(8192, surface.drawableSize.height)))
+        let rc = gta_native_input_apply(&pad)
+        if rc != lastInputBridgeResult {
+            lastInputBridgeResult = rc
+            LogStore.shared.write("native",
+                "Real WASM keyboard/mouse bridge: rc=\(rc) (0=applied, 1=pending guest memory, negative=invalid address). Input is not GTA gameplay until module instantiation.")
+        }
+    }
+
     @objc private func tickStats(_ link: CADisplayLink) {
+        syncNativeInput()
         frameCounter += 1
         let now = CACurrentMediaTime()
         let elapsed = now - frameStart
