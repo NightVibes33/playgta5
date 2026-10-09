@@ -141,3 +141,31 @@ or in-world controller response have been verified.
 
 The actual GTA `real-gta-ios.cwasm` is still an external/private AOT engine
 whose host ABI cannot currently be satisfied; do not call this build playable.
+
+
+## Build 17: signed AArch64 shared memory64 import and data-coherence smoke
+
+Before allocating the real GTA engine's 3 GiB shared memory, exercise the
+exact Wasmtime 49 C API on-device with a tiny 64 KiB 64-bit shared memory:
+
+- CI compiles a synthetic `(import "env" "memory" (memory i64 1 2 shared))`
+  module to `aarch64-apple-ios` via the pinned Wasmtime CLI.
+- Native C calls `wasmtime_memorytype_new(1, true, 2, true, true, 16)`,
+  `wasmtime_sharedmemory_new`, and
+  `wasmtime_linker_define("env","memory")`; then deserializes the
+  signed-bundle AOT fixture, instantiates it and runs `touch(i64)`.
+- The guest stores `42` at address 16 and loads the value back. Native code
+  independently reads bytes 16–19 via `wasmtime_sharedmemory_data` and
+  requires both results to equal 42. A plain AOT deserialization is not enough.
+- Detailed native logs identify store/instantiation errors and distinguish
+  code-signing problems from unsupported shared-memory limits. Simulator
+  continues to omit device-only Wasmtime runtime.
+- CI verifies the fixture's presence and the real Wasmtime sharedmemory
+  symbols in the final unsigned IPA.
+
+This demonstrates only an iOS-capable path *once tested on the real phone*.
+No device execution is claimed based on CI alone. It is intentionally a
+64 KiB **test**, not a truncated or fake implementation of the GTA engine's
+49152-page (3 GiB) minimum. The remaining unimplemented 77 host imports,
+memory-size validation on hardware, native Metal shader bridge, audio, save
+and input binding still block actual gameplay.

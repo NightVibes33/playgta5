@@ -109,6 +109,18 @@ assert 'wasm_userdata_page_js' in host
 assert 'emscripten_check_blocking_allowed' in host
 assert 'gta_define_void' in host
 assert 'native-aot-smoke.cwasm' in workflow
+memory_probe = read("ios/Sources/Engine/NativeAOTMemoryProbe.c")
+assert 'wasmtime_memorytype_new(1, true, 2, true, true, 16' in memory_probe
+assert 'wasmtime_sharedmemory_new' in memory_probe
+assert 'wasmtime_linker_define' in memory_probe
+assert 'wasmtime_linker_instantiate' in memory_probe
+assert 'wasmtime_sharedmemory_data_size(memory) != 65536' in memory_probe
+assert 'answer.of.i32 != 42 || observed != 42' in memory_probe
+assert 'wasmtime_sharedmemory_delete(memory)' in memory_probe
+assert 'gta_ios_wasmtime_memory64_smoke' in game
+assert 'native-memory64-smoke.cwasm' in workflow
+assert 'gta_ios_wasmtime_memory64_smoke' in read("ios/Sources/Engine/NativeWasmtimeHost.h")
+assert '_gta_ios_wasmtime_memory64_smoke' in ipa
 assert 'case .deserialized(let imports, let linked, let details)' in game
 assert 'gta_ios_wasmtime_register_host_basics' in host
 assert 'emscripten_get_heap_max' in host
@@ -128,9 +140,9 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>16</string>" in plist
+assert "<key>CFBundleVersion</key><string>17</string>" in plist
 
-print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
+print("PASS: native Metal/Wasmtime and imported shared memory64 AOT execution probe compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
 print("PASS: native Bluetooth and touch control capture, runtime controls, thermal/UI tick diagnostics")
 print("PASS: atomic native saves and PCM audio output service present, not yet engine-bound")

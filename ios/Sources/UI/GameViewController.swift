@@ -170,6 +170,22 @@ final class GameViewController: UIViewController {
             LogStore.shared.write("native",
                 "AOT native smoke fixture absent from IPA: cannot verify iOS executable AOT pages")
         }
+        // Separate, real AOT execution check with imported shared memory64.
+        // This is intentionally a 64 KiB host allocation, not the GTA
+        // module's 3 GiB shared heap. The C runtime compares guest output
+        // AND independently reads the host-visible bytes to prove coherence.
+        if let sharedFixture = Bundle.main.path(forResource: "native-memory64-smoke", ofType: "cwasm") {
+            var memoryMessage = [CChar](repeating: 0, count: 640)
+            let memoryResult = sharedFixture.withCString {
+                gta_ios_wasmtime_memory64_smoke($0, &memoryMessage, memoryMessage.count)
+            }
+            let summary = String(cString: memoryMessage)
+            LogStore.shared.write("native",
+                "Shared memory64 native AOT execution: rc=\(memoryResult), detail=\(summary)")
+        } else {
+            LogStore.shared.write("native",
+                "Shared memory64 AOT fixture missing from IPA; device compatibility not tested")
+        }
         var registered: UInt32 = 0
         var hostMessage = [CChar](repeating: 0, count: 512)
         let basicProbe = gta_ios_wasmtime_basic_host_probe(&registered, &hostMessage, hostMessage.count)
