@@ -26,7 +26,8 @@ jobs:
           cmake -S thirdparty/wasmtime/crates/c-api -B "$RUNNER_TEMP/ios-wasmtime" \
             -DWASMTIME_TARGET=aarch64-apple-ios \
             -DCMAKE_BUILD_TYPE=Release \
-            -DWASMTIME_USER_CARGO_BUILD_OPTIONS="--no-default-features;--features;threads"
+            -DWASMTIME_DISABLE_ALL_FEATURES=ON \
+            -DWASMTIME_FEATURE_THREADS=ON
           cmake --build "$RUNNER_TEMP/ios-wasmtime" --parallel 4
           find thirdparty/wasmtime/target/aarch64-apple-ios/release -name libwasmtime.a -o -name libwasmtime_c_api.a
           file thirdparty/wasmtime/target/aarch64-apple-ios/release/libwasmtime.a
