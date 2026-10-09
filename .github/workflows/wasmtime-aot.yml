@@ -1,0 +1,61 @@
+name: Wasmtime ARM64 iOS AOT Compile
+on:
+  push:
+    branches: [ios-usb-port, native-aot-work]
+    paths: ["ios/Scripts/aot_compile_wasmtime.sh", ".github/workflows/wasmtime-aot.yml"]
+  workflow_dispatch:
+    inputs:
+      private_engine_artifact_run:
+        description: "Optional authorized engine-input artifact run ID; never publish game code"
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  wasmtime-aot:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download pinned macOS ARM64 Wasmtime compiler
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/bytecodealliance/wasmtime/releases/download/v49.0.2/wasmtime-v49.0.2-aarch64-macos.tar.xz \
+            -o "$RUNNER_TEMP/wasmtime.tar.xz"
+          mkdir -p "$RUNNER_TEMP/wasmtime-extract"
+          tar -xJf "$RUNNER_TEMP/wasmtime.tar.xz" -C "$RUNNER_TEMP/wasmtime-extract"
+          find "$RUNNER_TEMP/wasmtime-extract" -type f -name wasmtime -exec cp {} "$RUNNER_TEMP/wasmtime" \;
+          chmod +x "$RUNNER_TEMP/wasmtime"
+          "$RUNNER_TEMP/wasmtime" --version
+      - name: Verify ARM64 iOS code generation with actual AOT compiler
+        env:
+          WASMTIME_BIN: ${{ runner.temp }}/wasmtime
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          Path(os.environ["RUNNER_TEMP"], "mini.wasm").write_bytes(
+            bytes.fromhex("0061736d0100000001070160027f7f017f030201000707010361646400000a09010700200020016a0b"))
+          PY
+          bash ios/Scripts/aot_compile_wasmtime.sh "$RUNNER_TEMP/mini.wasm" "$RUNNER_TEMP/mini-ios.cwasm"
+      - name: Retrieve optional authorized private engine binary
+        if: github.event_name == 'workflow_dispatch' && inputs.private_engine_artifact_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: engine-input
+          run-id: ${{ inputs.private_engine_artifact_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/private-engine
+      - name: AOT-compile actual authorized engine privately
+        if: github.event_name == 'workflow_dispatch' && inputs.private_engine_artifact_run != ''
+        env:
+          WASMTIME_BIN: ${{ runner.temp }}/wasmtime
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/private-engine/game.wasm"
+          python3 ios/Scripts/aot_import_audit.py "$RUNNER_TEMP/private-engine/game.wasm" \
+            --expected-sha256 11ca8d2c04c5e843d18ff4aea4899d72c86973c6b031df334e67c446b2ae83e0
+          bash ios/Scripts/aot_compile_wasmtime.sh "$RUNNER_TEMP/private-engine/game.wasm" "$RUNNER_TEMP/private-engine/gta-ios.cwasm"
+          echo "AOT code compiled but not executable without iOS Wasmtime runtime/host APIs. No public proprietary artifact emitted."
