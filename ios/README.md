@@ -97,3 +97,15 @@ is not in this repository or CI, has not been converted, and cannot yet be
 linked to native Emscripten/WASI host functions or the real Metal renderer.
 No JIT executor or playable engine is included. The native IPA remains a
 hardware/USB/format readiness harness, NOT a GTA V port.
+
+
+## Real uploaded game.wasm — engine conversion check
+
+The exact uploaded 63,201,802-byte game binary passed WABT WASM
+validation but **failed native C translation**. WABT `wasm2c`
+aborted when it encountered `memory.atomic.notify` /
+`memory.atomic.wait32`, which the C writer does not implement.
+The new `aot_feature_gate.py` prevents truncated C output and
+documents the blocker in `ios/Scripts/ENGINE_REAL_AOT_REPORT.md`.
+The game is still not playable; the native IPA remains a hardware/USB
+readiness harness.

@@ -26,7 +26,7 @@ jobs:
       - name: Build pinned WebAssembly toolchain
         run: |
           cmake -S external/wabt -B "$RUNNER_TEMP/wabt-build" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_TOOLS=ON
-          cmake --build "$RUNNER_TEMP/wabt-build" --target wasm2c wat2wasm wasm-validate --parallel 4
+          cmake --build "$RUNNER_TEMP/wabt-build" --target wasm2c wat2wasm wasm-validate wasm-objdump --parallel 4
       - name: Cross-compile memory64+shared memory test to real iPhone ARM64 object
         env:
           WABT_SOURCE_DIR: ${{ github.workspace }}/external/wabt
@@ -51,6 +51,25 @@ jobs:
           assert m["limits"]["initial_pages"] == 1
           print("PASS: tested memory64/shared WASM to arm64 Mach-O conversion")
           PY
+      - name: Verify atomic wait/notify fails cleanly before wasm2c translation
+        env:
+          WABT_BIN_DIR: ${{ runner.temp }}/wabt-build
+        run: |
+          cat > "$RUNNER_TEMP/atomic-wait.wat" <<'WAT'
+          (module
+            (import "env" "memory" (memory i64 1 2 shared))
+            (func (export "notify") (param i64 i32) (result i32)
+              local.get 0
+              local.get 1
+              memory.atomic.notify)
+          )
+          WAT
+          "$WABT_BIN_DIR/wat2wasm" --enable-threads "$RUNNER_TEMP/atomic-wait.wat" -o "$RUNNER_TEMP/atomic-wait.wasm"
+          if python3 ios/Scripts/aot_feature_gate.py "$RUNNER_TEMP/atomic-wait.wasm" --objdump "$WABT_BIN_DIR/wasm-objdump"; then
+            echo "ERROR: WABT gate failed to identify unsupported atomic.notify" >&2
+            exit 1
+          fi
+          echo "PASS: unsupported wait/notify detected before incomplete native code generation"
       - name: Retrieve optional private engine artifact
         if: github.event_name == 'workflow_dispatch' && inputs.private_engine_artifact_run != ''
         uses: actions/download-artifact@v4
