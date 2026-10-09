@@ -68,10 +68,58 @@ enum NativeEngineStatus {
         let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         guard size > 8 else { throw Failure.invalidWasm("empty or truncated module") }
         let memory = try inspectWasmMemory(wasm)
+        // Stage the actual data/manifest.json into the native HTTPFS
+        // import provider before any future AOT game instantiation.
+        // Only this small manifest is copied; archives remain on USB.
+        do {
+            let staged = try stageHTTPFSManifest()
+            LogStore.shared.write("native",
+                "Native HTTPFS manifest staged from USB: \(staged) bytes")
+        } catch {
+            gta_httpfs_manifest_clear()
+            LogStore.shared.write("native",
+                "Native HTTPFS manifest unavailable: \(error.localizedDescription)")
+        }
         let result = Inspection(byteCount: size, memory: memory, shaderIndex: shader, gameFile: wasm)
         LogStore.shared.write("native", "WASM inspected: bytes=\(size), shared=\(memory.shared), memory64=\(memory.memory64), minimumPages=\(memory.minimumPages), maximumPages=\(String(describing: memory.maximumPages))")
         LogStore.shared.write("native", "USB shader index accessible: \(shader.lastPathComponent). Native shader translation has NOT been implemented.")
         return result
+    }
+
+    private static func stageHTTPFSManifest() throws -> Int {
+        guard let url = USBStorageManager.shared.file("data/manifest.json") else {
+            throw Failure.missing("data/manifest.json")
+        }
+        var coordinationError: NSError?
+        var readError: Error?
+        var stagedSize: Int?
+        NSFileCoordinator(filePresenter: nil).coordinate(
+            readingItemAt: url, options: [], error: &coordinationError) { granted in
+                do {
+                    let attrs = try FileManager.default.attributesOfItem(atPath: granted.path)
+                    let count = (attrs[.size] as? NSNumber)?.int64Value ?? -1
+                    guard count > 0 && count <= Int64(GTA_HTTPFS_MAX_MANIFEST) else {
+                        throw Failure.io("HTTPFS manifest exceeds native 32 MiB safety limit")
+                    }
+                    let data = try Data(contentsOf: granted)
+                    guard data.count > 0 && data.count <= GTA_HTTPFS_MAX_MANIFEST else {
+                        throw Failure.io("Native HTTPFS manifest data is invalid")
+                    }
+                    let rc = data.withUnsafeBytes { bytes -> Int32 in
+                        gta_httpfs_manifest_stage(bytes.baseAddress, data.count)
+                    }
+                    guard rc == 0 else {
+                        throw Failure.io("Native HTTPFS manifest stage error \(rc)")
+                    }
+                    stagedSize = data.count
+                } catch {
+                    readError = error
+                }
+            }
+        if let coordinationError { throw coordinationError }
+        if let readError { throw readError }
+        guard let stagedSize else { throw Failure.io("File provider returned no manifest") }
+        return stagedSize
     }
 
     /// Read only the initial import section; the proprietary game binary

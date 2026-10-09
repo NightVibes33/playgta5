@@ -57,6 +57,13 @@ jobs:
             ios/Tests/native-input-abi.test.c -lm -lpthread \
             -o "$RUNNER_TEMP/native-input-abi-test"
           "$RUNNER_TEMP/native-input-abi-test"
+      - name: Verify native HTTPFS manifest import semantics
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pthread \
+            ios/Sources/Engine/NativeHTTPFSManifestABI.c \
+            ios/Tests/native-httpfs-manifest.test.c \
+            -o "$RUNNER_TEMP/native-httpfs-manifest"
+          "$RUNNER_TEMP/native-httpfs-manifest"
       - name: Compile signed-device ARM64 AOT execution smoke fixture
         run: |
           set -euo pipefail
