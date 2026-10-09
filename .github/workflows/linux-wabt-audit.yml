@@ -2,7 +2,7 @@ name: Build Linux WASM AOT Audit Tools
 on:
   push:
     branches: [native-aot-work]
-    paths: [".github/workflows/linux-wabt-audit.yml"]
+    paths: [".github/workflows/linux-wabt-audit.yml", "ios/Scripts/patch_wabt_atomics.py", "ios/NativeRuntime/**"]
   workflow_dispatch:
 permissions:
   contents: read
