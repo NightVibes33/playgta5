@@ -50,6 +50,28 @@ assert "memory64:" in native and "minimumPages:" in native and "maximumPages:" i
 assert "NativeUSBAssetReader" in native
 assert "NSFileCoordinator" in native and "length <= 4 * 1024 * 1024" in native
 assert "startAccessingSecurityScopedResource()" in usb
+touch = read("ios/Sources/Input/NativeTouchControlsView.swift")
+audio = read("ios/Sources/Engine/NativePCMOutput.swift")
+save = read("ios/Sources/Engine/NativeGameSaveStore.swift")
+launcher = read("ios/Sources/UI/LauncherViewController.swift")
+splash = read("ios/Sources/Resources/LaunchScreen.storyboard")
+assert "class NativeInputState" in touch and "class NativeTouchControlsView" in touch
+assert 'NativeTouchStick(axis: "move")' in touch
+assert 'NativeTouchStick(axis: "camera")' in touch
+assert 'touchActive' in touch and 'onState' in touch
+assert 'NativeInputState.shared.updateHardware(state)' in game
+assert 'NativeInputState.shared.updateTouch(values)' in game
+assert 'gtaios.touch.visible' in game and 'HIDE TOUCH' in game
+assert 'NOT GAME FPS' in game and 'thermalState' in game
+assert 'class NativeGameSaveStore' in save
+assert '32 * 1024 * 1024' in save and 'Data(contentsOf:' in save
+assert 'options: [.atomic, .completeFileProtectionUnlessOpen]' in save
+assert 'class NativePCMOutput' in audio and 'scheduleStereoFloatPCM' in audio
+assert 'AVAudioEngine()' in audio and 'AVAudioPlayerNode()' in audio
+assert 'ADVANCED  ·  FILE PICKER TESTS' in launcher
+assert 'CHECK NATIVE RUNTIME' in launcher
+assert 'The local server runs inside the app' not in launcher
+assert 'GTAiOS' in splash and 'NATIVE RUNTIME  /  SIDELOADED' in splash
 assert "import GameController" in input_source
 for control in ["leftThumbstick", "rightThumbstick", "leftTrigger", "rightTrigger",
                 "buttonA", "buttonB", "buttonX", "buttonY", "buttonMenu",
@@ -95,10 +117,11 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>14</string>" in plist
+assert "<key>CFBundleVersion</key><string>15</string>" in plist
 
 print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
-print("PASS: GameController Bluetooth analog + hardware buttons, native readiness UI, diagnostics")
+print("PASS: native Bluetooth and touch control capture, runtime controls, thermal/UI tick diagnostics")
+print("PASS: atomic native saves and PCM audio output service present, not yet engine-bound")
 print("PASS: no WebKit gameplay or embedded browser runtime; unlinked engine truthfully blocked")
 print("NOT PLAYABLE: compiled ARM64 GTA engine, real Metal renderer/import ABI and on-device gameplay remain outstanding")

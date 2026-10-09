@@ -18,6 +18,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let logsButton = UIButton(type: .system)
     private let filePickerTestButton = UIButton(type: .system)
     private let indexFileButton = UIButton(type: .system)
+    private let advancedButton = UIButton(type: .system)
+    private let advancedPanel = UIStackView()
+    private let runtimeTitle = UILabel()
+    private let runtimeDetail = UILabel()
+    private var expandedDiagnostics = false
     private let modeButtons = [UIButton(type: .system), UIButton(type: .system), UIButton(type: .system)]
     private var focusIndex = 0
     private var heldUp = false
@@ -53,7 +58,8 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         content.translatesAutoresizingMaskIntoConstraints = false
         content.axis = .vertical
         content.alignment = .fill
-        content.spacing = 13
+        content.spacing = 14
+        content.isLayoutMarginsRelativeArrangement = false
         view.addSubview(scrollView)
         scrollView.addSubview(content)
         NSLayoutConstraint.activate([
@@ -78,7 +84,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         dot.translatesAutoresizingMaskIntoConstraints = false
         dot.widthAnchor.constraint(equalToConstant: 8).isActive = true
         dot.heightAnchor.constraint(equalToConstant: 8).isActive = true
-        let wordmark = label("GTAV  /  iOS", size: 13, weight: .bold, color: .white)
+        let wordmark = label("GTAiOS   /   NATIVE", size: 13, weight: .bold, color: .white)
         let build = label("BUILD  " + (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"), size: 10, weight: .medium, color: muted)
         build.textAlignment = .right
         top.addArrangedSubview(dot)
@@ -95,12 +101,12 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         heroCopy.axis = .vertical
         heroCopy.alignment = .leading
         heroCopy.spacing = 4
-        let eyebrow = label("NATIVE PORT • UNDER DEVELOPMENT", size: 10, weight: .bold, color: mint)
-        let title = label("GRAND THEFT AUTO V", size: 27, weight: .black, color: .white)
+        let eyebrow = label("ON-DEVICE RUNTIME  •  SIDELOADED", size: 10, weight: .bold, color: mint)
+        let title = label("GTA V", size: 35, weight: .black, color: .white)
         title.adjustsFontSizeToFitWidth = true
         title.minimumScaleFactor = 0.67
         title.numberOfLines = 1
-        let sub = label("A18 • NATIVE METAL • ENGINE NOT LINKED", size: 12, weight: .regular, color: muted)
+        let sub = label("iPhone 16 · Apple Metal · USB-C library", size: 12, weight: .regular, color: muted)
         sub.adjustsFontSizeToFitWidth = true
         sub.minimumScaleFactor = 0.75
         heroCopy.addArrangedSubview(eyebrow)
@@ -108,7 +114,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         heroCopy.addArrangedSubview(sub)
         gameIcon.contentMode = .scaleAspectFit
         gameIcon.tintColor = mint
-        gameIcon.image = UIImage(systemName: "gamecontroller.fill")
+        gameIcon.image = UIImage(systemName: "cpu.fill")
         gameIcon.backgroundColor = UIColor.white.withAlphaComponent(0.035)
         gameIcon.layer.cornerRadius = 12
         gameIcon.clipsToBounds = true
@@ -163,13 +169,42 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         srow.addArrangedSubview(stateText)
         srow.addArrangedSubview(fileIndicator)
         content.addArrangedSubview(storage)
+
+        let runtime = UIView()
+        runtime.backgroundColor = UIColor.white.withAlphaComponent(0.035)
+        runtime.layer.cornerRadius = 13
+        runtime.layer.borderWidth = 1
+        runtime.layer.borderColor = mint.withAlphaComponent(0.14).cgColor
+        runtime.translatesAutoresizingMaskIntoConstraints = false
+        let readiness = UIStackView()
+        readiness.axis = .vertical
+        readiness.spacing = 5
+        readiness.translatesAutoresizingMaskIntoConstraints = false
+        runtimeTitle.text = "NATIVE ENGINE • INTEGRATION"
+        runtimeTitle.textColor = mint
+        runtimeTitle.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
+        runtimeDetail.text = "Metal and USB runtime available. Game engine host imports and world renderer are still being implemented."
+        runtimeDetail.textColor = muted
+        runtimeDetail.font = .systemFont(ofSize: 12)
+        runtimeDetail.numberOfLines = 0
+        readiness.addArrangedSubview(runtimeTitle)
+        readiness.addArrangedSubview(runtimeDetail)
+        runtime.addSubview(readiness)
+        NSLayoutConstraint.activate([
+            readiness.leadingAnchor.constraint(equalTo: runtime.leadingAnchor, constant: 15),
+            readiness.trailingAnchor.constraint(equalTo: runtime.trailingAnchor, constant: -15),
+            readiness.topAnchor.constraint(equalTo: runtime.topAnchor, constant: 14),
+            readiness.bottomAnchor.constraint(equalTo: runtime.bottomAnchor, constant: -14)
+        ])
+        content.addArrangedSubview(runtime)
+
         let tapStorage = UITapGestureRecognizer(target: self, action: #selector(chooseFolder))
         storage.addGestureRecognizer(tapStorage)
         storage.isUserInteractionEnabled = true
         storage.accessibilityLabel = "Choose USB game files folder"
         storage.accessibilityTraits = .button
 
-        content.addArrangedSubview(label("START SESSION", size: 10, weight: .bold, color: muted))
+        content.addArrangedSubview(label("GAME PROFILE  •  SAVED FOR NATIVE ENGINE", size: 10, weight: .bold, color: muted))
         let modes = UIStackView()
         modes.axis = .horizontal
         modes.distribution = .fillEqually
@@ -188,7 +223,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             modes.addArrangedSubview(button)
         }
         content.addArrangedSubview(modes)
-        style(playButton, title: "NATIVE RUNTIME CHECK", symbol: "cpu", filled: true)
+        style(playButton, title: "CHECK NATIVE RUNTIME", symbol: "cpu", filled: true)
         playButton.addTarget(self, action: #selector(launch), for: .touchUpInside)
         playButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
         content.addArrangedSubview(playButton)
@@ -208,14 +243,27 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         toolRow.addArrangedSubview(controllerButton)
         content.addArrangedSubview(toolRow)
 
-        // A minimal picker-only diagnostic: no 20GB scan, no bookmark, no disk
-        // permissions beyond the chosen file. Distinguishes Files UI handoff
-        // failures from issues opening the actual GTA game folder.
+        // Diagnostic-only file pickers stay behind the Advanced disclosure.
+        // Keep the main launcher focused on connection, input and native boot.
+        advancedPanel.axis = .vertical
+        advancedPanel.spacing = 9
+        advancedPanel.isHidden = true
+        var advancedConfig = UIButton.Configuration.plain()
+        advancedConfig.title = "ADVANCED  ·  FILE PICKER TESTS"
+        advancedConfig.image = UIImage(systemName: "chevron.down")
+        advancedConfig.imagePlacement = .leading
+        advancedConfig.baseForegroundColor = muted
+        advancedButton.configuration = advancedConfig
+        advancedButton.contentHorizontalAlignment = .leading
+        advancedButton.addTarget(self, action: #selector(toggleAdvanced), for: .touchUpInside)
+        advancedButton.accessibilityHint = "Show optional Files compatibility diagnostics"
+        content.addArrangedSubview(advancedButton)
+        content.addArrangedSubview(advancedPanel)
         let pickerTip = label("FOLDER PICKER: TAP SELECT, CHOOSE playgta5.com, THEN OPEN", size: 10, weight: .medium, color: mint)
         pickerTip.numberOfLines = 2
         pickerTip.lineBreakMode = .byWordWrapping
         pickerTip.accessibilityLabel = "Select the playgta5.com folder with the Files selection control, then confirm Open; this does not copy the game"
-        content.addArrangedSubview(pickerTip)
+        advancedPanel.addArrangedSubview(pickerTip)
 
         let probeRow = UIStackView()
         probeRow.axis = .horizontal
@@ -227,7 +275,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         indexFileButton.addTarget(self, action: #selector(chooseIndexFile), for: .touchUpInside)
         probeRow.addArrangedSubview(filePickerTestButton)
         probeRow.addArrangedSubview(indexFileButton)
-        content.addArrangedSubview(probeRow)
+        advancedPanel.addArrangedSubview(probeRow)
         prepareDiagnosticTextFile()
 
         let bottom = UIStackView()
@@ -310,11 +358,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     }
     private func refresh() {
         updateMode()
-        playButton.configuration?.title = "LAUNCH GAME"
+        playButton.configuration?.title = "CHECK NATIVE RUNTIME"
         if let root = USBStorageManager.shared.root {
             let missing = USBStorageManager.shared.missingStartupAssets()
-            storageTitle.text = root.lastPathComponent + "  /  USB"
-            storageDetails.text = missing.isEmpty ? "Files detected • Ready for engine check"
+            storageTitle.text = root.lastPathComponent + "  /  EXTERNAL STORAGE"
+            storageDetails.text = missing.isEmpty ? "Startup assets found • Native runtime checks available"
                 : "Missing \(missing.count) required startup resources • Tap FILES"
             storageDetails.textColor = missing.isEmpty ? mint : UIColor.systemOrange
             fileIndicator.backgroundColor = missing.isEmpty ? mint : UIColor.systemOrange
@@ -329,11 +377,22 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             fileIndicator.backgroundColor = .systemOrange
             playButton.isEnabled = true
             playButton.alpha = 1
-            playButton.configuration?.title = "SELECT GAME FILES"
+            playButton.configuration?.title = "CONNECT USB GAME FILES"
         }
         updateDevice(ControllerManager.shared.currentName)
         highlightFocus()
     }
+    @objc private func toggleAdvanced() {
+        expandedDiagnostics.toggle()
+        advancedPanel.isHidden = !expandedDiagnostics
+        advancedButton.configuration?.title = expandedDiagnostics
+            ? "HIDE ADVANCED DIAGNOSTICS" : "ADVANCED  ·  FILE PICKER TESTS"
+        advancedButton.configuration?.image = UIImage(
+            systemName: expandedDiagnostics ? "chevron.up" : "chevron.down")
+        UISelectionFeedbackGenerator().selectionChanged()
+        UIAccessibility.post(notification: .layoutChanged, argument: advancedButton)
+    }
+
     private func updateMode() {
         let current = EngineOptions.value("mode")
         for (i, b) in modeButtons.enumerated() {
@@ -555,14 +614,14 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         let missing = USBStorageManager.shared.missingStartupAssets()
         if !missing.isEmpty {
             let alert = UIAlertController(title: "Missing game resources",
-                message: missing.joined(separator: "\n") + "\n\nThe local server runs inside the app; Launch-Local.cmd is Windows-only.",
+                message: missing.joined(separator: "\n") + "\n\nGTAiOS will not copy the full game dataset. Select the authorized root folder containing the engine and data resources.",
                 preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "Change folder", style: .default) { [weak self] _ in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     self?.chooseFolder()
                 }
             })
-            alert.addAction(UIAlertAction(title: "Diagnostics boot", style: .default) { [weak self] _ in self?.openGame() })
+            alert.addAction(UIAlertAction(title: "Run native checks", style: .default) { [weak self] _ in self?.openGame() })
             alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
             present(alert, animated: true)
         } else { openGame() }

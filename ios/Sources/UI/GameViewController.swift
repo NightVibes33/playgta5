@@ -11,6 +11,13 @@ final class GameViewController: UIViewController {
     private let controllerStatus = UILabel()
     private let closeButton = UIButton(type: .system)
     private let logsButton = UIButton(type: .system)
+    private let touchButton = UIButton(type: .system)
+    private let statsLabel = UILabel()
+    private let touchControls = NativeTouchControlsView(frame: .zero)
+    private var statsTicker: CADisplayLink?
+    private var frameCounter = 0
+    private var frameStart = CACurrentMediaTime()
+    private var lastStats: TimeInterval = 0
     private var inspectStarted = false
     private var gamepadSnapshot: [String: Double] = [:]
 
@@ -25,6 +32,17 @@ final class GameViewController: UIViewController {
         surface = NativeMetalSurface(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(surface)
+
+        // Render no fake GTA gameplay. Native game controls are genuine
+        // interactive UIKit events staged for the forthcoming engine ABI.
+        touchControls.onState = { values in
+            NativeInputState.shared.updateTouch(values)
+        }
+        touchControls.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(touchControls)
+        let storedVisibility = UserDefaults.standard.object(forKey: "gtaios.touch.visible")
+        touchControls.isHidden = storedVisibility == nil
+            ? false : !UserDefaults.standard.bool(forKey: "gtaios.touch.visible")
 
         heading.text = "GTA V • NATIVE ARM64"
         heading.textAlignment = .center
@@ -63,7 +81,30 @@ final class GameViewController: UIViewController {
         logsButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(logsButton)
 
+        var touchConfig = UIButton.Configuration.tinted()
+        touchConfig.title = touchControls.isHidden ? "SHOW TOUCH" : "HIDE TOUCH"
+        touchConfig.baseForegroundColor = .white
+        touchConfig.background.backgroundColor = UIColor.black.withAlphaComponent(0.65)
+        touchButton.configuration = touchConfig
+        touchButton.titleLabel?.font = .systemFont(ofSize: 10, weight: .semibold)
+        touchButton.addTarget(self, action: #selector(toggleTouch), for: .touchUpInside)
+        touchButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(touchButton)
+        statsLabel.textAlignment = .center
+        statsLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        statsLabel.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        statsLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
+        statsLabel.numberOfLines = 2
+        statsLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(statsLabel)
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        updateStats(seconds: 0)
+
         NSLayoutConstraint.activate([
+            touchControls.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            touchControls.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            touchControls.topAnchor.constraint(equalTo: view.topAnchor),
+            touchControls.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             surface.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             surface.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             surface.topAnchor.constraint(equalTo: view.topAnchor),
@@ -83,7 +124,13 @@ final class GameViewController: UIViewController {
             closeButton.heightAnchor.constraint(equalToConstant: 36),
             logsButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -10),
             logsButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 5),
-            logsButton.heightAnchor.constraint(equalToConstant: 36)
+            logsButton.heightAnchor.constraint(equalToConstant: 36),
+            touchButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            touchButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
+            touchButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 35),
+            statsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            statsLabel.topAnchor.constraint(equalTo: touchButton.bottomAnchor, constant: 6),
+            statsLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 176)
         ])
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
@@ -172,13 +219,60 @@ final class GameViewController: UIViewController {
             // Preserve full analog values for the future native engine ABI.
             // The current binary has NO native controller-consumer interface.
             self?.gamepadSnapshot = state
+            NativeInputState.shared.updateHardware(state)
         }
         ControllerManager.shared.begin()
+        // CADisplayLink measures the native UIKit/Metal surface tick rate,
+        // not GTA render FPS; display the distinction explicitly.
+        statsTicker?.invalidate()
+        statsTicker = CADisplayLink(target: self, selector: #selector(tickStats))
+        statsTicker?.preferredFramesPerSecond = 30
+        statsTicker?.add(to: .main, forMode: .common)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         ControllerManager.shared.stop()
+        statsTicker?.invalidate()
+        statsTicker = nil
+        touchControls.reset()
+        NativeInputState.shared.clearHardware()
+    }
+
+    @objc private func toggleTouch() {
+        touchControls.isHidden.toggle()
+        if touchControls.isHidden { touchControls.reset() }
+        UserDefaults.standard.set(!touchControls.isHidden, forKey: "gtaios.touch.visible")
+        touchButton.configuration?.title = touchControls.isHidden ? "SHOW TOUCH" : "HIDE TOUCH"
+        UISelectionFeedbackGenerator().selectionChanged()
+        LogStore.shared.write("native", "Native touch overlay visible=\(!touchControls.isHidden)")
+    }
+
+    @objc private func tickStats(_ link: CADisplayLink) {
+        frameCounter += 1
+        let now = CACurrentMediaTime()
+        let elapsed = now - frameStart
+        if elapsed >= 1 {
+            let fps = Double(frameCounter) / elapsed
+            updateStats(seconds: fps)
+            frameCounter = 0
+            frameStart = now
+        }
+    }
+
+    private func updateStats(seconds fps: Double) {
+        let process = ProcessInfo.processInfo
+        let state: String
+        switch process.thermalState {
+        case .nominal: state = "COOL"
+        case .fair: state = "WARM"
+        case .serious: state = "HOT"
+        case .critical: state = "CRITICAL"
+        @unknown default: state = "UNKNOWN"
+        }
+        let battery = UIDevice.current.batteryLevel >= 0
+            ? "\(Int(UIDevice.current.batteryLevel * 100))%" : "--"
+        statsLabel.text = "UI \(Int(fps.rounded())) Hz · THERMAL \(state) · BATTERY \(battery)\nNOT GAME FPS"
     }
 
     @objc private func closeGame() {

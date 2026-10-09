@@ -89,3 +89,29 @@ A green build means the code compiles and links on arm64; the 5/86 coverage
 must still be observed on physical iPhone after supplying the private AOT.
 All remaining host imports, memory, input, WebGPU-to-Metal renderer, original
 loading, native game audio and saves are unfinished. No gameplay claim.
+
+
+## Build 15: sideload-native UI quality and input/audio/save foundations
+
+- Polished launcher: branded launch storyboard, simpler GTAV hero, live USB
+  readiness, engine status, controller tools and a collapsed advanced diagnostics
+  panel. Main action is explicitly **CHECK NATIVE RUNTIME**, not fake gameplay.
+- Real native landscape touch-input overlay: two draggable analog joysticks,
+  multi-touch-capable held buttons for aim/fire/jump/cover/reload/enter, a
+  driving/on-foot profile flag and persistent visibility toggle. GameController
+  analog and touch input merge into NativeInputState. The source engine input
+  ABI is still unimplemented; this is staging hardware and UI input only.
+- Native UI refresh/FPS tick statistics (explicitly **NOT GAME FPS**),
+  device thermal status and battery level. This does not measure GTA gameplay.
+- AVAudioEngine stereo float PCM scheduling adapter and app-private atomic
+  32-MiB-bounded save slots. Neither is wired to GTA's original audio/save
+  Emscripten imports yet.
+- Native AOT introspection remains the same as Build 14: game is NOT
+  instantiated, original engine loading and shader rendering remain missing.
+- Intended for SideStore unsigned IPA distribution only; no App Store release
+  workflow, subscriptions, storefront, or App Review entitlement assumptions.
+
+The advanced controls, dashboard and save/audio components can all compile
+and run without the proprietary engine. They are prerequisites, not evidence
+of playable GTA V. No game frames, game soundtrack, original loading sequence,
+or in-world controller response have been verified.
