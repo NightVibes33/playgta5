@@ -29,4 +29,17 @@ if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then
   echo "ERROR: proprietary game data must not be bundled in the IPA" >&2
   exit 1
 fi
-echo "IPA payload and native Metal app verified; proprietary engine not linked or bundled."
+# The bundled Wasmtime C API must be actually linked into the physical
+# iPhone Mach-O app, not merely present as an unused .a in DerivedData.
+# Xcode's dead-strip/linker can mark C-to-Swift bridge symbols private
+# external (N_PEXT). nm -g excludes those even though they are linked.
+# Inspect all defined Mach-O symbols instead of rejecting a valid IPA.
+xcrun nm "$app/GTAiOS" > "$tmp/symbols.txt"
+for symbol in _gta_ios_wasmtime_engine_probe _gta_ios_wasmtime_aot_probe _wasm_engine_new _wasm_engine_delete _wasmtime_module_deserialize_file _wasmtime_module_imports; do
+  if ! grep -F "$symbol" "$tmp/symbols.txt" >/dev/null; then
+    echo "ERROR: linked native Wasmtime runtime symbol missing: $symbol" >&2
+    exit 1
+  fi
+done
+echo "Native Wasmtime engine and SHA256-verified AOT inspection entry points linked: PASS"
+echo "IPA payload and native Metal + Wasmtime host verified; proprietary GTA engine not linked or bundled."

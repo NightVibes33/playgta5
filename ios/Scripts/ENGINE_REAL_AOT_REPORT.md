@@ -96,3 +96,25 @@ kept out of this public GitHub repository and its CI artifacts.
 `aot_compile_wasmtime.sh` and `wasmtime-aot.yml` supply a reproducible
 private AOT route; CI tests a tiny public module and does NOT falsely
 claim real-world GTA gameplay.
+
+## iPhone runtime deserialization gate (new)
+
+A real Wasmtime 49.0.2 iOS native host now supports an **opt-in AOT
+deserialization probe**. Put the privately compiled `real-gta-ios.cwasm`
+(238,815,736 bytes; SHA256
+`b2fadd0881302505388104a0ff6b428db65106edd81a8e5a64fcfa905a4febb0`)
+inside the USB-selected `playgta5.com` root, next to `index.html`, or in
+`b/8b0b5899ed/`. This file is provided separately and never uploaded to the
+public repository or packaged into the small IPA.
+
+The iPhone validates the full SHA256 **before calling Wasmtime's unsafe
+deserialize_file API**, then attempts module deserialization and enumerates
+86 imports. A rejection reports the actual Wasmtime error so on-device
+code-signing/executable-memory problems are visible; a success does NOT
+instantiate the 3 GiB game memory, execute GTA functions, or render gameplay.
+
+Wasmtime deserialize can require executable-page mapping even when the code
+was compiled ahead-of-time; SideStore's signing method may prohibit that.
+Further progress requires the 85 real host function implementations, an
+engine-compatible Metal renderer and physical gameplay tests. Never claim
+that passing this gate means GTA V is playable.

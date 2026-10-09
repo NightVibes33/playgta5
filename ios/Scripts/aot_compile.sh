@@ -23,8 +23,15 @@ test -s "$out/native_engine.h"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=17.0 \
   -std=c11 -O1 -fno-optimize-sibling-calls -frounding-math \
   -I"$WABT_SOURCE_DIR/wasm2c" \
+  -I"$WABT_SOURCE_DIR/third_party/simde" \
+  -I"$(dirname "$0")/../NativeRuntime" \
   -c "$out/native_engine.c" -o "$out/native_engine-arm64.o"
-xcrun --sdk iphoneos ar -rcs "$out/libnative-engine-arm64.a" "$out/native_engine-arm64.o"
+xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=17.0 \
+  -std=c11 -O2 -I"$WABT_SOURCE_DIR/wasm2c" \
+  -I"$(dirname "$0")/../NativeRuntime" \
+  -c "$(dirname "$0")/../NativeRuntime/gta-native-atomics.c" \
+  -o "$out/gta-native-atomics-arm64.o"
+xcrun --sdk iphoneos ar -rcs "$out/libnative-engine-arm64.a" "$out/native_engine-arm64.o" "$out/gta-native-atomics-arm64.o"
 file "$out/native_engine-arm64.o"
 echo "ARM64 AOT compilation succeeded. Host imports are NOT yet linked."
 echo "No claim of playable GTA: real host ABI, Metal shader bridge and physical device tests remain."
