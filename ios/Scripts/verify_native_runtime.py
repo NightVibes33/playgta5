@@ -66,6 +66,19 @@ assert 'if [ -e "$app/WebRuntime/index.html" ]' in ipa
 assert 'wasm_engine_new()' in read("ios/Sources/Engine/NativeWasmtimeHost.c")
 assert 'wasm_engine_delete(engine)' in read("ios/Sources/Engine/NativeWasmtimeHost.c")
 assert 'gta_ios_wasmtime_engine_probe()' in game
+host = read("ios/Sources/Engine/NativeWasmHostBasics.c")
+assert 'gta_ios_wasmtime_basic_host_probe' in host
+assert 'wasmtime_linker_define_func' in host
+assert 'wasmtime_linker_get' in host
+assert 'wasmtime_func_call' in host
+assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
+assert 'emscripten_num_logical_cores' in host
+assert 'wasm_now_ms' in host
+assert 'gta_ios_wasmtime_basic_host_probe' in game
+assert 'registered != 4' in game
+assert 'wasmtime_linker_define_unknown_imports_as_default_values' not in host
+assert 'wasmtime_linker_define_unknown_imports_as_traps' not in host
+
 assert 'SWIFT_OBJC_BRIDGING_HEADER' in project
 assert 'OTHER_LDFLAGS[sdk=iphoneos*]' in project
 assert 'Resolve pinned Wasmtime iOS static runtime' in workflow
@@ -73,7 +86,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>12</string>" in plist
+assert "<key>CFBundleVersion</key><string>13</string>" in plist
 
 print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
