@@ -13,6 +13,22 @@
                     <view key="view" contentMode="scaleToFill" id="gtA-background">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <viewLayoutGuide key="safeArea" id="gtA-safe"/>
+                        <subviews>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="GTAiOS" textAlignment="center" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gtA-wordmark">
+                                <fontDescription key="fontDescription" type="system" weight="black" pointSize="40"/>
+                                <color key="textColor" red="0.92" green="0.97" blue="0.92" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </label>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="NATIVE RUNTIME  /  SIDELOADED" textAlignment="center" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gtA-tagline">
+                                <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="11"/>
+                                <color key="textColor" red="0.66" green="0.89" blue="0.68" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </label>
+                        </subviews>
+                        <constraints>
+                            <constraint firstItem="gtA-wordmark" firstAttribute="centerX" secondItem="gtA-background" secondAttribute="centerX" id="gtA-center-title"/>
+                            <constraint firstItem="gtA-wordmark" firstAttribute="centerY" secondItem="gtA-background" secondAttribute="centerY" constant="-12" id="gtA-center-y"/>
+                            <constraint firstItem="gtA-tagline" firstAttribute="centerX" secondItem="gtA-wordmark" secondAttribute="centerX" id="gtA-center-tagline"/>
+                            <constraint firstItem="gtA-tagline" firstAttribute="top" secondItem="gtA-wordmark" secondAttribute="bottom" constant="11" id="gtA-tagline-y"/>
+                        </constraints>
                         <color key="backgroundColor" red="0.035" green="0.051" blue="0.061" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     </view>
                 </viewController>
