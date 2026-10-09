@@ -8,7 +8,7 @@ import CryptoKit
 enum NativeAOTModuleProbe {
     enum Outcome {
         case notSupplied
-        case deserialized(UInt32)
+        case deserialized(UInt32, UInt32, String)
         case failed(String)
     }
 
@@ -71,15 +71,16 @@ enum NativeAOTModuleProbe {
                 }
                 LogStore.shared.write("native", "Trusted 228 MiB AArch64 AOT module SHA256 verified. Deserialization beginning.")
                 var count: UInt32 = 0
+                var covered: UInt32 = 0
                 var message = [CChar](repeating: 0, count: 1024)
                 let result: Int32 = granted.withUnsafeFileSystemRepresentation { path in
                     guard let path else { return -10 }
-                    return gta_ios_wasmtime_aot_probe(path, &count, &message, message.count)
+                    return gta_ios_wasmtime_aot_probe(path, &count, &covered, &message, message.count)
                 }
                 let detail = String(cString: message)
-                LogStore.shared.write("native", "Wasmtime real AOT deserialization result=\(result), imports=\(count), message=\(detail)")
+                LogStore.shared.write("native", "Wasmtime real AOT deserialization result=\(result), imports=\(count), linked=\(covered), message=\(detail)")
                 if result == 0 {
-                    outcome = .deserialized(count)
+                    outcome = .deserialized(count, covered, detail)
                 } else {
                     outcome = .failed("Wasmtime deserialization code \(result): \(detail)")
                 }

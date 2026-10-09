@@ -8,7 +8,7 @@ extern "C" {
    This does not instantiate the GTA game engine. */
 int gta_ios_wasmtime_engine_probe(void);
 
-/* Registers four non-memory GTA host imports (three clocks, CPU count)
+/* Registers five verified GTA host imports (three clocks, CPU count, heap maximum)
    and invokes the native Wasmtime monotonic-clock callback as a smoke test.
    The remaining imports are intentionally NOT stubbed or instantiated. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -19,7 +19,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
    Returns a negative error code and a diagnostic string otherwise. */
 #include <stddef.h>
 int gta_ios_wasmtime_aot_probe(const char *path,
-                              unsigned int *import_count,
+                              unsigned int *import_count, unsigned int *covered_count,
                               char *error_message, size_t error_capacity);
 #ifdef __cplusplus
 }

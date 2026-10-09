@@ -67,3 +67,25 @@ Only 4 of 85 imported functions are implemented. Importing a large
 threads, input, audio and the remaining WASI/Emscripten imports are
 still necessary before genuine gameplay. A green ARM64 build checks
 linkability, not actual on-device callback operation.
+
+
+## Build 14: typed host import coverage and real heap-limit callback
+
+A fifth GTA import, `env.emscripten_get_heap_max() -> i64`, is implemented
+using the actual engine's declared maximum 262144 * 65536 = 17179869184
+bytes. This is a **logical WASM heap maximum**, not physically available RAM.
+The runtime invokes the callback via the Wasmtime linker and checks its
+64-bit result, as well as the existing monotonic-clock smoke test.
+
+For an SHA256-verified `real-gta-ios.cwasm` file on the USB drive, native
+deserialization now enumerates all 86 actual imports, registers the known
+callbacks with the real Wasmtime C API linker, and compares each resolved
+function's complete input/output value kinds against the module. Reports
+include the number of compatible host imports, unresolved imports and the
+first missing symbol (typically `env.memory`). It **does not** allocate
+the 3 GiB heap, register fake defaults or instantiate the GTA engine.
+
+A green build means the code compiles and links on arm64; the 5/86 coverage
+must still be observed on physical iPhone after supplying the private AOT.
+All remaining host imports, memory, input, WebGPU-to-Metal renderer, original
+loading, native game audio and saves are unfinished. No gameplay claim.

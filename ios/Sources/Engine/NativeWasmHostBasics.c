@@ -23,7 +23,8 @@ enum gta_host_function {
     GTA_MONOTONIC_MS = 1,
     GTA_EMSCRIPTEN_NOW = 2,
     GTA_WALLCLOCK_MS = 3,
-    GTA_CPU_COUNT = 4
+    GTA_CPU_COUNT = 4,
+    GTA_HEAP_MAX = 5
 };
 
 static double gta_clock_ms(clockid_t clock_id) {
@@ -55,6 +56,13 @@ static wasm_trap_t *gta_basic_callback(
             results[0].of.i32 = (int32_t)(n > 0 && n <= INT32_MAX ? n : 1);
             return NULL;
         }
+        case GTA_HEAP_MAX:
+            // Exact maximum declared by the real GTA WASM memory64 import:
+            // 262144 pages * 65536 bytes = 16 GiB. This is a WASM contract
+            // limit, not a promise that iOS can actually reserve that much.
+            results[0].kind = WASMTIME_I64;
+            results[0].of.i64 = INT64_C(262144) * INT64_C(65536);
+            return NULL;
         default: return NULL;
     }
 }
@@ -70,7 +78,10 @@ static int gta_define(
     wasmtime_linker_t *linker, const char *name, uint8_t kind, uintptr_t op,
     char *message, size_t capacity
 ) {
-    wasm_valtype_t *output = wasm_valtype_new(kind == WASMTIME_I32 ? WASM_I32 : WASM_F64);
+    wasm_valkind_t result_type =
+        kind == WASMTIME_I32 ? WASM_I32 :
+        kind == WASMTIME_I64 ? WASM_I64 : WASM_F64;
+    wasm_valtype_t *output = wasm_valtype_new(result_type);
     if (!output) {
         gta_host_message(message, capacity, "Could not allocate Wasm result type");
         return -1;
@@ -99,7 +110,30 @@ static int gta_define(
     return 0;
 }
 
-/* Returns 0 only when all four GTA-matching host functions are registered
+// Shared import-registration path used by both callback tests and real AOT
+// module coverage. All registrations use verified signatures from game.wasm.
+int gta_ios_wasmtime_register_host_basics(
+    wasmtime_linker_t *linker, unsigned int *installed,
+    char *message, size_t capacity
+) {
+    if (installed) *installed = 0;
+    const struct { const char *name; uint8_t kind; uintptr_t op; } functions[] = {
+        { "wasm_now_ms", WASMTIME_F64, GTA_MONOTONIC_MS },
+        { "emscripten_get_now", WASMTIME_F64, GTA_EMSCRIPTEN_NOW },
+        { "emscripten_date_now", WASMTIME_F64, GTA_WALLCLOCK_MS },
+        { "emscripten_num_logical_cores", WASMTIME_I32, GTA_CPU_COUNT },
+        { "emscripten_get_heap_max", WASMTIME_I64, GTA_HEAP_MAX },
+    };
+    for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); i++) {
+        int rc = gta_define(linker, functions[i].name, functions[i].kind,
+                            functions[i].op, message, capacity);
+        if (rc != 0) return rc;
+        if (installed) ++*installed;
+    }
+    return 0;
+}
+
+/* Returns 0 only when all five ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -117,19 +151,8 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
         return -11;
     }
 
-    const struct { const char *name; uint8_t kind; uintptr_t op; } functions[] = {
-        { "wasm_now_ms", WASMTIME_F64, GTA_MONOTONIC_MS },
-        { "emscripten_get_now", WASMTIME_F64, GTA_EMSCRIPTEN_NOW },
-        { "emscripten_date_now", WASMTIME_F64, GTA_WALLCLOCK_MS },
-        { "emscripten_num_logical_cores", WASMTIME_I32, GTA_CPU_COUNT },
-    };
-    int result = 0;
-    for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); i++) {
-        result = gta_define(linker, functions[i].name, functions[i].kind,
-                            functions[i].op, message, capacity);
-        if (result != 0) goto finish;
-        if (installed) (*installed)++;
-    }
+    int result = gta_ios_wasmtime_register_host_basics(linker, installed, message, capacity);
+    if (result != 0) goto finish;
 
     wasmtime_store_t *store = wasmtime_store_new(engine, NULL, NULL);
     if (!store) {
@@ -155,12 +178,40 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
             gta_host_message(message, capacity, "Monotonic clock callback failed");
         } else {
             gta_host_message(message, capacity,
-                "Four native GTA host callbacks registered; monotonic function invoked correctly");
+                "Five native GTA host callbacks registered; monotonic function invoked correctly");
         }
         if (error) wasmtime_error_delete(error);
         if (trap) wasm_trap_delete(trap);
     }
     if (exported.kind == WASMTIME_EXTERN_FUNC) wasmtime_extern_delete(&exported);
+    // Exercise the *real* i64 heap limit import as well, using the exact
+    // maximum encoded by the supplied 63 MiB engine. The host must never
+    // mistake this logical memory maximum for available physical RAM.
+    if (result == 0) {
+        wasmtime_extern_t heap = {0};
+        const char *name = "emscripten_get_heap_max";
+        if (!wasmtime_linker_get(linker, context, "env", 3, name, strlen(name), &heap)
+                || heap.kind != WASMTIME_EXTERN_FUNC) {
+            result = -23;
+            gta_host_message(message, capacity, "Heap limit linker lookup failed");
+        } else {
+            wasmtime_val_t answer = {0};
+            wasm_trap_t *trap = NULL;
+            wasmtime_error_t *error = wasmtime_func_call(
+                context, &heap.of.func, NULL, 0, &answer, 1, &trap);
+            if (error || trap || answer.kind != WASMTIME_I64
+                    || answer.of.i64 != INT64_C(17179869184)) {
+                result = -24;
+                gta_host_message(message, capacity, "WASM memory64 logical maximum host callback failed");
+            } else {
+                gta_host_message(message, capacity,
+                    "Five native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
+            }
+            if (error) wasmtime_error_delete(error);
+            if (trap) wasm_trap_delete(trap);
+        }
+        if (heap.kind == WASMTIME_EXTERN_FUNC) wasmtime_extern_delete(&heap);
+    }
     wasmtime_store_delete(store);
 finish:
     wasmtime_linker_delete(linker);

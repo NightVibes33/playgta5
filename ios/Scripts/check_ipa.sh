@@ -35,11 +35,11 @@ fi
 # external (N_PEXT). nm -g excludes those even though they are linked.
 # Inspect all defined Mach-O symbols instead of rejecting a valid IPA.
 xcrun nm "$app/GTAiOS" > "$tmp/symbols.txt"
-for symbol in _gta_ios_wasmtime_engine_probe _gta_ios_wasmtime_basic_host_probe _gta_ios_wasmtime_aot_probe _wasm_engine_new _wasm_engine_delete _wasmtime_module_deserialize_file _wasmtime_module_imports; do
+for symbol in _gta_ios_wasmtime_engine_probe _gta_ios_wasmtime_basic_host_probe _gta_ios_wasmtime_register_host_basics _gta_ios_wasmtime_aot_probe _wasm_engine_new _wasm_engine_delete _wasmtime_module_deserialize_file _wasmtime_module_imports; do
   if ! grep -F "$symbol" "$tmp/symbols.txt" >/dev/null; then
     echo "ERROR: linked native Wasmtime runtime symbol missing: $symbol" >&2
     exit 1
   fi
 done
-echo "Native Wasmtime + real clock/CPU host function registration + SHA256 AOT inspection linked: PASS"
+echo "Native Wasmtime + five typed host callbacks + SHA256 AOT import-coverage audit linked: PASS"
 echo "IPA payload and native Metal + Wasmtime host verified; proprietary GTA engine not linked or bundled."
