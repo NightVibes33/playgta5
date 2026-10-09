@@ -26,6 +26,13 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.gtaios
         PRODUCT_NAME: GTAiOS
         SWIFT_EMIT_LOC_STRINGS: NO
+        SWIFT_OBJC_BRIDGING_HEADER: "$(SRCROOT)/Sources/Engine/NativeWasmtimeHost.h"
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/Vendor/Wasmtime/include"
+        "OTHER_LDFLAGS[sdk=iphoneos*]":
+          - "$(inherited)"
+          - "$(SRCROOT)/Vendor/Wasmtime/libwasmtime.a"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: "$(SRCROOT)/Config/Info.plist"
         TARGETED_DEVICE_FAMILY: "1"

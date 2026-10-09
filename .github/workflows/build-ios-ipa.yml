@@ -1,16 +1,32 @@
 name: Build GTAiOS Unsigned IPA
 on:
   push:
-    branches: [ios-usb-port]
+    branches: [ios-usb-port, native-aot-work]
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   ios:
     runs-on: macos-15
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Install native Wasmtime 49 ARM64 runtime and headers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/wasmtime-artifact" ios/Vendor/Wasmtime/include
+          gh run download 37863716790 -R "$GITHUB_REPOSITORY" \
+            -n ios-wasmtime49-threads-runtime-arm64 \
+            -D "$RUNNER_TEMP/wasmtime-artifact"
+          cp "$RUNNER_TEMP/wasmtime-artifact/wasmtime/target/aarch64-apple-ios/release/libwasmtime.a" ios/Vendor/Wasmtime/
+          cp -R "$RUNNER_TEMP/wasmtime-artifact/wasmtime/crates/c-api/include/." ios/Vendor/Wasmtime/include/
+          test -s ios/Vendor/Wasmtime/libwasmtime.a
+          test -s ios/Vendor/Wasmtime/include/wasm.h
+          file ios/Vendor/Wasmtime/libwasmtime.a
+          echo 'Wasmtime native staticlib + C API installed; GTA engine code stays on USB'
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Verify native Metal and USB architecture

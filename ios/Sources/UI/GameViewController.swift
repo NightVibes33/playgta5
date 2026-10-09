@@ -99,6 +99,16 @@ final class GameViewController: UIViewController {
         GameOrientation.request(.landscape, from: view)
         guard !inspectStarted else { return }
         inspectStarted = true
+        #if targetEnvironment(simulator)
+        LogStore.shared.write("native", "Wasmtime ARM64 static host: simulator excluded by design")
+        #else
+        let hostProbe = gta_ios_wasmtime_engine_probe()
+        LogStore.shared.write("native", "Wasmtime native host initialization: status=\(hostProbe)")
+        if hostProbe != 0 {
+            status.text = "Native Wasmtime runtime could not initialize (\(hostProbe)). Check code signing and runtime diagnostics."
+            return
+        }
+        #endif
         if !surface.gpuReady {
             status.text = "Metal device or command queue unavailable. Native rendering cannot start."
             LogStore.shared.write("native", "Metal hardware check failed")
