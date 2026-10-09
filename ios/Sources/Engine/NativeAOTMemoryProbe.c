@@ -76,6 +76,9 @@ int gta_ios_wasmtime_memory64_smoke(const char *aot_path,
         gta_memory_message(message, capacity, "Wasmtime memory64 configuration unavailable");
         return -2;
     }
+    // Require exactly the GC-disabled profile used when compiling our
+    // signed iOS AOT modules; the static Wasmtime host has no GC feature.
+    wasmtime_config_gc_support_set(config, false);
     wasmtime_config_wasm_threads_set(config, true);
     wasmtime_config_shared_memory_set(config, true);
     wasmtime_config_wasm_memory64_set(config, true);

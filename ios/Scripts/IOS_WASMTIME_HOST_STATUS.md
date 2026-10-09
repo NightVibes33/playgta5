@@ -246,3 +246,37 @@ AOT executable pages, even for this signed fixture.
   shared memory64) and the Metal renderer are implemented.
 - This is not engine execution or gameplay. It only provides a genuine
   prerequisite for loading the original game archives.
+
+
+## Build 21 — iPhone 16 / iOS 27 beta 4: compatibility corrections
+
+Real user logs from BUILD 20 confirm the USB folder was granted and passed
+validation. Metal A18 GPU creation and native host C-API initialization both
+succeeded, along with a 10/85 genuine host-function registration smoke.
+
+Two signed-bundle native AOT fixtures failed Wasmtime deserialization:
+`module was compiled with GC however GC is disabled in the host`.
+The v49.0.2 host was built with `--no-default-features --features threads`.
+The v49.0.2 CLI defaults to GC-enabled support even for basic modules.
+Build 21 therefore compiles both iOS fixtures with
+`-W gc-support=n,threads=y,shared-memory=y,memory64=y` and explicitly
+sets `wasmtime_config_gc_support_set(false)` in the three deserializing
+C-API engines. This aligns serialized artifact configuration with the
+actual installed runtime rather than enabling a missing runtime feature.
+
+The same compatible flag is set in `aot_compile_wasmtime.sh` for a
+user-authorized private GTA engine build. The original
+`real-gta-ios.cwasm` SHA allowlist is NOT updated speculatively: an
+actual newly compiled engine would have a different digest and size,
+which must be verified before the app can deserialize it. No GTA
+engine instantiation or actual gameplay is claimed.
+
+A separate `None of the requested orientations are supported` diagnostic
+indicates a race during portrait-launcher to landscape-native-view navigation.
+Build 21 refreshes UIKit orientation support during the navigation
+transition and schedules geometry selection after presentation.
+
+The remaining GTA engine work includes at least 75 additional host functions,
+real 3 GiB shared-memory management, native Metal shader/graphics command
+translation, host/guest controller ABI, genuine game audio, saves and gameplay.
+A green IPA build does NOT establish that any of those exist.

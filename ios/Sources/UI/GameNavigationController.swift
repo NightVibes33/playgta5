@@ -5,10 +5,20 @@ import UIKit
 final class GameNavigationController: UINavigationController {
     override var shouldAutorotate: Bool { true }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        topViewController?.supportedInterfaceOrientations ?? .allButUpsideDown
+        if visibleViewController is GameViewController { return .landscape }
+        // During push/pop animations UIKit can still report the previous
+        // portrait-only controller as visible. Keep both orientations allowed
+        // until the gameplay controller is fully onscreen.
+        if viewControllers.contains(where: { $0 is GameViewController }) {
+            return .allButUpsideDown
+        }
+        return topViewController?.supportedInterfaceOrientations ?? .allButUpsideDown
     }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        topViewController?.preferredInterfaceOrientationForPresentation ?? .portrait
+        if viewControllers.contains(where: { $0 is GameViewController }) {
+            return .landscapeRight
+        }
+        return topViewController?.preferredInterfaceOrientationForPresentation ?? .portrait
     }
 }
 

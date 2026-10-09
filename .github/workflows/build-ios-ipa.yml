@@ -76,6 +76,9 @@ jobs:
           test -n "$WASMTIME"
           chmod +x "$WASMTIME"
           "$WASMTIME" --version
+          # Reproduces Cargo's --no-default-features --features threads
+          # when serialized AOT is loaded by the signing-limited iOS host.
+          "$WASMTIME" compile -W help | grep -F 'gc-support'
           # Small original WASM module: export add(i32,i32) -> i32.
           python3 - <<'PY'
           from pathlib import Path
@@ -83,8 +86,9 @@ jobs:
           Path(os.environ["RUNNER_TEMP"], "native-smoke.wasm").write_bytes(
               bytes.fromhex("0061736d0100000001070160027f7f017f030201000707010361646400000a09010700200020016a0b"))
           PY
-          "$WASMTIME" compile --target aarch64-apple-ios -O opt-level=0 \
-            -C parallel-compilation=n \
+          "$WASMTIME" compile --target aarch64-apple-ios \
+            -W gc-support=n,threads=y,shared-memory=y,memory64=y \
+            -O opt-level=0 -C parallel-compilation=n \
             -o ios/Sources/Resources/native-aot-smoke.cwasm \
             "$RUNNER_TEMP/native-smoke.wasm"
           file ios/Sources/Resources/native-aot-smoke.cwasm
@@ -108,8 +112,9 @@ jobs:
               local.get 0
               i32.load8_u))
           WAT
-          "$WASMTIME" compile --target aarch64-apple-ios -O opt-level=0 \
-            -C parallel-compilation=n \
+          "$WASMTIME" compile --target aarch64-apple-ios \
+            -W gc-support=n,threads=y,shared-memory=y,memory64=y \
+            -O opt-level=0 -C parallel-compilation=n \
             -o ios/Sources/Resources/native-memory64-smoke.cwasm \
             "$RUNNER_TEMP/native-memory64-smoke.wat"
           test -s ios/Sources/Resources/native-memory64-smoke.cwasm

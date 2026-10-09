@@ -9,7 +9,11 @@ test -s "$wasm"
 mkdir -p "$(dirname "$out")"
 python3 "$(dirname "$0")/aot_import_audit.py" "$wasm" \
   --json "$(dirname "$out")/aot-imports.json"
+# Match the iPhone's threads-only Wasmtime C host. Without gc-support=n,
+# serialized AOT deserialization fails: "module was compiled with GC however
+# GC is disabled in the host", even for modules that never use WebAssembly GC.
 "$WASMTIME_BIN" compile --target aarch64-apple-ios \
+  -W gc-support=n,threads=y,shared-memory=y,memory64=y \
   -O opt-level=0 -C parallel-compilation=n -o "$out" "$wasm"
 python3 - "$out" <<'PY'
 from pathlib import Path

@@ -56,6 +56,9 @@ int gta_ios_wasmtime_aot_probe(const char *path,
         aot_message(error_message, error_capacity, "Wasmtime configuration failed");
         return -11;
     }
+    // Require exactly the GC-disabled profile used when compiling our
+    // signed iOS AOT modules; the static Wasmtime host has no GC feature.
+    wasmtime_config_gc_support_set(config, false);
     wasmtime_config_wasm_threads_set(config, true);
     wasmtime_config_shared_memory_set(config, true);
     wasmtime_config_wasm_memory64_set(config, true);
