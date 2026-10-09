@@ -106,6 +106,39 @@ static int gta_define_input_callback(wasmtime_linker_t *linker) {
     return 0;
 }
 
+/* Real Emscripten host ABI: wasm_httpfs_manifest_js(i64 buffer, i32 cap)
+ * -> i32 needed bytes, reading the staged USB data/manifest.json.
+ * No implicit HTTP fetch, no archive copying, no fabricated JSON.
+ */
+static wasm_trap_t *gta_httpfs_manifest_callback(
+    void *env, wasmtime_caller_t *caller, const wasmtime_val_t *args,
+    size_t nargs, wasmtime_val_t *results, size_t nresults
+) {
+    (void)env; (void)caller;
+    if (nargs != 2 || nresults != 1 || args[0].kind != WASMTIME_I64
+                   || args[1].kind != WASMTIME_I32) return NULL;
+    results[0].kind = WASMTIME_I32;
+    results[0].of.i32 = gta_httpfs_manifest_js(
+        (uint64_t)args[0].of.i64, args[1].of.i32);
+    return NULL;
+}
+
+static int gta_define_manifest_callback(wasmtime_linker_t *linker) {
+    wasm_valtype_t *ptr = wasm_valtype_new(WASM_I64);
+    wasm_valtype_t *cap = wasm_valtype_new(WASM_I32);
+    wasm_valtype_t *result = wasm_valtype_new(WASM_I32);
+    if (!ptr || !cap || !result) return -1;
+    wasm_functype_t *type = wasm_functype_new_2_1(ptr, cap, result);
+    if (!type) return -2;
+    const char *name = "wasm_httpfs_manifest_js";
+    wasmtime_error_t *error = wasmtime_linker_define_func(
+        linker, "env", 3, name, strlen(name), type,
+        gta_httpfs_manifest_callback, NULL, NULL);
+    wasm_functype_delete(type);
+    if (error) { wasmtime_error_delete(error); return -3; }
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -200,10 +233,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if (installed) ++*installed;
+    rc = gta_define_manifest_callback(linker);
+    if (rc != 0) {
+        gta_host_message(message, capacity, "Native HTTPFS manifest callback registration failed");
+        return rc;
+    }
+    if (installed) ++*installed;
     return 0;
 }
 
-/* Returns 0 only when all nine ABI-matched host functions are registered
+/* Returns 0 only when ten ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -248,7 +287,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
             gta_host_message(message, capacity, "Monotonic clock callback failed");
         } else {
             gta_host_message(message, capacity,
-                "Nine native GTA host callbacks registered; monotonic function invoked correctly");
+                "Ten native GTA host callbacks registered; monotonic function invoked correctly");
         }
         if (error) wasmtime_error_delete(error);
         if (trap) wasm_trap_delete(trap);
@@ -275,7 +314,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "WASM memory64 logical maximum host callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Nine native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
+                    "Ten native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
@@ -306,7 +345,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                     "Actual WASM input block publish callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Nine verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
+                    "Ten verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);

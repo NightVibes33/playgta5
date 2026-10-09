@@ -225,3 +225,24 @@ memory has NOT been allocated; none of the remaining game imports, in-world
 controls, genuine game loading, graphics, shaders, audio or saves are
 operational. Physical device run is still needed to verify that iOS permits
 AOT executable pages, even for this signed fixture.
+
+
+## Build 20: real USB HTTPFS manifest import (10th host binding)
+
+- Implemented the exact `env.wasm_httpfs_manifest_js(i64 buffer, i32 capacity)->i32`
+  from the original `game.js`. It reads the externally selected
+  `data/manifest.json` through `NSFileCoordinator`, stages at most 32 MiB
+  of JSON in the native host, and returns the required byte length. A second
+  call with sufficient capacity writes bytes plus a terminating NUL into
+  a bound shared WASM memory view. This reproduces the original browser
+  implementation's `cap > length` condition, rather than simulating HTTP.
+- Strict bounds checks protect untrusted memory64 destination pointers; the
+  real 20 GB archive data stays on USB. A pure C regression test exercises
+  length querying, exact-size non-write behavior, successful copy,
+  NUL termination, overflow, out-of-bounds rejection, and unbinding.
+- The Wasmtime linker now registers **10 of 85** verified game imports,
+  with the correct `i64,i32 -> i32` signature. Game engine import
+  validation remains non-instantiating until all 86 imports (including
+  shared memory64) and the Metal renderer are implemented.
+- This is not engine execution or gameplay. It only provides a genuine
+  prerequisite for loading the original game archives.
