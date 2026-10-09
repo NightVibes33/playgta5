@@ -5,7 +5,9 @@
 
 #if !TARGET_OS_SIMULATOR
 #include <wasm.h>
-#include <wasmtime.h>
+#include <wasmtime/error.h>
+#include <wasmtime/config.h>
+#include <wasmtime/module.h>
 #endif
 
 static void aot_message(char *out, size_t capacity, const char *msg) {
