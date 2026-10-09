@@ -20,6 +20,13 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
 int gta_ios_wasmtime_execute_smoke(const char *aot_path,
                                     char *message, size_t capacity);
 
+/* Executes an actual iPhone ARM64 AOT module with an imported shared
+   memory64 allocation of one 64KiB page. Verifies a guest store+load at
+   i64 offset 16 against the host shared memory. The test does NOT allocate
+   the GTA engine's 3GiB initial memory or run the game. */
+int gta_ios_wasmtime_memory64_smoke(const char *aot_path,
+                                    char *message, size_t capacity);
+
 /* Only accepts a trusted SHA256-verified, version-matched Wasmtime AOT file.
    Returns 0 with 86 imports if deserialization succeeded (NOT gameplay).
    Returns a negative error code and a diagnostic string otherwise. */

@@ -75,6 +75,26 @@ jobs:
             "$RUNNER_TEMP/native-smoke.wasm"
           file ios/Sources/Resources/native-aot-smoke.cwasm
           test -s ios/Sources/Resources/native-aot-smoke.cwasm
+          # Real shared memory64/threads AOT fixture. It imports env.memory,
+          # writes and reads 42 at a 64-bit guest address, and allows the
+          # app to verify host/guest memory coherence on device. One page
+          # only: NEVER allocate GTA's 3 GiB heap for this smoke test.
+          cat > "$RUNNER_TEMP/native-memory64-smoke.wat" <<'WAT'
+          (module
+            (import "env" "memory" (memory i64 1 2 shared))
+            (func (export "touch") (param i64) (result i32)
+              local.get 0
+              i32.const 42
+              i32.store
+              local.get 0
+              i32.load))
+          WAT
+          "$WASMTIME" compile --target aarch64-apple-ios -O opt-level=0 \
+            -C parallel-compilation=n \
+            -o ios/Sources/Resources/native-memory64-smoke.cwasm \
+            "$RUNNER_TEMP/native-memory64-smoke.wat"
+          test -s ios/Sources/Resources/native-memory64-smoke.cwasm
+          file ios/Sources/Resources/native-memory64-smoke.cwasm
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Verify native Metal and USB architecture
