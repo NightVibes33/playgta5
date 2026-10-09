@@ -125,7 +125,21 @@ final class GameViewController: UIViewController {
                 if !m.memory64 || !m.shared {
                     self.status.text = "WASM engine requires an unsupported host contract.\nDetected memory64=\(m.memory64), shared=\(m.shared). Native AOT conversion required."
                 } else if !NativeEngineStatus.nativeEngineLinked {
-                    self.status.text = "USB game.wasm and shader index found.\nMetal GPU ready • Bluetooth controller input ready.\n\nNative ARM64 game engine not linked.\nThis is NOT playable yet; no loading sequence is simulated."
+                    self.status.text = "USB game.wasm and shader index found.\nMetal GPU ready.\nChecking optional native ARM64 AOT engine file…"
+                    NativeAOTModuleProbe.inspect { [weak self] result in
+                        guard let self else { return }
+                        switch result {
+                        case .notSupplied:
+                            self.status.text = "USB engine validated.\nFor native AOT compatibility testing, place real-gta-ios.cwasm next to index.html on the USB drive.\n\nGTA V gameplay is NOT implemented."
+                            LogStore.shared.write("native", "Optional AOT module absent from USB root. No game engine linked.")
+                        case .deserialized(let imports):
+                            self.status.text = "Actual AArch64 GTA AOT module deserialized.\nImported host bindings: \(imports).\n\nNative engine execution NOT implemented. Metal renderer and 85 host functions still missing."
+                            LogStore.shared.write("native", "Actual GTA Wasmtime AOT module parsed, imports=\(imports), not instantiated")
+                        case .failed(let why):
+                            self.status.text = "Native AOT compatibility test failed:\n\(why)\n\nNo game execution attempted."
+                            LogStore.shared.write("native", "Real AOT compatibility failure: \(why)")
+                        }
+                    }
                 } else {
                     // Add actual engine launch only once a verified AOT backend exists.
                     self.status.text = "Native engine backend linked; initialization pending."
