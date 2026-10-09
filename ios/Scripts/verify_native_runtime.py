@@ -68,7 +68,7 @@ assert 'wasm_engine_delete(engine)' in read("ios/Sources/Engine/NativeWasmtimeHo
 assert 'gta_ios_wasmtime_engine_probe()' in game
 assert 'SWIFT_OBJC_BRIDGING_HEADER' in project
 assert 'OTHER_LDFLAGS[sdk=iphoneos*]' in project
-assert 'Install native Wasmtime 49 ARM64 runtime' in workflow
+assert 'Resolve pinned Wasmtime iOS static runtime' in workflow
 assert "<key>CFBundleVersion</key><string>11</string>" in plist
 
 print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
