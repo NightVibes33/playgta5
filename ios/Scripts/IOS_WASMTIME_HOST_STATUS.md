@@ -44,3 +44,26 @@ code-page permissions and Wasmtime artifact compatibility can fail on-device.
 Never claim GTA V gameplay has launched simply because the Wasmtime static
 library linked, the AOT artifact deserialized, or a Metal diagnostic frame
 was presented. The proprietary game engine/AOT blobs remain outside GitHub.
+
+
+## Build 13: first real native host functions
+
+The signed-side Wasmtime host now defines four genuine, ABI-matched
+`env` imports from the actual game:
+`wasm_now_ms() -> f64`, `emscripten_get_now() -> f64`,
+`emscripten_date_now() -> f64`, and
+`emscripten_num_logical_cores() -> i32`.
+
+Both monotonic-time imports use `clock_gettime(CLOCK_MONOTONIC)`,
+the date import uses `CLOCK_REALTIME`, and the CPU query uses
+`sysconf(_SC_NPROCESSORS_ONLN)`. These are registered in the actual
+Wasmtime C API linker, with a device-side `wasmtime_linker_get` /
+`wasmtime_func_call` smoke test that invokes the native callback.
+
+Unsupported game functions remain **unresolved**. The app does not
+register fake zero-returning callbacks or instantiate the GTA game.
+Only 4 of 85 imported functions are implemented. Importing a large
+3 GiB shared memory, the complete WebGPU/Metal bridge, asset paging,
+threads, input, audio and the remaining WASI/Emscripten imports are
+still necessary before genuine gameplay. A green ARM64 build checks
+linkability, not actual on-device callback operation.

@@ -108,6 +108,16 @@ final class GameViewController: UIViewController {
             status.text = "Native Wasmtime runtime could not initialize (\(hostProbe)). Check code signing and runtime diagnostics."
             return
         }
+        var registered: UInt32 = 0
+        var hostMessage = [CChar](repeating: 0, count: 512)
+        let basicProbe = gta_ios_wasmtime_basic_host_probe(&registered, &hostMessage, hostMessage.count)
+        let hostDetail = String(cString: hostMessage)
+        LogStore.shared.write("native",
+            "Real GTA native host callbacks: result=\(basicProbe), registered=\(registered)/85, message=\(hostDetail)")
+        if basicProbe != 0 || registered != 4 {
+            status.text = "Native Wasmtime host callback test failed (\(basicProbe)). \(hostDetail)"
+            return
+        }
         #endif
         if !surface.gpuReady {
             status.text = "Metal device or command queue unavailable. Native rendering cannot start."
