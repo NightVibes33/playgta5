@@ -1,0 +1,29 @@
+name: Fetch Wasmtime AOT Test CLI
+on:
+  push:
+    branches: [native-aot-work]
+    paths: [".github/workflows/fetch-wasmtime-cli.yml"]
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Fetch pinned Wasmtime 49.0.2 Linux executable
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/bytecodealliance/wasmtime/releases/download/v49.0.2/wasmtime-v49.0.2-x86_64-linux.tar.xz \
+            -o "$RUNNER_TEMP/wasmtime.tar.xz"
+          mkdir -p "$RUNNER_TEMP/unpacked" dist
+          tar -xJf "$RUNNER_TEMP/wasmtime.tar.xz" -C "$RUNNER_TEMP/unpacked"
+          find "$RUNNER_TEMP/unpacked" -type f -name wasmtime -exec cp {} dist/wasmtime \;
+          test -x dist/wasmtime
+          dist/wasmtime --version
+          file dist/wasmtime
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasmtime-49.0.2-linux-aot-cli
+          path: dist/
+          retention-days: 2
