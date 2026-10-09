@@ -61,6 +61,9 @@ int gta_ios_wasmtime_memory64_smoke(const char *aot_path,
     wasmtime_linker_t *linker = NULL;
     wasmtime_extern_t exported = {0};
     bool exported_owned = false;
+    wasmtime_extern_t input_export = {0};
+    bool input_export_owned = false;
+    bool input_bound = false;
     wasm_trap_t *trap = NULL;
     wasmtime_error_t *error = NULL;
 
@@ -150,10 +153,65 @@ int gta_ios_wasmtime_memory64_smoke(const char *aot_path,
         gta_memory_message(message, capacity, "Guest / host memory64 contents disagree");
         rc = -13; goto cleanup;
     }
+    /* Prove a genuine native GameController/touch frame is visible to an
+     * AOT-compiled WASM guest through the 444-byte game input block.
+     * This synthetic module reads a keyboard byte from guest memory; it
+     * does not run GTA's original gameplay routines. */
+    enum { INPUT_BLOCK = 512, VK_W_OFFSET = 0x57 };
+    gta_native_input_bind_memory(wasmtime_sharedmemory_data(memory),
+                                 wasmtime_sharedmemory_data_size(memory));
+    input_bound = true;
+    gta_native_input_publish_block(INPUT_BLOCK);
+    gta_native_pad_frame_t pad = {0};
+    pad.active = 1;
+    pad.ly = 0.8f; /* Forward motion -> original virtual key W */
+    pad.width = 960;
+    pad.height = 540;
+    if (gta_native_input_apply(&pad) != 0) {
+        gta_memory_message(message, capacity, "Native controller input could not be applied to AOT shared memory");
+        rc = -14; goto cleanup;
+    }
+    if (!wasmtime_instance_export_get(ctx, &instance, "input_w", 7, &input_export)
+            || input_export.kind != WASMTIME_EXTERN_FUNC) {
+        gta_memory_message(message, capacity, "AOT fixture missing compiled input_w(i64)->i32");
+        rc = -15; goto cleanup;
+    }
+    input_export_owned = true;
+    wasmtime_val_t input_address[1] = {0};
+    input_address[0].kind = WASMTIME_I64;
+    input_address[0].of.i64 = INPUT_BLOCK + VK_W_OFFSET;
+    wasmtime_val_t key_pressed = {0};
+    error = wasmtime_func_call(ctx, &input_export.of.func, input_address, 1,
+                               &key_pressed, 1, &trap);
+    if (error || trap || key_pressed.kind != WASMTIME_I32
+            || key_pressed.of.i32 != 0x80) {
+        gta_memory_error(message, capacity, error);
+        if (trap || !error) gta_memory_message(message, capacity,
+            "Native-to-WASM input press was not visible in compiled AOT code");
+        rc = -16; goto cleanup;
+    }
+    pad.active = 0;
+    if (gta_native_input_apply(&pad) != 0) {
+        gta_memory_message(message, capacity, "Native controller release failed");
+        rc = -17; goto cleanup;
+    }
+    wasmtime_val_t key_released = {0};
+    error = wasmtime_func_call(ctx, &input_export.of.func, input_address, 1,
+                               &key_released, 1, &trap);
+    if (error || trap || key_released.kind != WASMTIME_I32
+            || key_released.of.i32 != 0) {
+        gta_memory_error(message, capacity, error);
+        if (trap || !error) gta_memory_message(message, capacity,
+            "AOT guest retained a released controller key");
+        rc = -18; goto cleanup;
+    }
     gta_memory_message(message, capacity,
-        "PASS: AArch64 Wasmtime AOT executed; guest 64-bit address touched real shared host memory (42). GTA NOT running.");
+        "PASS: ARM64 memory64 AOT guest executed, shared host data=42; native controller W press=128 and release=0 read by guest. GTA NOT running.");
     rc = 0;
 cleanup:
+    /* Never leave the live gamepad publisher pointing into freed guest memory. */
+    if (input_bound) gta_native_input_unbind();
+    if (input_export_owned) wasmtime_extern_delete(&input_export);
     if (exported_owned) wasmtime_extern_delete(&exported);
     if (trap) wasm_trap_delete(trap);
     if (linker) wasmtime_linker_delete(linker);

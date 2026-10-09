@@ -200,3 +200,28 @@ still require a new engine interface or adaptation.
 GTA V gameplay, original loading, native Metal shaders, original audio and
 saves remain unverified and unfinished. CI passing means the host ABI code
 compiles, not that an in-world engine received these inputs.
+
+
+## Build 19: compiled ARM64 guest reads actual native game input block
+
+Extend the **existing** signed-bundle Wasmtime memory64 AOT fixture with
+an exported `input_w(i64)->i32` memory load. After successfully validating
+shared-memory host/guest coherence, the native iPhone runtime binds
+`wasmtime_sharedmemory_data` to `NativeGameInputABI`, publishes the
+444-byte input block at aligned offset 512 and applies a movement frame.
+It then calls the AOT-compiled `input_w` function at the W-key address
+and requires the result to be 0x80 (pressed). On release it requires
+a second guest readback of 0x00. The host unbinds its pointer **before**
+the shared memory is freed on every path, including failures.
+
+This is a much stronger end-to-end test than C unit tests: native iOS
+GameController/touch-frame format → real shared memory64 memory → compiled
+AArch64 WASM guest instruction → readback, plus release. The unsigned IPA
+packages the augmented AOT fixture and logs success or the precise failing
+phase on the actual iPhone. **CI verifies compilation and packaging only.**
+
+This is deliberately a synthetic one-page module. The real 3 GiB GTA shared
+memory has NOT been allocated; none of the remaining game imports, in-world
+controls, genuine game loading, graphics, shaders, audio or saves are
+operational. Physical device run is still needed to verify that iOS permits
+AOT executable pages, even for this signed fixture.
