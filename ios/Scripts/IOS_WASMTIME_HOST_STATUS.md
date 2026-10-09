@@ -115,3 +115,29 @@ The advanced controls, dashboard and save/audio components can all compile
 and run without the proprietary engine. They are prerequisites, not evidence
 of playable GTA V. No game frames, game soundtrack, original loading sequence,
 or in-world controller response have been verified.
+
+## Build 16: first real iPhone AOT **execution** probe (separate from GTA)
+
+- CI now compiles an original, tiny WebAssembly function `add(i32,i32)->i32`
+  into Wasmtime 49.0.2 AArch64-Apple-iOS serialized AOT code, and bundles it
+  as `native-aot-smoke.cwasm` in the unsigned IPA.
+- New `NativeAOTExecutionProbe.c` uses the real Wasmtime C API to deserialize,
+  **instantiate and execute** this signed-bundle fixture on a physical
+  iPhone, checking that `add(20,22)` returns `42`. This is a test of
+  executable-page availability, not a fake rendering scene.
+- On-device results (success or entitlement/code-signing failure) are logged
+  in native diagnostics. CI can only prove the test code compiles and links;
+  until device testing, the execution result is **not verified**.
+- Three additional real GTA imports are registered: `wasm_has_page_js()->i32`
+  and `wasm_userdata_page_js()->i32` correctly report 0 because the
+  original browser page / JS ioWorker services are unavailable in the native
+  runtime, and `emscripten_check_blocking_allowed()->void` matches the
+  original JavaScript no-op check. These are feature probes, **not** full
+  implementations of browser paging, persistence, or threading.
+- With 8/85 function imports registered, 77 host functions and the required
+  imported 3GiB shared memory remain missing. The game is still not
+  instantiated. No real GTA shader, loading screen, audio, saves, or gameplay
+  has been tested.
+
+The actual GTA `real-gta-ios.cwasm` is still an external/private AOT engine
+whose host ABI cannot currently be satisfied; do not call this build playable.

@@ -24,7 +24,10 @@ enum gta_host_function {
     GTA_EMSCRIPTEN_NOW = 2,
     GTA_WALLCLOCK_MS = 3,
     GTA_CPU_COUNT = 4,
-    GTA_HEAP_MAX = 5
+    GTA_HEAP_MAX = 5,
+    GTA_HAS_BROWSER_PAGE = 6,
+    GTA_HAS_USERDATA_WORKER = 7,
+    GTA_BLOCKING_ALLOWED_CHECK = 8
 };
 
 static double gta_clock_ms(clockid_t clock_id) {
@@ -38,8 +41,10 @@ static wasm_trap_t *gta_basic_callback(
     size_t nargs, wasmtime_val_t *results, size_t nresults
 ) {
     (void)caller; (void)args;
-    if (nargs != 0 || nresults != 1) return NULL;
+    if (nargs != 0) return NULL;
     uintptr_t op = (uintptr_t)env;
+    if (op == GTA_BLOCKING_ALLOWED_CHECK) return NULL; // Empty callback per original game.js
+    if (nresults != 1) return NULL;
     switch (op) {
         case GTA_MONOTONIC_MS:
         case GTA_EMSCRIPTEN_NOW:
@@ -56,6 +61,12 @@ static wasm_trap_t *gta_basic_callback(
             results[0].of.i32 = (int32_t)(n > 0 && n <= INT32_MAX ? n : 1);
             return NULL;
         }
+        case GTA_HAS_BROWSER_PAGE:
+        case GTA_HAS_USERDATA_WORKER:
+            // No native browser page or JS userdata worker has been implemented.
+            results[0].kind = WASMTIME_I32;
+            results[0].of.i32 = 0;
+            return NULL;
         case GTA_HEAP_MAX:
             // Exact maximum declared by the real GTA WASM memory64 import:
             // 262144 pages * 65536 bytes = 16 GiB. This is a WASM contract
@@ -110,6 +121,25 @@ static int gta_define(
     return 0;
 }
 
+static int gta_define_void(wasmtime_linker_t *linker, const char *name,
+                           uintptr_t op, char *message, size_t capacity) {
+    wasm_functype_t *type = wasm_functype_new_0_0();
+    if (!type) {
+        gta_host_message(message, capacity, "Could not allocate void Wasm function type");
+        return -1;
+    }
+    wasmtime_error_t *error = wasmtime_linker_define_func(
+        linker, "env", 3, name, strlen(name), type, gta_basic_callback,
+        (void *)op, NULL);
+    wasm_functype_delete(type);
+    if (error) {
+        wasmtime_error_delete(error);
+        gta_host_message(message, capacity, "Native void host registration failed");
+        return -3;
+    }
+    return 0;
+}
+
 // Shared import-registration path used by both callback tests and real AOT
 // module coverage. All registrations use verified signatures from game.wasm.
 int gta_ios_wasmtime_register_host_basics(
@@ -123,6 +153,8 @@ int gta_ios_wasmtime_register_host_basics(
         { "emscripten_date_now", WASMTIME_F64, GTA_WALLCLOCK_MS },
         { "emscripten_num_logical_cores", WASMTIME_I32, GTA_CPU_COUNT },
         { "emscripten_get_heap_max", WASMTIME_I64, GTA_HEAP_MAX },
+        { "wasm_has_page_js", WASMTIME_I32, GTA_HAS_BROWSER_PAGE },
+        { "wasm_userdata_page_js", WASMTIME_I32, GTA_HAS_USERDATA_WORKER },
     };
     for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); i++) {
         int rc = gta_define(linker, functions[i].name, functions[i].kind,
@@ -130,10 +162,14 @@ int gta_ios_wasmtime_register_host_basics(
         if (rc != 0) return rc;
         if (installed) ++*installed;
     }
+    int rc = gta_define_void(linker, "emscripten_check_blocking_allowed",
+                             GTA_BLOCKING_ALLOWED_CHECK, message, capacity);
+    if (rc != 0) return rc;
+    if (installed) ++*installed;
     return 0;
 }
 
-/* Returns 0 only when all five ABI-matched host functions are registered
+/* Returns 0 only when all eight ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -178,7 +214,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
             gta_host_message(message, capacity, "Monotonic clock callback failed");
         } else {
             gta_host_message(message, capacity,
-                "Five native GTA host callbacks registered; monotonic function invoked correctly");
+                "Eight native GTA host callbacks registered; monotonic function invoked correctly");
         }
         if (error) wasmtime_error_delete(error);
         if (trap) wasm_trap_delete(trap);
@@ -205,7 +241,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "WASM memory64 logical maximum host callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Five native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
+                    "Eight native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);

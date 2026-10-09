@@ -97,7 +97,18 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 5' in game
+assert 'registered != 8' in game
+assert 'native-aot-smoke' in game
+assert 'gta_ios_wasmtime_execute_smoke' in game
+assert 'gta_ios_wasmtime_execute_smoke' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
+assert 'wasmtime_linker_instantiate' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
+assert 'wasmtime_instance_export_get' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
+assert 'WASMTIME_I32' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
+assert 'wasm_has_page_js' in host
+assert 'wasm_userdata_page_js' in host
+assert 'emscripten_check_blocking_allowed' in host
+assert 'gta_define_void' in host
+assert 'native-aot-smoke.cwasm' in workflow
 assert 'case .deserialized(let imports, let linked, let details)' in game
 assert 'gta_ios_wasmtime_register_host_basics' in host
 assert 'emscripten_get_heap_max' in host
@@ -117,7 +128,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>15</string>" in plist
+assert "<key>CFBundleVersion</key><string>16</string>" in plist
 
 print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

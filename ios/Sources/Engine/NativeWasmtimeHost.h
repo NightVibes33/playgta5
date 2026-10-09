@@ -8,11 +8,17 @@ extern "C" {
    This does not instantiate the GTA game engine. */
 int gta_ios_wasmtime_engine_probe(void);
 
-/* Registers five verified GTA host imports (three clocks, CPU count, heap maximum)
+/* Registers eight verified GTA host imports (timing, capabilities and heap limit)
    and invokes the native Wasmtime monotonic-clock callback as a smoke test.
    The remaining imports are intentionally NOT stubbed or instantiated. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                                       char *error_message, size_t error_capacity);
+
+/* Execute a tiny trusted, CI-generated AArch64 AOT test function in a signed
+   iOS app. Returns 0 only when its real machine code returns add(20,22)=42.
+   This is a hardware execution check, NOT GTA engine instantiation. */
+int gta_ios_wasmtime_execute_smoke(const char *aot_path,
+                                    char *message, size_t capacity);
 
 /* Only accepts a trusted SHA256-verified, version-matched Wasmtime AOT file.
    Returns 0 with 86 imports if deserialization succeeded (NOT gameplay).

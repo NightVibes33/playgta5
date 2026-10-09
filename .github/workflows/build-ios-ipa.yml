@@ -50,6 +50,31 @@ jobs:
           test -s ios/Vendor/Wasmtime/include/wasm.h
           test -s ios/Vendor/Wasmtime/include/wasmtime/conf.h
           echo 'Wasmtime iPhone static host + C API ready; no GTA game code in IPA.'
+      - name: Compile signed-device ARM64 AOT execution smoke fixture
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/bytecodealliance/wasmtime/releases/download/v49.0.2/wasmtime-v49.0.2-aarch64-macos.tar.xz \
+            -o "$RUNNER_TEMP/wasmtime-cli.tar.xz"
+          mkdir -p "$RUNNER_TEMP/wasmtime-bin"
+          tar -xJf "$RUNNER_TEMP/wasmtime-cli.tar.xz" -C "$RUNNER_TEMP/wasmtime-bin"
+          WASMTIME=$(find "$RUNNER_TEMP/wasmtime-bin" -type f -name wasmtime | head -1)
+          test -n "$WASMTIME"
+          chmod +x "$WASMTIME"
+          "$WASMTIME" --version
+          # Small original WASM module: export add(i32,i32) -> i32.
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          Path(os.environ["RUNNER_TEMP"], "native-smoke.wasm").write_bytes(
+              bytes.fromhex("0061736d0100000001070160027f7f017f030201000707010361646400000a09010700200020016a0b"))
+          PY
+          "$WASMTIME" compile --target aarch64-apple-ios -O opt-level=0 \
+            -C parallel-compilation=n \
+            -o ios/Sources/Resources/native-aot-smoke.cwasm \
+            "$RUNNER_TEMP/native-smoke.wasm"
+          file ios/Sources/Resources/native-aot-smoke.cwasm
+          test -s ios/Sources/Resources/native-aot-smoke.cwasm
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Verify native Metal and USB architecture

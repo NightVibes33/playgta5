@@ -155,13 +155,28 @@ final class GameViewController: UIViewController {
             status.text = "Native Wasmtime runtime could not initialize (\(hostProbe)). Check code signing and runtime diagnostics."
             return
         }
+        // Executed-machine-code test (not simply Wasmtime deserialization).
+        // The fixture is a tiny original module AOT-compiled for iPhone ARM64
+        // during CI; it is completely separate from proprietary GTA game code.
+        if let fixture = Bundle.main.path(forResource: "native-aot-smoke", ofType: "cwasm") {
+            var smokeMessage = [CChar](repeating: 0, count: 640)
+            let rc = fixture.withCString {
+                gta_ios_wasmtime_execute_smoke($0, &smokeMessage, smokeMessage.count)
+            }
+            let detail = String(cString: smokeMessage)
+            LogStore.shared.write("native",
+                "AOT native machine-code execution: rc=\(rc), result=\(detail)")
+        } else {
+            LogStore.shared.write("native",
+                "AOT native smoke fixture absent from IPA: cannot verify iOS executable AOT pages")
+        }
         var registered: UInt32 = 0
         var hostMessage = [CChar](repeating: 0, count: 512)
         let basicProbe = gta_ios_wasmtime_basic_host_probe(&registered, &hostMessage, hostMessage.count)
         let hostDetail = String(cString: hostMessage)
         LogStore.shared.write("native",
             "Real GTA native host callbacks: result=\(basicProbe), registered=\(registered)/85, message=\(hostDetail)")
-        if basicProbe != 0 || registered != 5 {
+        if basicProbe != 0 || registered != 8 {
             status.text = "Native Wasmtime host callback test failed (\(basicProbe)). \(hostDetail)"
             return
         }
