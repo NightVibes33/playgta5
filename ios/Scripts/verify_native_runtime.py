@@ -75,7 +75,16 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 4' in game
+assert 'registered != 5' in game
+assert 'case .deserialized(let imports, let linked, let details)' in game
+assert 'gta_ios_wasmtime_register_host_basics' in host
+assert 'emscripten_get_heap_max' in host
+assert 'WASMTIME_I64' in host
+assert 'INT64_C(17179869184)' in host
+assert 'gta_types_match' in probe_c
+assert 'wasmtime_linker_get' in probe_c
+assert 'covered_count' in probe_c
+assert 'wasmtime_instance_new' not in probe_c
 assert 'wasmtime_linker_define_unknown_imports_as_default_values' not in host
 assert 'wasmtime_linker_define_unknown_imports_as_traps' not in host
 
@@ -86,7 +95,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>13</string>" in plist
+assert "<key>CFBundleVersion</key><string>14</string>" in plist
 
 print("PASS: native Metal command queue and Wasmtime C API engine lifecycle compiled into device app")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

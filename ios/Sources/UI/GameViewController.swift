@@ -114,7 +114,7 @@ final class GameViewController: UIViewController {
         let hostDetail = String(cString: hostMessage)
         LogStore.shared.write("native",
             "Real GTA native host callbacks: result=\(basicProbe), registered=\(registered)/85, message=\(hostDetail)")
-        if basicProbe != 0 || registered != 4 {
+        if basicProbe != 0 || registered != 5 {
             status.text = "Native Wasmtime host callback test failed (\(basicProbe)). \(hostDetail)"
             return
         }
@@ -142,9 +142,9 @@ final class GameViewController: UIViewController {
                         case .notSupplied:
                             self.status.text = "USB engine validated.\nFor native AOT compatibility testing, place real-gta-ios.cwasm next to index.html on the USB drive.\n\nGTA V gameplay is NOT implemented."
                             LogStore.shared.write("native", "Optional AOT module absent from USB root. No game engine linked.")
-                        case .deserialized(let imports):
-                            self.status.text = "Actual AArch64 GTA AOT module deserialized.\nImported host bindings: \(imports).\n\nNative engine execution NOT implemented. Metal renderer and 85 host functions still missing."
-                            LogStore.shared.write("native", "Actual GTA Wasmtime AOT module parsed, imports=\(imports), not instantiated")
+                        case .deserialized(let imports, let linked, let details):
+                            self.status.text = "Actual AArch64 GTA AOT module deserialized.\nImported host bindings: \(imports).\nVerified native callbacks: \(linked).\n\n\(details)\n\nEngine execution and GTA rendering are not yet implemented."
+                            LogStore.shared.write("native", "Actual GTA Wasmtime AOT module parsed, imports=\(imports), linked=\(linked), no instantiation")
                         case .failed(let why):
                             self.status.text = "Native AOT compatibility test failed:\n\(why)\n\nNo game execution attempted."
                             LogStore.shared.write("native", "Real AOT compatibility failure: \(why)")

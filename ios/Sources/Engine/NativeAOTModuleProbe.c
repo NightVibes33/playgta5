@@ -8,6 +8,21 @@
 #include <wasmtime/error.h>
 #include <wasmtime/config.h>
 #include <wasmtime/module.h>
+#include <wasmtime/linker.h>
+#include <wasmtime/extern.h>
+#include <wasmtime/func.h>
+#include <wasmtime/store.h>
+extern int gta_ios_wasmtime_register_host_basics(wasmtime_linker_t *, unsigned int *, char *, size_t);
+static bool gta_types_match(const wasm_functype_t *a, const wasm_functype_t *b) {
+    if (!a || !b) return false;
+    const wasm_valtype_vec_t *ap=wasm_functype_params(a), *bp=wasm_functype_params(b);
+    const wasm_valtype_vec_t *ar=wasm_functype_results(a), *br=wasm_functype_results(b);
+    if (ap->size!=bp->size || ar->size!=br->size) return false;
+    for(size_t i=0;i<ap->size;i++) if(wasm_valtype_kind(ap->data[i])!=wasm_valtype_kind(bp->data[i])) return false;
+    for(size_t i=0;i<ar->size;i++) if(wasm_valtype_kind(ar->data[i])!=wasm_valtype_kind(br->data[i])) return false;
+    return true;
+}
+
 #endif
 
 static void aot_message(char *out, size_t capacity, const char *msg) {
@@ -22,9 +37,10 @@ static void aot_message(char *out, size_t capacity, const char *msg) {
    arbitrary inputs, and may be blocked by executable memory signing on iOS.
    This function never instantiates the module or executes its exports. */
 int gta_ios_wasmtime_aot_probe(const char *path,
-                              unsigned int *import_count,
+                              unsigned int *import_count, unsigned int *covered_count,
                               char *error_message, size_t error_capacity) {
     if (import_count) *import_count = 0;
+    if (covered_count) *covered_count = 0;
 #if TARGET_OS_SIMULATOR
     aot_message(error_message, error_capacity,
                 "Wasmtime AOT module inspection is supported only on a signed iOS device");
@@ -81,11 +97,68 @@ int gta_ios_wasmtime_aot_probe(const char *path,
         return -30;
     }
 
+    // Verify actual C-API linker exports and exact function signatures, not
+    // just string names. No fake defaults, 3 GiB memory, or engine execution.
+    wasmtime_linker_t *linker = wasmtime_linker_new(engine);
+    wasmtime_store_t *store = linker ? wasmtime_store_new(engine, NULL, NULL) : NULL;
+    if (!linker || !store) {
+        aot_message(error_message, error_capacity, "Host import audit linker/store unavailable");
+        if (store) wasmtime_store_delete(store);
+        if (linker) wasmtime_linker_delete(linker);
+        wasm_importtype_vec_delete(&imports);
+        wasmtime_module_delete(module);
+        wasm_engine_delete(engine);
+        return -40;
+    }
+    unsigned int registered = 0;
+    int registration = gta_ios_wasmtime_register_host_basics(linker, &registered,
+        error_message, error_capacity);
+    if (registration) {
+        wasmtime_store_delete(store); wasmtime_linker_delete(linker);
+        wasm_importtype_vec_delete(&imports); wasmtime_module_delete(module);
+        wasm_engine_delete(engine);
+        return -41;
+    }
+    unsigned int covered = 0;
+    char first_missing[144] = {0};
+    wasmtime_context_t *context = wasmtime_store_context(store);
+    for (size_t i=0; i<imports.size; ++i) {
+        const wasm_importtype_t *entry = imports.data[i];
+        const wasm_name_t *mod = wasm_importtype_module(entry);
+        const wasm_name_t *name = wasm_importtype_name(entry);
+        const wasm_externtype_t *expected = wasm_importtype_type(entry);
+        wasmtime_extern_t existing = {0};
+        bool found = wasmtime_linker_get(linker, context,
+            mod->data, mod->size, name->data, name->size, &existing);
+        bool valid = false;
+        if (found) {
+            wasm_externtype_t *actual = wasmtime_extern_type(context, &existing);
+            if (actual && wasm_externtype_kind(expected)==WASM_EXTERN_FUNC
+                    && wasm_externtype_kind(actual)==WASM_EXTERN_FUNC)
+                valid = gta_types_match(wasm_externtype_as_functype_const(expected),
+                                        wasm_externtype_as_functype_const(actual));
+            if (actual) wasm_externtype_delete(actual);
+            wasmtime_extern_delete(&existing);
+        }
+        if (valid) ++covered;
+        else if (!first_missing[0]) {
+            snprintf(first_missing, sizeof(first_missing), "%.*s.%.*s",
+                (int)(mod->size>40?40:mod->size), mod->data,
+                (int)(name->size>88?88:name->size), name->data);
+        }
+    }
+    if (covered_count) *covered_count = covered;
+    if (error_message && error_capacity) {
+        snprintf(error_message, error_capacity,
+            "Host ABI: %u/%u imports linked, %u unresolved, first=%s; game NOT instantiated.",
+            covered, (unsigned int)imports.size, (unsigned int)imports.size-covered,
+            first_missing[0]?first_missing:"(none)");
+    }
+    wasmtime_store_delete(store);
+    wasmtime_linker_delete(linker);
     wasm_importtype_vec_delete(&imports);
     wasmtime_module_delete(module);
     wasm_engine_delete(engine);
-    aot_message(error_message, error_capacity,
-                "AOT module deserialized and 86 imports enumerated; game is NOT instantiated");
     return 0;
 #endif
 }
