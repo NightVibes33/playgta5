@@ -63,3 +63,36 @@ A real loading sequence and world gameplay must be demonstrated on-device.
 The previously built unsigned IPA only contains a native device/Metal/
 USB readiness harness. It is not a playable GTA V port and should never
 be marketed or described as one.
+
+
+## Alternative AOT backend: actual ARM64 code generation succeeded
+
+An independent second test used Wasmtime 49.0.2's Cranelift compiler
+directly on the same user-supplied 63,201,802-byte `game.wasm`, with:
+
+```sh
+wasmtime compile --target aarch64-apple-ios -O opt-level=0 \
+  -C parallel-compilation=n -o real-gta-ios.cwasm game.wasm
+```
+
+**Result: success on the real GTA engine.** The compiler produced a
+227–228 MiB `real-gta-ios.cwasm` in approximately **81.5 seconds**,
+peaking at about **2.12 GB RSS**. Its ELF header identifies a 64-bit
+little-endian AArch64 relocatable artifact, confirming actual
+ARM64 machine-code generation, not a synthetic module and not x86 code.
+The private output has SHA-256
+`b2fadd0881302505388104a0ff6b428db65106edd81a8e5a64fcfa905a4febb0`.
+
+This is a **Wasmtime-serialized ELF object**, not an iOS Mach-O
+executable or an installable IPA. A compatible iOS Wasmtime runtime must
+load it, and that executable-memory mapping is subject to iOS signing
+and JIT/debugger capabilities. Wasmtime currently does not provide
+a simple static-link-single-module pipeline. The full 85-function host
+ABI, memory64 shared runtime, WebGPU-to-Metal renderer, native audio,
+gamepad input bridge, save handling and real-world test remain undone.
+
+The proprietary `game.wasm` and the translated engine output were
+kept out of this public GitHub repository and its CI artifacts.
+`aot_compile_wasmtime.sh` and `wasmtime-aot.yml` supply a reproducible
+private AOT route; CI tests a tiny public module and does NOT falsely
+claim real-world GTA gameplay.

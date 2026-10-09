@@ -109,3 +109,13 @@ The new `aot_feature_gate.py` prevents truncated C output and
 documents the blocker in `ios/Scripts/ENGINE_REAL_AOT_REPORT.md`.
 The game is still not playable; the native IPA remains a hardware/USB
 readiness harness.
+
+
+## Genuine GTA engine compiled into ARM64 code (not playable yet)
+
+Wasmtime 49.0.2 compiled the uploaded real engine to an AArch64
+serialized ELF artifact targeting `aarch64-apple-ios`.
+This output is not a standalone iOS Mach-O or a functioning game.
+An iOS Wasmtime runtime/executable mapping, the 85 host imports, native
+WebGPU-to-Metal rendering, gamepad game ABI, audio and actual-world
+verification remain required. See `ios/Scripts/ENGINE_REAL_AOT_REPORT.md`.

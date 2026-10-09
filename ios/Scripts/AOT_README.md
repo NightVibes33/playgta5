@@ -58,3 +58,18 @@ success is not real engine conversion.
 A compatible AOT backend or semantics-correct atomic wait/notify
 compiler/runtime implementation is necessary before compiling to ARM64.
 The engine has not been linked or run on iPhone.
+
+
+## Actual 63 MB engine AOT success with Wasmtime
+
+The uploaded real `game.wasm` was cross-compiled into a 64-bit
+AArch64 relocatable Wasmtime serialized ELF object targeting
+`aarch64-apple-ios` in 81.5 seconds using Wasmtime 49.0.2.
+The artifact is **NOT a Mach-O executable**, cannot currently be
+statically linked directly into this IPA, and needs a properly
+ported, signed iOS Wasmtime runtime, real engine imports, GPU and input
+bindings. See `ENGINE_REAL_AOT_REPORT.md`. This proves the native
+code-generation feasibility, not GTA gameplay.
+
+Use `aot_compile_wasmtime.sh` for an authorized private engine,
+not `wasm2c` (which cannot compile its atomic wait/notify instructions).
