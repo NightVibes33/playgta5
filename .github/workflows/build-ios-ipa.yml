@@ -35,8 +35,19 @@ jobs:
             cp "$RUNNER_TEMP/wasmtime-source/target/aarch64-apple-ios/release/libwasmtime.a" ios/Vendor/Wasmtime/
             cp -R "$RUNNER_TEMP/wasmtime-source/crates/c-api/include/." ios/Vendor/Wasmtime/include/
           fi
+          # The pinned Wasmtime 49 C API header tree excludes the generated
+          # wasmtime/conf.h.in output. Match the exact Cargo features used
+          # above: --no-default-features --features threads.
+          mkdir -p ios/Vendor/Wasmtime/include/wasmtime
+          cat > ios/Vendor/Wasmtime/include/wasmtime/conf.h <<'WASMTIME_CONF'
+          #ifndef WASMTIME_CONF_H
+          #define WASMTIME_CONF_H
+          #define WASMTIME_FEATURE_THREADS 1
+          #endif
+          WASMTIME_CONF
           test -s ios/Vendor/Wasmtime/libwasmtime.a
           test -s ios/Vendor/Wasmtime/include/wasm.h
+          test -s ios/Vendor/Wasmtime/include/wasmtime/conf.h
           echo 'Wasmtime iPhone static host + C API ready; no GTA game code in IPA.'
       - name: Install XcodeGen
         run: brew install xcodegen
