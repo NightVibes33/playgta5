@@ -72,7 +72,7 @@ enum NativeAOTModuleProbe {
                 LogStore.shared.write("native", "Trusted 228 MiB AArch64 AOT module SHA256 verified. Deserialization beginning.")
                 var count: UInt32 = 0
                 var covered: UInt32 = 0
-                var message = [CChar](repeating: 0, count: 1024)
+                var message = [CChar](repeating: 0, count: 16384)
                 let result: Int32 = granted.withUnsafeFileSystemRepresentation { path in
                     guard let path else { return -10 }
                     return gta_ios_wasmtime_aot_probe(path, &count, &covered, &message, message.count)

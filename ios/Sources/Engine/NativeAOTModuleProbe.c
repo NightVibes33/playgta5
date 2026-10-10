@@ -2,6 +2,7 @@
 #include <TargetConditionals.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 #if !TARGET_OS_SIMULATOR
 #include <wasm.h>
@@ -21,6 +22,54 @@ static bool gta_types_match(const wasm_functype_t *a, const wasm_functype_t *b) 
     for(size_t i=0;i<ap->size;i++) if(wasm_valtype_kind(ap->data[i])!=wasm_valtype_kind(bp->data[i])) return false;
     for(size_t i=0;i<ar->size;i++) if(wasm_valtype_kind(ar->data[i])!=wasm_valtype_kind(br->data[i])) return false;
     return true;
+}
+
+
+/* The definitive function type inventory comes from the SHA-verified
+ * private module, NOT the larger superset in minified game.js. */
+static const char *gta_wasm_kind(wasm_valkind_t k) {
+    switch (k) {
+        case WASM_I32: return "i32";
+        case WASM_I64: return "i64";
+        case WASM_F32: return "f32";
+        case WASM_F64: return "f64";
+        default: return "ref-or-vector";
+    }
+}
+static void gta_audit_append(char *buffer, size_t capacity, size_t *used,
+                             const char *fmt, ...) {
+    if (!buffer || !capacity || *used >= capacity - 1) return;
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(buffer + *used, capacity - *used, fmt, args);
+    va_end(args);
+    if (n < 0) return;
+    size_t available = capacity - *used;
+    *used += (size_t)n >= available ? available - 1 : (size_t)n;
+}
+static void gta_audit_import(char *buffer, size_t capacity, size_t *used,
+                             const wasm_name_t *module, const wasm_name_t *name,
+                             const wasm_externtype_t *type, bool mismatch) {
+    gta_audit_append(buffer, capacity, used, "\\n%s %.*s.%.*s",
+        mismatch ? "TYPE_MISMATCH" : "UNRESOLVED",
+        (int)(module->size > 96 ? 96 : module->size), module->data,
+        (int)(name->size > 128 ? 128 : name->size), name->data);
+    if (wasm_externtype_kind(type) != WASM_EXTERN_FUNC) {
+        gta_audit_append(buffer, capacity, used, " [non-function import]");
+        return;
+    }
+    const wasm_functype_t *signature = wasm_externtype_as_functype_const(type);
+    const wasm_valtype_vec_t *params = wasm_functype_params(signature);
+    const wasm_valtype_vec_t *results = wasm_functype_results(signature);
+    gta_audit_append(buffer, capacity, used, "(");
+    for (size_t j=0; j<params->size; ++j)
+        gta_audit_append(buffer, capacity, used, "%s%s",
+            j ? "," : "", gta_wasm_kind(wasm_valtype_kind(params->data[j])));
+    gta_audit_append(buffer, capacity, used, ")->");
+    if (!results->size) gta_audit_append(buffer, capacity, used, "void");
+    for (size_t j=0; j<results->size; ++j)
+        gta_audit_append(buffer, capacity, used, "%s%s",
+            j ? "," : "", gta_wasm_kind(wasm_valtype_kind(results->data[j])));
 }
 
 #endif
@@ -123,6 +172,8 @@ int gta_ios_wasmtime_aot_probe(const char *path,
         return -41;
     }
     unsigned int covered = 0;
+    char missing_report[12000] = {0};
+    size_t missing_used = 0;
     char first_missing[144] = {0};
     wasmtime_context_t *context = wasmtime_store_context(store);
     for (size_t i=0; i<imports.size; ++i) {
@@ -144,10 +195,14 @@ int gta_ios_wasmtime_aot_probe(const char *path,
             wasmtime_extern_delete(&existing);
         }
         if (valid) ++covered;
-        else if (!first_missing[0]) {
-            snprintf(first_missing, sizeof(first_missing), "%.*s.%.*s",
-                (int)(mod->size>40?40:mod->size), mod->data,
-                (int)(name->size>88?88:name->size), name->data);
+        else {
+            if (!first_missing[0]) {
+                snprintf(first_missing, sizeof(first_missing), "%.*s.%.*s",
+                    (int)(mod->size>40?40:mod->size), mod->data,
+                    (int)(name->size>88?88:name->size), name->data);
+            }
+            gta_audit_import(missing_report, sizeof(missing_report), &missing_used,
+                             mod, name, expected, found);
         }
     }
     if (covered_count) *covered_count = covered;
@@ -156,6 +211,9 @@ int gta_ios_wasmtime_aot_probe(const char *path,
             "Host ABI: %u/%u imports linked, %u unresolved, first=%s; game NOT instantiated.",
             covered, (unsigned int)imports.size, (unsigned int)imports.size-covered,
             first_missing[0]?first_missing:"(none)");
+        size_t used = strlen(error_message);
+        gta_audit_append(error_message, error_capacity, &used,
+            "\\nVerified module unresolved import signatures:%s", missing_report);
     }
     wasmtime_store_delete(store);
     wasmtime_linker_delete(linker);

@@ -478,3 +478,14 @@ folder closes any outstanding guest descriptor duplicates.
 This verifies a native device filesystem path only *after physical iPhone
 execution*. It is not GTA engine instantiation, game archive openat, original
 loading, graphics, audio, or gameplay. ABI import coverage stays **23/85**.
+
+## Build 30 — full private AOT import audit
+
+For the SHA256-verified, version-matched private GTA AOT module, the device
+now records every unresolved or type-mismatched import and the true Wasm
+function signature (params and results) in the Files-exportable diagnostics,
+not only the first missing name. The import inventory is derived from the
+actual serialized module, not the broader `game.js` JS shim (which contains
+functions not necessarily imported by the 63 MiB binary). The compact UI
+shows only the summary; the native log retains the complete ABI report.
+No fake host callbacks, engine instantiation, or playable-game claim.
