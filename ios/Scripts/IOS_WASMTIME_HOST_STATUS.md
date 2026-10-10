@@ -303,3 +303,32 @@ compiler profile consistent with the host. **The full game is NOT yet
 instantiable**: only 10 of 85 function imports are implemented, the
 real 3 GiB shared memory and graphics host ABI are not, and GTA V
 cannot yet load its true shaders, render its world or execute gameplay.
+
+
+## Build 23 — additional real WASM game text/configuration imports
+
+The uploaded game's exact WebAssembly signatures were checked against its
+binary and the original `game.js`:
+- `env.wasm_print_line_js(i64)` — engine UTF-8 diagnostics
+- `env.wasm_hang_line_js(i64)` — engine hang diagnostics
+- `env.wasm_module_int_js(i64,i32)->i32` — Module integer option/fallback
+
+The iPhone host now registers these three exact-typed Wasmtime C API
+callbacks in addition to the ten previously linked game functions (**13 of
+85 real function imports**). A fixed-size pthread-protected ring passes
+sanitized engine lines to Files-exportable `LogStore` diagnostics, with
+NUL-termination and address bounds checks on all guest memory64 reads.
+The integer configuration import returns the original game's supplied
+fallback when the option is absent; native options can be staged explicitly.
+
+A deterministic C host test verifies pointer validation, a real
+memory-backed option override, fallback behavior, order-preserving log
+extraction, and unbind safety. The iOS Wasmtime linker smoke test calls
+`wasm_module_int_js` through the actual C API (not a simulated Swift
+callback) and checks the returned fallback.
+
+**Still not gameplay.** Native guest pointers cannot reference the original
+GTA engine until its 3 GiB shared memory is safely instantiated and bound,
+and the remaining host imports, renderer/shaders, actual game audio,
+save lifecycle, and in-world input all exist. The real AOT module currently
+undergoes deserialization and ABI coverage inspection only.

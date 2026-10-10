@@ -326,6 +326,13 @@ final class GameViewController: UIViewController {
         let now = CACurrentMediaTime()
         let elapsed = now - frameStart
         if elapsed >= 1 {
+            // Drain bounded engine guest diagnostic messages into Files-exported
+            // LogStore. This is safe even before the 3GiB game memory exists.
+            var guestLine = [CChar](repeating: 0, count: 256)
+            for _ in 0..<8 {
+                guard gta_text_host_next_log(&guestLine, guestLine.count) == 1 else { break }
+                LogStore.shared.write("engine", String(cString: guestLine))
+            }
             let fps = Double(frameCounter) / elapsed
             updateStats(seconds: fps)
             frameCounter = 0

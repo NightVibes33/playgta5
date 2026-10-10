@@ -126,6 +126,15 @@ assert 'wasmtime_instance_export_get' in read("ios/Sources/Engine/NativeAOTExecu
 assert 'WASMTIME_I32' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
 assert 'wasm_has_page_js' in host
 assert 'wasm_userdata_page_js' in host
+for name in ['wasm_print_line_js', 'wasm_hang_line_js', 'wasm_module_int_js']:
+    assert name in host, name
+assert 'gta_define_text_callbacks' in host
+assert 'gta_text_host_next_log' in game
+assert 'NativeTextHostABI.h' in read("ios/Sources/Engine/NativeWasmtimeHost.h")
+assert 'NativeTextHostABI.c' in workflow
+assert 'native-text-abi.test.c' in workflow
+assert 'GTA_TEXT_SOURCE_MAX 4096' in read("ios/Sources/Engine/NativeTextHostABI.c")
+assert 'GTA_TEXT_QUEUE 32' in read("ios/Sources/Engine/NativeTextHostABI.c")
 assert 'emscripten_check_blocking_allowed' in host
 assert 'gta_define_void' in host
 assert 'native-aot-smoke.cwasm' in workflow
@@ -174,7 +183,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>22</string>" in plist
+assert "<key>CFBundleVersion</key><string>23</string>" in plist
 
 print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

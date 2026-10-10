@@ -43,7 +43,7 @@ fi
 # external (N_PEXT). nm -g excludes those even though they are linked.
 # Inspect all defined Mach-O symbols instead of rejecting a valid IPA.
 xcrun nm "$app/GTAiOS" > "$tmp/symbols.txt"
-for symbol in _gta_ios_wasmtime_engine_probe _gta_ios_wasmtime_basic_host_probe _gta_ios_wasmtime_register_host_basics _gta_ios_wasmtime_aot_probe _gta_ios_wasmtime_execute_smoke _gta_ios_wasmtime_memory64_smoke _gta_httpfs_manifest_js _wasmtime_sharedmemory_new _wasm_engine_new _wasm_engine_delete _wasmtime_module_deserialize_file _wasmtime_module_imports; do
+for symbol in _gta_ios_wasmtime_engine_probe _gta_ios_wasmtime_basic_host_probe _gta_ios_wasmtime_register_host_basics _gta_ios_wasmtime_aot_probe _gta_ios_wasmtime_execute_smoke _gta_ios_wasmtime_memory64_smoke _gta_httpfs_manifest_js _gta_text_host_module_int_js _gta_text_host_print_line_js _gta_text_host_hang_line_js _wasmtime_sharedmemory_new _wasm_engine_new _wasm_engine_delete _wasmtime_module_deserialize_file _wasmtime_module_imports; do
   if ! grep -F "$symbol" "$tmp/symbols.txt" >/dev/null; then
     echo "ERROR: linked native Wasmtime runtime symbol missing: $symbol" >&2
     exit 1
