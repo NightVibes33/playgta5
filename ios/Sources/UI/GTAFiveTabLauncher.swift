@@ -1168,7 +1168,7 @@ final class GTAReferenceMoreController: GTAReferencePage {
                                                        size: 12, color: GTAReference.secondary))
         about.addArrangedSubview(controllerStatus)
         stack.addArrangedSubview(about)
-        stack.addArrangedSubview(GTAReference.section("Developer Credits"))
+        stack.addArrangedSubview(GTAReference.section("GTAiOS Developer"))
 
         let developerCard = GTAReference.panelView(15)
         let creator = UIStackView()
@@ -1202,23 +1202,6 @@ final class GTAReferenceMoreController: GTAReferencePage {
         developerCard.addArrangedSubview(profileButton)
         stack.addArrangedSubview(developerCard)
 
-        stack.addArrangedSubview(GTAReference.section("Engine & Acknowledgements"))
-        let engineCard = GTAReference.panelView(13)
-        engineCard.addArrangedSubview(GTAReference.label(
-            "Native Engine · Muguet by c22dev", size: 14, weight: .bold))
-        engineCard.addArrangedSubview(GTAReference.label(
-            "Open-source runtime used for the native game build (GPL-3.0-or-later).",
-            size: 12, color: GTAReference.secondary))
-        let engineLink = GTAReference.control("View Muguet Source & License",
-                                               symbol: "chevron.left.forwardslash.chevron.right")
-        engineLink.addTarget(self, action: #selector(openEngineSource),
-                             for: .touchUpInside)
-        engineCard.addArrangedSubview(engineLink)
-        engineCard.addArrangedSubview(GTAReference.hairline())
-        engineCard.addArrangedSubview(GTAReference.label(
-            "Grand Theft Auto V and associated game artwork are the property of Rockstar Games / Take-Two Interactive. This is an independent project.",
-            size: 11, color: GTAReference.secondary))
-        stack.addArrangedSubview(engineCard)
         stack.addArrangedSubview(GTAReference.section("Local Tools"))
         let operations: [(String, String, Selector)] = [
             ("Game Library", "externaldrive", #selector(library)),
@@ -1296,10 +1279,6 @@ final class GTAReferenceMoreController: GTAReferencePage {
     }
     @objc private func openCreatorProfile() {
         guard let url = URL(string: "https://github.com/NightVibes33") else { return }
-        UIApplication.shared.open(url)
-    }
-    @objc private func openEngineSource() {
-        guard let url = URL(string: "https://github.com/c22dev/muguet") else { return }
         UIApplication.shared.open(url)
     }
     @objc private func library() { switchTab(1) }
