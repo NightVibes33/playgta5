@@ -260,13 +260,25 @@ final class GTAReferenceHomeController: GTAReferencePage {
         hero.layer.cornerCurve = .continuous
         hero.translatesAutoresizingMaskIntoConstraints = false
         hero.heightAnchor.constraint(equalToConstant: 370).isActive = true
-        let art = GTAReference.image("gtav-story-trio", height: 370, radius: 0)
+        hero.backgroundColor = UIColor(red: 0.055, green: 0.073, blue: 0.10, alpha: 1)
+        // The original widescreen trio contains all three protagonists and
+        // the GTA V title. Preserve the WHOLE image instead of center-cropping
+        // Franklin and Trevor off the sides on a narrow iPhone screen.
+        let art = GTAReference.image("gtav-story-trio", height: 214, radius: 0)
+        art.contentMode = .scaleAspectFit
         hero.addSubview(art)
+        let tagline = GTAReference.label("GRAND THEFT AUTO V  ·  LOCAL iPHONE LAUNCHER",
+                                         size: 10, weight: .bold, color: GTAReference.secondary)
+        tagline.textAlignment = .center
+        tagline.translatesAutoresizingMaskIntoConstraints = false
+        hero.addSubview(tagline)
         NSLayoutConstraint.activate([
             art.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
             art.trailingAnchor.constraint(equalTo: hero.trailingAnchor),
-            art.topAnchor.constraint(equalTo: hero.topAnchor),
-            art.bottomAnchor.constraint(equalTo: hero.bottomAnchor)
+            art.topAnchor.constraint(equalTo: hero.topAnchor, constant: 44),
+            tagline.leadingAnchor.constraint(equalTo: hero.leadingAnchor, constant: 12),
+            tagline.trailingAnchor.constraint(equalTo: hero.trailingAnchor, constant: -12),
+            tagline.topAnchor.constraint(equalTo: art.bottomAnchor, constant: 8)
         ])
         play.titleLabel?.font = .systemFont(ofSize: 19, weight: .bold)
         play.layer.borderWidth = 1
@@ -296,7 +308,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         actions.addArrangedSubview(files)
         stack.addArrangedSubview(actions)
         let city = GTAReference.panelView(0)
-        city.addArrangedSubview(GTAReference.image("gtav-vinewood-view", height: 132))
+        city.addArrangedSubview(GTAReference.image("gtav-vinewood-view", height: 118))
         let cityText = GTAReference.label("Los Santos", size: 16, weight: .bold)
         cityText.textAlignment = .center
         city.addArrangedSubview(cityText)
