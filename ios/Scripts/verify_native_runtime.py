@@ -68,10 +68,17 @@ assert '32 * 1024 * 1024' in save and 'Data(contentsOf:' in save
 assert 'options: [.atomic, .completeFileProtectionUnlessOpen]' in save
 assert 'class NativePCMOutput' in audio and 'scheduleStereoFloatPCM' in audio
 assert 'AVAudioEngine()' in audio and 'AVAudioPlayerNode()' in audio
-assert 'ADVANCED  ·  FILE PICKER TESTS' in launcher
-assert 'CHECK NATIVE RUNTIME' in launcher
+assert 'File picker troubleshooting' in launcher
+assert 'RUN NATIVE CHECKS' in launcher
 assert 'The local server runs inside the app' not in launcher
-assert 'GTAiOS' in splash and 'NATIVE RUNTIME  /  SIDELOADED' in splash
+assert 'GTAiOS' in splash and 'LOS SANTOS  /  NATIVE PORT' in splash
+art = read("ios/Sources/UI/LosSantosHeroView.swift")
+assert "class LosSantosHeroView" in art
+assert "class SunsetSkylineView" in art
+assert "PORT IN PROGRESS" in art and "NATIVE iPHONE PROJECT" in art
+assert "GTATheme.coral" in launcher and "LosSantosHeroView()" in launcher
+assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
+assert "GTATheme.section" in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert "import GameController" in input_source
 for control in ["leftThumbstick", "rightThumbstick", "leftTrigger", "rightTrigger",
                 "buttonA", "buttonB", "buttonX", "buttonY", "buttonMenu",

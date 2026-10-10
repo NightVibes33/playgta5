@@ -16,11 +16,11 @@
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="GTAiOS" textAlignment="center" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gtA-wordmark">
                                 <fontDescription key="fontDescription" type="system" weight="black" pointSize="40"/>
-                                <color key="textColor" red="0.92" green="0.97" blue="0.92" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <color key="textColor" red="0.995" green="0.973" blue="0.932" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             </label>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="NATIVE RUNTIME  /  SIDELOADED" textAlignment="center" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gtA-tagline">
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="LOS SANTOS  /  NATIVE PORT" textAlignment="center" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gtA-tagline">
                                 <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="11"/>
-                                <color key="textColor" red="0.66" green="0.89" blue="0.68" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <color key="textColor" red="1" green="0.717" blue="0.509" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             </label>
                         </subviews>
                         <constraints>
@@ -29,7 +29,7 @@
                             <constraint firstItem="gtA-tagline" firstAttribute="centerX" secondItem="gtA-wordmark" secondAttribute="centerX" id="gtA-center-tagline"/>
                             <constraint firstItem="gtA-tagline" firstAttribute="top" secondItem="gtA-wordmark" secondAttribute="bottom" constant="11" id="gtA-tagline-y"/>
                         </constraints>
-                        <color key="backgroundColor" red="0.035" green="0.051" blue="0.061" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.055" green="0.066" blue="0.08" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="gtA-first" userLabel="First Responder" sceneMemberID="firstResponder"/>
