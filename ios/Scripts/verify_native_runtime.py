@@ -105,7 +105,7 @@ assert "hardwareStatusLabel.text = name ==" in launcher
 reference = read("ios/Sources/UI/GTAFiveTabLauncher.swift")
 assert "GTAFiveTabController()" in scene
 assert 'GTALaunchPreferences.fraction("touchOpacity"' in read("ios/Sources/UI/ControllerSettingsViewController.swift")
-assert '"gtav-official-header"' in read("ios/Sources/UI/ControllerSettingsViewController.swift")
+assert '"gtav-franklin-race"' in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert 'setMasterVolume' in read("ios/Sources/Engine/NativePCMOutput.swift")
 assert 'AVRoutePickerView' in read("ios/Sources/UI/GTAFiveTabLauncher.swift")
 assert 'library_hero.jpg' in read("ios/Scripts/fetch_official_gtav_art.sh")
@@ -116,6 +116,9 @@ for title in ['"Home"', '"Library"', '"Graphics"', '"Controls"', '"More"']:
     assert title in reference
 assert "ControllerSettingsViewController()" in reference
 assert "GTAReferenceLibraryController" in reference
+assert "GTAReference.settingsRow" in reference
+assert 'gtav-franklin-race' in controls
+assert "fetch_distinct_gtav_art.sh" in workflow
 assert "GTAReferenceGraphicsController" in reference
 assert "NativeEngineStatus.inspect" in reference
 assert "USBStorageManager.shared.chooseAsync" in reference
@@ -130,8 +133,10 @@ assert "GCController.controllers().first?.vendorName" in reference
 controls = read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert 'title = "Controls"' in controls and "GTAReference.green" in controls
 assert 'iphone-library.png' in workflow and 'iphone-graphics.png' in workflow
-assert '"gtav-official-header"' in reference
-assert '"gtav-official-hero"' in reference
+assert '"gtav-vinewood-view"' in reference
+assert '"gtav-city-helicopter"' in reference
+assert '"gtav-car-gameplay"' in reference
+assert '"gtav-story-trio"' in reference
 assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
 assert "GTATheme.section" in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert "import GameController" in input_source
