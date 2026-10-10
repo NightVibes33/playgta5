@@ -304,7 +304,29 @@ final class GTAReferenceHomeController: GTAReferencePage {
         // Franklin and Trevor off the sides on a narrow iPhone screen.
         let art = GTAReference.image("gtav-story-trio", height: 214, radius: 0)
         art.contentMode = .scaleAspectFit
+        // Cinematic edge fill uses the SAME original GTA V photograph,
+        // blurred behind the uncropped key art. No synthetic city graphics.
+        let backdrop = UIImageView(image: art.image)
+        backdrop.contentMode = .scaleAspectFill
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        backdrop.clipsToBounds = true
+        backdrop.alpha = 0.40
+        hero.addSubview(backdrop)
+        let shade = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+        shade.translatesAutoresizingMaskIntoConstraints = false
+        shade.alpha = 0.62
+        hero.addSubview(shade)
         hero.addSubview(art)
+        NSLayoutConstraint.activate([
+            backdrop.topAnchor.constraint(equalTo: hero.topAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: hero.bottomAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: hero.trailingAnchor),
+            shade.topAnchor.constraint(equalTo: hero.topAnchor),
+            shade.bottomAnchor.constraint(equalTo: hero.bottomAnchor),
+            shade.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
+            shade.trailingAnchor.constraint(equalTo: hero.trailingAnchor)
+        ])
         let identity = UIStackView()
         identity.axis = .vertical
         identity.spacing = 0
@@ -405,6 +427,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
                                                 color: GTAReference.secondary)
     private var selectedAsFile = false
     private var verifiedRoot: URL?
+    private var lastInspectedBytes: Int64?
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Library"))
@@ -466,15 +489,22 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         if let root = USBStorageManager.shared.root {
             let missing = USBStorageManager.shared.missingStartupAssets()
             let confirmed = verifiedRoot == root.standardizedFileURL
+            if !confirmed { lastInspectedBytes = nil }
             connection.text = !missing.isEmpty ? "Missing startup paths" :
                 (confirmed ? "Engine file inspected · startup paths present" :
                     "Startup paths detected · validation pending")
             connection.textColor = verifiedRoot == root.standardizedFileURL && missing.isEmpty ?
                 GTAReference.green : GTAReference.blue
             diskInfo.text = "Selected folder: " + root.lastPathComponent
-            engineInfo.text = "Run Validate to inspect real engine file bytes"
+            if confirmed, let bytes = lastInspectedBytes {
+                engineInfo.text = "Inspected game.wasm: " +
+                    ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+            } else {
+                engineInfo.text = "Run Validate to inspect real engine file bytes"
+            }
         } else {
             verifiedRoot = nil
+            lastInspectedBytes = nil
             connection.text = "Not selected"
             connection.textColor = GTAReference.blue
             diskInfo.text = "Select your own local game mirror from the Files app"
@@ -522,7 +552,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
             case .success(let value):
                 let bytes = ByteCountFormatter.string(fromByteCount: value.byteCount, countStyle: .file)
                 self.verifiedRoot = USBStorageManager.shared.root?.standardizedFileURL
-                self.engineInfo.text = "Inspected game.wasm: " + bytes
+                self.lastInspectedBytes = value.byteCount
                 self.refresh()
                 GTAReference.present("Game files inspected", message:
                     "WebAssembly engine readable: " + bytes +
@@ -743,7 +773,17 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
     private func addEngineOption(_ id: String, to panel: UIStackView) {
         guard let spec = EngineOptions.option(id) else { return }
-        let button = GTAReference.settingsRow(spec.title, symbol: "slider.horizontal.3")
+        let symbol: String
+        switch id {
+        case "fps": symbol = "speedometer"
+        case "textureQuality": symbol = "square.3.layers.3d"
+        case "shadowQuality": symbol = "sun.horizon"
+        case "reflectionQuality": symbol = "sparkles"
+        case "particleQuality": symbol = "circle.dotted"
+        case "grassQuality": symbol = "leaf"
+        default: symbol = "slider.horizontal.3"
+        }
+        let button = GTAReference.settingsRow(spec.title, symbol: symbol)
         button.accessibilityIdentifier = "engine-option-" + id
         button.addAction(UIAction { [weak self, weak button] _ in
             guard let self, let button else { return }
