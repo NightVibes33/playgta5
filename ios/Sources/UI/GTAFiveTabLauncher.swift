@@ -209,6 +209,45 @@ enum GTAReference {
     }
 }
 
+/// Loads the project creator's actual GitHub profile photo and caches it
+/// under Caches. Offline launches use the last fetched image.
+final class GTAContributorAvatarView: UIImageView {
+    private static let url = URL(string: "https://avatars.githubusercontent.com/u/214680657?s=256&v=4")!
+    private static var cacheURL: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("NightVibes33-github-avatar", isDirectory: false)
+    }
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        image = UIImage(systemName: "person.crop.circle.fill")
+        tintColor = GTAReference.blue
+        contentMode = .scaleAspectFill
+        clipsToBounds = true
+        layer.cornerRadius = 42
+        layer.cornerCurve = .continuous
+        layer.borderWidth = 2
+        layer.borderColor = GTAReference.green.withAlphaComponent(0.7).cgColor
+        accessibilityLabel = "NightVibes33 GitHub profile picture"
+        loadProfilePicture()
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    private func loadProfilePicture() {
+        if let cache = Self.cacheURL, let data = try? Data(contentsOf: cache),
+           let photo = UIImage(data: data) {
+            image = photo
+        }
+        var request = URLRequest(url: Self.url)
+        request.timeoutInterval = 12
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard error == nil, let http = response as? HTTPURLResponse,
+                  http.statusCode == 200, let data, data.count <= 2_000_000,
+                  let photo = UIImage(data: data) else { return }
+            if let cache = Self.cacheURL { try? data.write(to: cache, options: .atomic) }
+            DispatchQueue.main.async { self?.image = photo }
+        }.resume()
+    }
+}
+
 // A responsive gradient action, not a pre-rendered / fake Play image.
 // A lightweight gradient only for UIKit chrome, never for game artwork.
 final class GTACinematicSurface: UIView {
@@ -1128,6 +1167,57 @@ final class GTAReferenceMoreController: GTAReferencePage {
                                                        size: 12, color: GTAReference.secondary))
         about.addArrangedSubview(controllerStatus)
         stack.addArrangedSubview(about)
+        stack.addArrangedSubview(GTAReference.section("Developer Credits"))
+
+        let developerCard = GTAReference.panelView(15)
+        let creator = UIStackView()
+        creator.axis = .horizontal
+        creator.alignment = .center
+        creator.spacing = 14
+        let avatar = GTAContributorAvatarView(frame: .zero)
+        avatar.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            avatar.widthAnchor.constraint(equalToConstant: 84),
+            avatar.heightAnchor.constraint(equalToConstant: 84)
+        ])
+        creator.addArrangedSubview(avatar)
+        let authorDetails = UIStackView()
+        authorDetails.axis = .vertical
+        authorDetails.spacing = 5
+        authorDetails.addArrangedSubview(GTAReference.label("NightVibes33", size: 19, weight: .bold))
+        authorDetails.addArrangedSubview(GTAReference.label(
+            "GTAiOS project creator & iOS app developer",
+            size: 12, color: GTAReference.secondary))
+        authorDetails.addArrangedSubview(GTAReference.label(
+            "@NightVibes33 · GitHub",
+            size: 12, weight: .semibold, color: GTAReference.green))
+        creator.addArrangedSubview(authorDetails)
+        developerCard.addArrangedSubview(creator)
+        let profileButton = GTAReference.control("Visit My GitHub Profile",
+                                                  symbol: "arrow.up.right.square")
+        profileButton.accessibilityIdentifier = "credits-creator-profile"
+        profileButton.addTarget(self, action: #selector(openCreatorProfile),
+                                for: .touchUpInside)
+        developerCard.addArrangedSubview(profileButton)
+        stack.addArrangedSubview(developerCard)
+
+        stack.addArrangedSubview(GTAReference.section("Engine & Acknowledgements"))
+        let engineCard = GTAReference.panelView(13)
+        engineCard.addArrangedSubview(GTAReference.label(
+            "Native Engine · Muguet by c22dev", size: 14, weight: .bold))
+        engineCard.addArrangedSubview(GTAReference.label(
+            "Open-source runtime used for the native game build (GPL-3.0-or-later).",
+            size: 12, color: GTAReference.secondary))
+        let engineLink = GTAReference.control("View Muguet Source & License",
+                                               symbol: "chevron.left.forwardslash.chevron.right")
+        engineLink.addTarget(self, action: #selector(openEngineSource),
+                             for: .touchUpInside)
+        engineCard.addArrangedSubview(engineLink)
+        engineCard.addArrangedSubview(GTAReference.hairline())
+        engineCard.addArrangedSubview(GTAReference.label(
+            "Grand Theft Auto V and associated game artwork are the property of Rockstar Games / Take-Two Interactive. This is an independent project.",
+            size: 11, color: GTAReference.secondary))
+        stack.addArrangedSubview(engineCard)
         stack.addArrangedSubview(GTAReference.section("Local Tools"))
         let operations: [(String, String, Selector)] = [
             ("Game Library", "externaldrive", #selector(library)),
@@ -1202,6 +1292,14 @@ final class GTAReferenceMoreController: GTAReferencePage {
                 self.recentRows.addArrangedSubview(GTAReference.hairline())
             }
         }
+    }
+    @objc private func openCreatorProfile() {
+        guard let url = URL(string: "https://github.com/NightVibes33") else { return }
+        UIApplication.shared.open(url)
+    }
+    @objc private func openEngineSource() {
+        guard let url = URL(string: "https://github.com/c22dev/muguet") else { return }
+        UIApplication.shared.open(url)
     }
     @objc private func library() { switchTab(1) }
     @objc private func graphics() { switchTab(2) }
