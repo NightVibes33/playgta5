@@ -74,6 +74,7 @@ final class USBStorageManager {
     func disconnect(completion: @escaping () -> Void) {
         worker.async { [weak self] in
             guard let self else { return }
+            gta_wasi_reset_files() // close guest-only file duplicates before scope revocation
             if self.hasScope { self.accessURL?.stopAccessingSecurityScopedResource() }
             self.hasScope = false
             self.accessURL = nil
@@ -125,6 +126,7 @@ final class USBStorageManager {
         }
 
         // Do not drop a working selection if the new bookmark cannot be made.
+        gta_wasi_reset_files() // revoke any old guest FD ownership before changing drives
         if hasScope { accessURL?.stopAccessingSecurityScopedResource() }
         accessURL = selected
         hasScope = scope

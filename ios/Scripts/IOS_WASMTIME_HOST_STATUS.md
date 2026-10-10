@@ -463,3 +463,18 @@ engine-aware `__syscall_openat` bridge and a security-scoped USB root are
 still needed to register GTA archives; no GTA asset is invented or embedded.
 The private GTA engine AOT is not in this repo and cannot be instantiated or
 declared playable by these unit tests.
+
+## Build 29 — actual USB-to-WASI memory64 readback on iPhone
+
+When the external `data/manifest.json` is available, the native game
+preflight coordinates its existing security-scoped URL, opens the actual
+regular file, registers a separate guest-only descriptor, and compares a
+32-byte prefix from genuine `fd_pread` and `fd_read` through a 128-byte
+memory64 test buffer against the original USB file. It also checks sequential
+seek position and guarantees unbinding/closing after the probe. Logs
+differentiate verified USB bytes from errors; removing or changing the USB
+folder closes any outstanding guest descriptor duplicates.
+
+This verifies a native device filesystem path only *after physical iPhone
+execution*. It is not GTA engine instantiation, game archive openat, original
+loading, graphics, audio, or gameplay. ABI import coverage stays **23/85**.

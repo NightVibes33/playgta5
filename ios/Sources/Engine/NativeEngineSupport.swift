@@ -80,6 +80,17 @@ enum NativeEngineStatus {
             LogStore.shared.write("native",
                 "Native HTTPFS manifest unavailable: \(error.localizedDescription)")
         }
+        // Exercise actual bytes from the user-approved USB folder through
+        // the same memory64 WASI descriptor functions that an AOT guest uses.
+        // This is a host I/O check, not game engine execution.
+        do {
+            let bytes = try verifyWASIUSBRead()
+            LogStore.shared.write("native",
+                "WASI virtual FD read verified against USB data/manifest.json: \(bytes) bytes; no GTA execution")
+        } catch {
+            LogStore.shared.write("native",
+                "WASI USB virtual FD read FAILED: \(error.localizedDescription)")
+        }
         let result = Inspection(byteCount: size, memory: memory, shaderIndex: shader, gameFile: wasm)
         LogStore.shared.write("native", "WASM inspected: bytes=\(size), shared=\(memory.shared), memory64=\(memory.memory64), minimumPages=\(memory.minimumPages), maximumPages=\(String(describing: memory.maximumPages))")
         LogStore.shared.write("native", "USB shader index accessible: \(shader.lastPathComponent). Native shader translation has NOT been implemented.")
@@ -120,6 +131,75 @@ enum NativeEngineStatus {
         if let readError { throw readError }
         guard let stagedSize else { throw Failure.io("File provider returned no manifest") }
         return stagedSize
+    }
+
+
+    /// Coordinates a real USB manifest file, duplicates its provider-approved
+    /// descriptor into a guest-only fd, then verifies memory64 pread and read
+    /// return precisely the bytes in the selected original file.
+    /// Never copies a game archive or claims the actual WASM was executed.
+    private static func verifyWASIUSBRead() throws -> Int {
+        guard let url = USBStorageManager.shared.file("data/manifest.json") else {
+            throw Failure.missing("data/manifest.json")
+        }
+        var coordinationError: NSError?
+        var testError: Error?
+        var result: Int?
+        NSFileCoordinator(filePresenter: nil).coordinate(
+            readingItemAt: url, options: [], error: &coordinationError) { granted in
+                do {
+                    let source = try FileHandle(forReadingFrom: granted)
+                    defer { try? source.close() }
+                    let expected = try source.read(upToCount: 32) ?? Data()
+                    guard !expected.isEmpty else {
+                        throw Failure.io("empty USB manifest sample")
+                    }
+                    let fd = gta_wasi_register_readonly_fd(source.fileDescriptor)
+                    guard fd >= 3 else {
+                        throw Failure.io("WASI refused external regular-file descriptor")
+                    }
+                    defer { _ = gta_wasi_fd_close(UInt32(fd)) }
+                    var guest = [UInt8](repeating: 0, count: 128)
+                    let good = guest.withUnsafeMutableBytes { bytes -> Bool in
+                        guard let pointer = bytes.baseAddress else { return false }
+                        func put64(_ index: Int, _ value: UInt64) {
+                            for i in 0..<8 { bytes[index + i] = UInt8(truncatingIfNeeded: value >> (UInt64(i) * 8)) }
+                        }
+                        func get64(_ index: Int) -> UInt64 {
+                            var value: UInt64 = 0
+                            for i in 0..<8 { value |= UInt64(bytes[index + i]) << (UInt64(i) * 8) }
+                            return value
+                        }
+                        put64(80, 0)  // memory64 iovec -> destination at 0
+                        put64(88, UInt64(expected.count))
+                        gta_wasi_bind_memory(pointer, UInt64(bytes.count))
+                        defer { gta_wasi_unbind_memory() }
+                        let guestFD = UInt32(fd)
+                        guard gta_wasi_fd_pread(guestFD, 80, 1, 0, 104) == 0,
+                              get64(104) == UInt64(expected.count),
+                              Array(bytes.prefix(expected.count)) == Array(expected) else {
+                            return false
+                        }
+                        for i in 0..<expected.count { bytes[i] = 0 }
+                        guard gta_wasi_fd_read(guestFD, 80, 1, 104) == 0,
+                              get64(104) == UInt64(expected.count),
+                              Array(bytes.prefix(expected.count)) == Array(expected),
+                              gta_wasi_fd_seek(guestFD, 0, 1, 112) == 0,
+                              get64(112) == UInt64(expected.count) else {
+                            return false
+                        }
+                        return true
+                    }
+                    guard good else {
+                        throw Failure.io("WASI memory64 USB bytes mismatch, seek or read error")
+                    }
+                    result = expected.count
+                } catch { testError = error }
+            }
+        if let coordinationError { throw coordinationError }
+        if let testError { throw testError }
+        guard let result else { throw Failure.io("file provider did not return WASI test bytes") }
+        return result
     }
 
     /// Read only the initial import section; the proprietary game binary
