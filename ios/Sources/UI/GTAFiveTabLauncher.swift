@@ -97,6 +97,45 @@ enum GTAReference {
         button.heightAnchor.constraint(greaterThanOrEqualToConstant: 43).isActive = true
         return button
     }
+    // Native console-launcher action tile with accessible, working targets.
+    static func actionTile(_ title: String, detail: String, symbol: String,
+                           accent: UIColor = GTAReference.blue) -> UIButton {
+        let button = UIButton(type: .system)
+        button.backgroundColor = panel
+        button.layer.cornerRadius = 16
+        button.layer.cornerCurve = .continuous
+        button.layer.borderWidth = 0.8
+        button.layer.borderColor = UIColor.white.withAlphaComponent(0.17).cgColor
+        let content = UIStackView()
+        content.axis = .vertical
+        content.alignment = .center
+        content.spacing = 5
+        content.isUserInteractionEnabled = false
+        content.translatesAutoresizingMaskIntoConstraints = false
+        let icon = UIImageView(image: UIImage(systemName: symbol,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)))
+        icon.tintColor = accent
+        icon.contentMode = .scaleAspectFit
+        icon.heightAnchor.constraint(equalToConstant: 29).isActive = true
+        content.addArrangedSubview(icon)
+        let heading = label(title, size: 12, weight: .bold)
+        heading.textAlignment = .center
+        heading.numberOfLines = 2
+        content.addArrangedSubview(heading)
+        let subtitle = label(detail, size: 10, color: secondary)
+        subtitle.textAlignment = .center
+        subtitle.numberOfLines = 2
+        content.addArrangedSubview(subtitle)
+        button.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
+            content.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
+            content.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 116)
+        ])
+        button.accessibilityLabel = title + ", " + detail
+        return button
+    }
     static func hairline() -> UIView {
         let view = UIView()
         view.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
@@ -140,6 +179,25 @@ enum GTAReference {
 }
 
 // A responsive gradient action, not a pre-rendered / fake Play image.
+// A lightweight gradient only for UIKit chrome, never for game artwork.
+final class GTACinematicSurface: UIView {
+    private let gradient = CAGradientLayer()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        gradient.colors = [
+            UIColor(red: 0.08, green: 0.075, blue: 0.15, alpha: 1).cgColor,
+            UIColor(red: 0.025, green: 0.038, blue: 0.080, alpha: 1).cgColor,
+            GTAReference.night.cgColor
+        ]
+        gradient.locations = [0, 0.60, 1]
+        gradient.startPoint = CGPoint(x: 0.5, y: 0)
+        gradient.endPoint = CGPoint(x: 0.5, y: 1)
+        layer.addSublayer(gradient)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }
+    override func layoutSubviews() { super.layoutSubviews(); gradient.frame = bounds }
+}
+
 final class GTAVNeonLaunchButton: UIButton {
     private let glow = CAGradientLayer()
     override init(frame: CGRect) {
@@ -297,35 +355,24 @@ final class GTAReferenceHomeController: GTAReferencePage {
         hero.layer.cornerRadius = 17
         hero.layer.cornerCurve = .continuous
         hero.translatesAutoresizingMaskIntoConstraints = false
-        hero.heightAnchor.constraint(equalToConstant: 370).isActive = true
+        hero.heightAnchor.constraint(equalToConstant: 398).isActive = true
         hero.backgroundColor = UIColor(red: 0.055, green: 0.073, blue: 0.10, alpha: 1)
         // The original widescreen trio contains all three protagonists and
         // the GTA V title. Preserve the WHOLE image instead of center-cropping
         // Franklin and Trevor off the sides on a narrow iPhone screen.
         let art = GTAReference.image("gtav-story-trio", height: 214, radius: 0)
         art.contentMode = .scaleAspectFit
-        // Cinematic edge fill uses the SAME original GTA V photograph,
-        // blurred behind the uncropped key art. No synthetic city graphics.
-        let backdrop = UIImageView(image: art.image)
-        backdrop.contentMode = .scaleAspectFill
-        backdrop.translatesAutoresizingMaskIntoConstraints = false
-        backdrop.clipsToBounds = true
-        backdrop.alpha = 0.40
-        hero.addSubview(backdrop)
-        let shade = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-        shade.translatesAutoresizingMaskIntoConstraints = false
-        shade.alpha = 0.62
-        hero.addSubview(shade)
+        // One real Rockstar key-art image, displayed uncropped. The lower
+        // color treatment is a native control surface, not repeated wallpaper.
+        let surface = GTACinematicSurface()
+        surface.translatesAutoresizingMaskIntoConstraints = false
+        hero.addSubview(surface)
         hero.addSubview(art)
         NSLayoutConstraint.activate([
-            backdrop.topAnchor.constraint(equalTo: hero.topAnchor),
-            backdrop.bottomAnchor.constraint(equalTo: hero.bottomAnchor),
-            backdrop.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
-            backdrop.trailingAnchor.constraint(equalTo: hero.trailingAnchor),
-            shade.topAnchor.constraint(equalTo: hero.topAnchor),
-            shade.bottomAnchor.constraint(equalTo: hero.bottomAnchor),
-            shade.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
-            shade.trailingAnchor.constraint(equalTo: hero.trailingAnchor)
+            surface.topAnchor.constraint(equalTo: hero.topAnchor),
+            surface.bottomAnchor.constraint(equalTo: hero.bottomAnchor),
+            surface.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
+            surface.trailingAnchor.constraint(equalTo: hero.trailingAnchor)
         ])
         let identity = UIStackView()
         identity.axis = .vertical
@@ -347,7 +394,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
             localBadge.trailingAnchor.constraint(equalTo: hero.trailingAnchor, constant: -13),
             localBadge.topAnchor.constraint(equalTo: hero.topAnchor, constant: 17)
         ])
-        let tagline = GTAReference.label("GRAND THEFT AUTO V  ·  LOCAL iPHONE LAUNCHER",
+        let tagline = GTAReference.label("LOS SANTOS AWAITS  ·  GRAND THEFT AUTO V",
                                          size: 10, weight: .bold, color: GTAReference.secondary)
         tagline.textAlignment = .center
         tagline.translatesAutoresizingMaskIntoConstraints = false
@@ -355,7 +402,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         NSLayoutConstraint.activate([
             art.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
             art.trailingAnchor.constraint(equalTo: hero.trailingAnchor),
-            art.topAnchor.constraint(equalTo: hero.topAnchor, constant: 44),
+            art.topAnchor.constraint(equalTo: hero.topAnchor, constant: 37),
             tagline.leadingAnchor.constraint(equalTo: hero.leadingAnchor, constant: 12),
             tagline.trailingAnchor.constraint(equalTo: hero.trailingAnchor, constant: -12),
             tagline.topAnchor.constraint(equalTo: art.bottomAnchor, constant: 8)
@@ -387,15 +434,39 @@ final class GTAReferenceHomeController: GTAReferencePage {
         actions.addArrangedSubview(graphics)
         actions.addArrangedSubview(files)
         stack.addArrangedSubview(actions)
-        let city = GTAReference.panelView(0)
-        city.addArrangedSubview(GTAReference.image("gtav-vinewood-view", height: 118))
-        let cityText = GTAReference.label("Los Santos", size: 16, weight: .bold)
-        cityText.textAlignment = .center
-        city.addArrangedSubview(cityText)
-        let citySubtitle = GTAReference.label("Grand Theft Auto V · Local USB game library", size: 12,
-                                         color: GTAReference.secondary)
-        citySubtitle.textAlignment = .center
-        city.addArrangedSubview(citySubtitle)
+        let city = UIView()
+        city.layer.cornerRadius = 17
+        city.layer.cornerCurve = .continuous
+        city.clipsToBounds = true
+        city.backgroundColor = GTAReference.panel
+        city.heightAnchor.constraint(equalToConstant: 154).isActive = true
+        let panorama = GTAReference.image("gtav-vinewood-view", height: 154, radius: 0)
+        panorama.contentMode = .scaleAspectFill
+        city.addSubview(panorama)
+        NSLayoutConstraint.activate([
+            panorama.topAnchor.constraint(equalTo: city.topAnchor),
+            panorama.bottomAnchor.constraint(equalTo: city.bottomAnchor),
+            panorama.leadingAnchor.constraint(equalTo: city.leadingAnchor),
+            panorama.trailingAnchor.constraint(equalTo: city.trailingAnchor)
+        ])
+        let titlePlate = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        titlePlate.layer.cornerRadius = 10
+        titlePlate.clipsToBounds = true
+        titlePlate.translatesAutoresizingMaskIntoConstraints = false
+        city.addSubview(titlePlate)
+        let cityTitle = GTAReference.label("LOS SANTOS", size: 16, weight: .black)
+        cityTitle.textAlignment = .left
+        cityTitle.translatesAutoresizingMaskIntoConstraints = false
+        titlePlate.contentView.addSubview(cityTitle)
+        NSLayoutConstraint.activate([
+            titlePlate.leadingAnchor.constraint(equalTo: city.leadingAnchor, constant: 12),
+            titlePlate.trailingAnchor.constraint(lessThanOrEqualTo: city.trailingAnchor, constant: -12),
+            titlePlate.bottomAnchor.constraint(equalTo: city.bottomAnchor, constant: -12),
+            cityTitle.topAnchor.constraint(equalTo: titlePlate.contentView.topAnchor, constant: 10),
+            cityTitle.leadingAnchor.constraint(equalTo: titlePlate.contentView.leadingAnchor, constant: 12),
+            cityTitle.trailingAnchor.constraint(equalTo: titlePlate.contentView.trailingAnchor, constant: -12),
+            cityTitle.bottomAnchor.constraint(equalTo: titlePlate.contentView.bottomAnchor, constant: -10)
+        ])
         stack.addArrangedSubview(city)
     }
     override func viewWillAppear(_ animated: Bool) {
@@ -460,11 +531,11 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         actions.axis = .horizontal
         actions.spacing = 8
         actions.distribution = .fillEqually
-        let browse = GTAReference.control("Browse Files", symbol: "folder.fill")
+        let browse = GTAReference.actionTile("Browse Files", detail: "Choose game folder", symbol: "folder.fill")
         browse.addTarget(self, action: #selector(browsePressed), for: .touchUpInside)
-        let validate = GTAReference.control("Validate", symbol: "checkmark.shield.fill")
+        let validate = GTAReference.actionTile("Validate Files", detail: "Inspect native data", symbol: "checkmark.shield.fill", accent: GTAReference.green)
         validate.addTarget(self, action: #selector(validatePressed), for: .touchUpInside)
-        let disconnect = GTAReference.control("Disconnect", symbol: "externaldrive.badge.xmark")
+        let disconnect = GTAReference.actionTile("Disconnect", detail: "Release USB access", symbol: "externaldrive.badge.xmark", accent: UIColor.systemRed)
         disconnect.addTarget(self, action: #selector(disconnectPressed), for: .touchUpInside)
         actions.addArrangedSubview(browse)
         actions.addArrangedSubview(validate)
