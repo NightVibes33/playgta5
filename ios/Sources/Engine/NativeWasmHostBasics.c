@@ -576,6 +576,82 @@ static int gta_define_game_audio(wasmtime_linker_t *linker) {
     return 0;
 }
 
+
+/* Three further native Emscripten platform imports from original game.js:
+ * __syscall_newfstatat(i32,i64,i64,i32)->i32
+ * __syscall_statfs64(i64,i64,i64)->i32
+ * _tzset_js(i64,i64,i64,i64)->void
+ */
+enum { GTA_EXT_NEWFSTAT=1,GTA_EXT_STATFS=2,GTA_EXT_TZSET=3 };
+static wasm_trap_t *gta_extended_platform_callback(
+    void *env,wasmtime_caller_t *caller,const wasmtime_val_t *args,
+    size_t nargs,wasmtime_val_t *outputs,size_t nresults) {
+    (void)caller;
+    uintptr_t op=(uintptr_t)env;
+    int32_t rc;
+    if(op==GTA_EXT_NEWFSTAT && nargs==4 && nresults==1 &&
+       args[0].kind==WASMTIME_I32 && args[1].kind==WASMTIME_I64 &&
+       args[2].kind==WASMTIME_I64 && args[3].kind==WASMTIME_I32) {
+        rc=gta_wasi_syscall_newfstatat(args[0].of.i32,
+            (uint64_t)args[1].of.i64,(uint64_t)args[2].of.i64,args[3].of.i32);
+    } else if(op==GTA_EXT_STATFS && nargs==3 && nresults==1 &&
+              args[0].kind==WASMTIME_I64 && args[1].kind==WASMTIME_I64 &&
+              args[2].kind==WASMTIME_I64) {
+        rc=gta_wasi_syscall_statfs64((uint64_t)args[0].of.i64,
+            (uint64_t)args[1].of.i64,(uint64_t)args[2].of.i64);
+    } else if(op==GTA_EXT_TZSET && nargs==4 && nresults==0 &&
+              args[0].kind==WASMTIME_I64 && args[1].kind==WASMTIME_I64 &&
+              args[2].kind==WASMTIME_I64 && args[3].kind==WASMTIME_I64) {
+        (void)gta_wasi_tzset_js((uint64_t)args[0].of.i64,
+            (uint64_t)args[1].of.i64,(uint64_t)args[2].of.i64,
+            (uint64_t)args[3].of.i64);
+        return NULL;
+    } else return NULL;
+    outputs[0].kind=WASMTIME_I32;
+    outputs[0].of.i32=rc;
+    return NULL;
+}
+static int gta_define_extended_platform(wasmtime_linker_t *linker) {
+    const struct {
+        const char *name;uintptr_t op;
+        wasm_valkind_t args[4];size_t count;int returns_value;
+    } table[]={
+        {"__syscall_newfstatat",GTA_EXT_NEWFSTAT,
+            {WASM_I32,WASM_I64,WASM_I64,WASM_I32},4,1},
+        {"__syscall_statfs64",GTA_EXT_STATFS,
+            {WASM_I64,WASM_I64,WASM_I64},3,1},
+        {"_tzset_js",GTA_EXT_TZSET,
+            {WASM_I64,WASM_I64,WASM_I64,WASM_I64},4,0}
+    };
+    for(size_t i=0;i<sizeof(table)/sizeof(table[0]);i++){
+        wasm_valtype_t *args[4]={0};
+        for(size_t j=0;j<table[i].count;j++){
+            args[j]=wasm_valtype_new(table[i].args[j]);
+            if(!args[j]) {
+                for(size_t k=0;k<j;k++)wasm_valtype_delete(args[k]);
+                return -1;
+            }
+        }
+        wasm_valtype_vec_t params, results;
+        wasm_valtype_vec_new(&params,table[i].count,args);
+        if(table[i].returns_value) {
+            wasm_valtype_t *ret=wasm_valtype_new(WASM_I32);
+            if(!ret)return -2;
+            wasm_valtype_vec_new(&results,1,&ret);
+        } else {
+            wasm_valtype_vec_new_empty(&results);
+        }
+        wasm_functype_t *type=wasm_functype_new(&params,&results);
+        if(!type)return -3;
+        wasmtime_error_t *err=wasmtime_linker_define_func(
+            linker,"env",3,table[i].name,strlen(table[i].name),type,
+            gta_extended_platform_callback,(void *)table[i].op,NULL);
+        wasm_functype_delete(type);
+        if(err){wasmtime_error_delete(err);return -4;}
+    }
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -718,10 +794,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if(installed)++*installed;
+    rc=gta_define_extended_platform(linker);
+    if(rc!=0){
+        gta_host_message(message,capacity,"Additional statfs/newfstatat/timezone imports failed to register");
+        return rc;
+    }
+    if(installed)*installed+=3;
     return 0;
 }
 
-/* Returns 0 only when 33 ABI-matched host functions are registered
+/* Returns 0 only when 36 ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,

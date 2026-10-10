@@ -8,6 +8,12 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdio.h>
+#if defined(__APPLE__)
+#include <sys/mount.h>
+#else
+#include <sys/vfs.h>
+#endif
 #include "NativeTextHostABI.h"
 
 /* WASI preview1 errno values, not POSIX errno. */
@@ -346,6 +352,108 @@ int32_t gta_wasi_syscall_fcntl64(int32_t fd,int32_t cmd,uint64_t varargs) {
 finish:
     pthread_mutex_unlock(&wasi_mutex);
     return result;
+}
+
+
+/* Direct port of Emscripten ___syscall_newfstatat's path/flag ABI.
+ * An AT_FDCWD path is resolved only in the user-approved USB root.
+ * AT_EMPTY_PATH permits a stat on a previously registered guest fd. */
+int32_t gta_wasi_syscall_newfstatat(int32_t dirfd,uint64_t pathname,
+                                    uint64_t result,int32_t flags) {
+    if(flags & ~(256|4096))return -28;
+    pthread_mutex_lock(&wasi_mutex);
+    if(!span_valid(pathname,1)){
+        pthread_mutex_unlock(&wasi_mutex);
+        return -21;
+    }
+    int empty=(guest_memory[(size_t)pathname]==0);
+    int absolute=(guest_memory[(size_t)pathname]=='/');
+    pthread_mutex_unlock(&wasi_mutex);
+    if(empty && (flags&4096) && dirfd>=0)
+        return gta_wasi_syscall_fstat64(dirfd,result);
+    if(empty)return -2;
+    if(dirfd!=-100 && !absolute)return -8;
+    return (flags&256)?gta_wasi_syscall_lstat64(pathname,result)
+                       :gta_wasi_syscall_stat64(pathname,result);
+}
+/* JS SYSCALLS.writeStatFs has stable memory64 offsets; native statfs
+ * obtains *actual* metadata from a user-authorized archive file fd.
+ * Never report fabricated block counts or local provider assumptions. */
+int32_t gta_wasi_syscall_statfs64(uint64_t pathname,uint64_t size,
+                                  uint64_t out) {
+    (void)size; /* Original game.js ignores its size argument. */
+    int32_t guest_fd=gta_wasi_syscall_openat(-100,pathname,O_RDONLY,0);
+    if(guest_fd<0)return guest_fd;
+    pthread_mutex_lock(&wasi_mutex);
+    gta_wasi_file *file=gta_wasi_lookup((uint32_t)guest_fd);
+    int32_t rc=0;
+    struct statfs st;
+    if(!file){rc=-8;goto finish;}
+    if(!span_valid(out,88)){rc=-21;goto finish;}
+    if(fstatfs(file->owned_fd,&st)!=0){rc=-29;goto finish;}
+    memset(guest_memory+(size_t)out,0,88);
+    gta_put_u32(out+8,(uint32_t)st.f_bsize);
+    gta_put_u32(out+72,(uint32_t)st.f_bsize);
+    put_u64_le(out+16,(uint64_t)st.f_blocks);
+    put_u64_le(out+24,(uint64_t)st.f_bfree);
+    put_u64_le(out+32,(uint64_t)st.f_bavail);
+    put_u64_le(out+40,(uint64_t)st.f_files);
+    put_u64_le(out+48,(uint64_t)st.f_ffree);
+#if defined(__APPLE__)
+    gta_put_u32(out+56,(uint32_t)st.f_fsid.val[0]);
+#else
+    gta_put_u32(out+56,(uint32_t)st.f_fsid.__val[0]);
+#endif
+    long name_max=fpathconf(file->owned_fd,_PC_NAME_MAX);
+    gta_put_u32(out+64,name_max>=0?(uint32_t)name_max:0);
+    gta_put_u32(out+80,(uint32_t)st.f_flags);
+finish:
+    pthread_mutex_unlock(&wasi_mutex);
+    (void)gta_wasi_fd_close((uint32_t)guest_fd);
+    return rc;
+}
+/* Original __tzset_js writes UTC offset (seconds west), DST flag, and
+ * two ASCII "UTC-0600" style names. Use actual local timezone rules. */
+static void gta_tz_name(char out[17],long offset_minutes) {
+    const long absolute=offset_minutes<0?-offset_minutes:offset_minutes;
+    (void)snprintf(out,17,"UTC%c%02ld%02ld",
+                   offset_minutes>=0?'-':'+',absolute/60,absolute%60);
+}
+int32_t gta_wasi_tzset_js(uint64_t timezone,uint64_t daylight,
+                         uint64_t std_name,uint64_t dst_name) {
+    tzset();
+    time_t now=time(NULL);
+    struct tm local;
+    if(!localtime_r(&now,&local))return -1;
+    struct tm jan={0},jul={0};
+    jan.tm_year=jul.tm_year=local.tm_year;
+    jan.tm_mon=0;jul.tm_mon=6;
+    jan.tm_mday=jul.tm_mday=1;
+    jan.tm_isdst=jul.tm_isdst=-1;
+    if(mktime(&jan)==(time_t)-1 || mktime(&jul)==(time_t)-1)return -1;
+#if defined(__APPLE__) || defined(__linux__)
+    long winter=-jan.tm_gmtoff/60;
+    long summer=-jul.tm_gmtoff/60;
+#else
+    long winter=0,summer=0;
+#endif
+    long standard=winter>summer?winter:summer;
+    long dst=winter<summer?winter:summer;
+    char standard_name[17]={0},daylight_name[17]={0};
+    gta_tz_name(standard_name,standard);
+    gta_tz_name(daylight_name,dst);
+    pthread_mutex_lock(&wasi_mutex);
+    if(!span_valid(timezone,8) || !span_valid(daylight,4) ||
+       !span_valid(std_name,17) || !span_valid(dst_name,17)){
+        pthread_mutex_unlock(&wasi_mutex);
+        return -21;
+    }
+    put_u64_le(timezone,(uint64_t)(int64_t)(standard*60));
+    gta_put_u32(daylight,winter!=summer?1:0);
+    memcpy(guest_memory+(size_t)std_name,standard_name,17);
+    memcpy(guest_memory+(size_t)dst_name,daylight_name,17);
+    pthread_mutex_unlock(&wasi_mutex);
+    return 0;
 }
 
 int32_t gta_wasi_clock_time_get(uint32_t clock_id, uint64_t precision_ns,

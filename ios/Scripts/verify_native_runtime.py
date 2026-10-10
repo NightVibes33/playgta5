@@ -182,7 +182,7 @@ assert 'wasm_httpfs_manifest_js' in host
 assert 'stageHTTPFSManifest()' in native
 assert 'data/manifest.json' in native
 assert 'native-httpfs-manifest.test.c' in workflow
-assert 'registered != 33' in game
+assert 'registered != 36' in game
 assert 'native-input-abi.test.c' in workflow
 
 assert 'wasmtime_linker_define_func' in host
@@ -192,7 +192,7 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 33' in game
+assert 'registered != 36' in game
 assert 'native-aot-smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
@@ -215,6 +215,9 @@ assert 'gta_define_openat_callback' in host and '__syscall_openat' in host
 assert 'gta_define_platform_callbacks' in host
 assert 'gta_define_more_callbacks' in host
 assert 'gta_define_game_audio' in host and 'wasm_audio_publish_js' in host
+assert 'gta_define_extended_platform' in host
+for platform_import in ('__syscall_newfstatat','__syscall_statfs64','_tzset_js'):
+    assert platform_import in host
 assert 'gta_game_audio_drain' in game
 assert 'gta_game_audio_bind' in read('ios/Sources/Engine/NativeGameAudioABI.h')
 for new_import in ('__syscall_getcwd','_emscripten_system','__syscall_fcntl64'):

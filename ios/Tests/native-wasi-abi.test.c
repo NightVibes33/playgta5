@@ -148,6 +148,26 @@ int main(void) {
     assert(gta_wasi_syscall_fcntl64(gamefd,0,190)==-21);
     assert(gta_wasi_syscall_fcntl64(gamefd,0,120)==7);
     assert(gta_wasi_fd_close(7)==0);
+    /* Source-accurate newfstatat/statfs64/timezone imports over actual
+     * provider-approved file bytes and the guest's memory64 structures. */
+    archive_test_fd=actual;
+    gta_wasi_set_openat_provider(archive_test_open);
+    strcpy((char*)large,"data/test.bin");
+    assert(gta_wasi_syscall_newfstatat(-100,0,80,0)==0);
+    assert(le64(large+112)==16);
+    assert(gta_wasi_syscall_newfstatat(9,0,80,0)==-8);
+    assert(gta_wasi_syscall_newfstatat(-100,191,80,0)==-21);
+    assert(gta_wasi_syscall_newfstatat(-100,0,80,99999)==-28);
+    assert(gta_wasi_syscall_statfs64(0,0,96)==0);
+    assert(le64(large+112)>0); /* real filesystem blocks */
+    large[60]=0;
+    assert(gta_wasi_syscall_newfstatat(gamefd,60,80,4096)==0);
+    assert(le64(large+112)==16);
+    gta_wasi_set_openat_provider(NULL);
+    archive_test_fd=-1;
+    assert(gta_wasi_tzset_js(0,8,16,40)==0);
+    assert(memcmp(large+16,"UTC",3)==0 && memcmp(large+40,"UTC",3)==0);
+    assert(gta_wasi_tzset_js(190,8,16,40)==-21);
     gta_wasi_bind_memory(memory,sizeof memory);
     close(actual); /* guest owns a duplicate, not the source */
     write_le64(memory+40,4);

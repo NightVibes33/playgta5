@@ -564,3 +564,22 @@ and no-bound-memory behavior.
 No real GTA audio can occur until the **actual game** is instantiated with
 its required 3 GiB shared memory and invokes this callback. Native Metal
 world rendering, threading, and engine startup remain missing.
+
+
+## Build 34 — verified-on-source native filesystem & timezone import batch (36/85)
+
+Three more typed Wasmtime registrations reproduce original game.js ABI:
+
+- \`env.__syscall_newfstatat(i32,i64,i64,i32)->i32\`, including
+  AT_FDCWD archive path queries and AT_EMPTY_PATH for a live guest FD
+- \`env.__syscall_statfs64(i64,i64,i64)->i32\`, writing the actual
+  filesystem's statfs block counts, availability and name length to
+  original guest memory64 offsets; no synthetic capacity values
+- \`env._tzset_js(i64,i64,i64,i64)->void\`, supplying the current
+  system's standard timezone offset, DST flag and Emscripten-compatible
+  UTC±HHMM display names into bounded memory
+
+These services remain limited to the selected read-only USB archive root,
+not a complete Emscripten virtual filesystem. They do not solve the original
+3 GiB guest shared-memory import, engine threading, WebGPU/Metal rendering or
+real-world GTA V launch. ABI registration is not proof of gameplay.
