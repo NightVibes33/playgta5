@@ -73,6 +73,36 @@ enum GTAReference {
         b.heightAnchor.constraint(greaterThanOrEqualToConstant: 55).isActive = true
         return b
     }
+    // Compact native settings rows: the artwork is decoration; these
+    // buttons retain their actual selection actions and persisted state.
+    static func settingsRow(_ title: String, symbol: String) -> UIButton {
+        let button = UIButton(type: .system)
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.image = UIImage(systemName: symbol)
+        config.imagePlacement = .leading
+        config.imagePadding = 13
+        config.baseForegroundColor = ink
+        config.contentInsets = .init(top: 8, leading: 7, bottom: 8, trailing: 6)
+        config.titleAlignment = .leading
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { original in
+            var attributes = original
+            attributes.font = .systemFont(ofSize: 13, weight: .semibold)
+            return attributes
+        }
+        button.configuration = config
+        button.contentHorizontalAlignment = .leading
+        button.tintColor = blue
+        button.titleLabel?.numberOfLines = 2
+        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 43).isActive = true
+        return button
+    }
+    static func hairline() -> UIView {
+        let view = UIView()
+        view.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.11)
+        return view
+    }
     static func statusRow(_ title: String, detail: UILabel, symbol: String) -> UIStackView {
         let row = UIStackView()
         row.axis = .horizontal
@@ -479,10 +509,11 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
         let display = GTAReference.panelView(9)
         display.addArrangedSubview(GTAReference.label("Graphics", size: 19, weight: .bold))
-        let preset = GTAReference.control("Graphics Preset", symbol: "camera.filters")
+        let preset = GTAReference.settingsRow("Graphics Preset", symbol: "camera.filters")
         preset.accessibilityIdentifier = "graphics-preset"
         preset.addTarget(self, action: #selector(showPresets), for: .touchUpInside)
         display.addArrangedSubview(preset)
+        display.addArrangedSubview(GTAReference.hairline())
         presetButton = preset
         addScale(to: display)
         addSwitch(to: display, title: "VSync", detail: "Preference saved; game renderer pending",
@@ -490,7 +521,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         for id in ["textureQuality", "shadowQuality", "reflectionQuality", "particleQuality", "grassQuality"] {
             addEngineOption(id, to: display)
         }
-        let aa = GTAReference.control("Anti-Aliasing", symbol: "circle.hexagongrid")
+        let aa = GTAReference.settingsRow("Anti-Aliasing", symbol: "circle.hexagongrid")
         aa.accessibilityIdentifier = "staged-anti-aliasing"
         aa.addAction(UIAction { [weak self, weak aa] _ in
             guard let self, let aa else { return }
@@ -507,6 +538,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             sheet.popoverPresentationController?.sourceView = aa
             self.present(sheet, animated: true)
         }, for: .touchUpInside)
+        display.addArrangedSubview(GTAReference.hairline())
         display.addArrangedSubview(aa)
         stack.addArrangedSubview(display)
 
@@ -641,7 +673,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
     private func addEngineOption(_ id: String, to panel: UIStackView) {
         guard let spec = EngineOptions.option(id) else { return }
-        let button = GTAReference.control(spec.title, symbol: "slider.horizontal.3")
+        let button = GTAReference.settingsRow(spec.title, symbol: "slider.horizontal.3")
         button.accessibilityIdentifier = "engine-option-" + id
         button.addAction(UIAction { [weak self, weak button] _ in
             guard let self, let button else { return }
@@ -660,12 +692,15 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             sheet.popoverPresentationController?.sourceView = button
             self.present(sheet, animated: true)
         }, for: .touchUpInside)
+        panel.addArrangedSubview(GTAReference.hairline())
         panel.addArrangedSubview(button)
         engineButtons.append((button, id))
     }
 
     private func addScale(to panel: UIStackView) {
-        let row = GTAReference.panelView(9)
+        let row = UIStackView()
+        row.axis = .vertical
+        row.spacing = 7
         row.addArrangedSubview(GTAReference.label("Resolution Scale", size: 13, weight: .semibold))
         let track = UIStackView()
         track.axis = .horizontal
@@ -692,6 +727,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         track.addArrangedSubview(value)
         row.addArrangedSubview(track)
         panel.addArrangedSubview(row)
+        panel.addArrangedSubview(GTAReference.hairline())
         valueLabels.append((value, "scale"))
     }
 
@@ -723,11 +759,14 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         }, for: .valueChanged)
         row.addArrangedSubview(toggle)
         panel.addArrangedSubview(row)
+        panel.addArrangedSubview(GTAReference.hairline())
     }
 
     private func addFraction(to panel: UIStackView, title: String, symbol: String,
                              key: String, fallback: Double, footnote: String) {
-        let group = GTAReference.panelView(8)
+        let group = UIStackView()
+        group.axis = .vertical
+        group.spacing = 6
         let heading = UIStackView()
         heading.axis = .horizontal
         heading.spacing = 7
@@ -764,6 +803,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         group.addArrangedSubview(GTAReference.label(footnote, size: 10,
                                                     color: GTAReference.secondary))
         panel.addArrangedSubview(group)
+        panel.addArrangedSubview(GTAReference.hairline())
     }
 
     @objc private func resetPressed() {
