@@ -70,7 +70,11 @@ assert 'class NativePCMOutput' in audio and 'scheduleStereoFloatPCM' in audio
 assert 'AVAudioEngine()' in audio and 'AVAudioPlayerNode()' in audio
 assert 'File picker troubleshooting' in launcher
 assert 'Choose Game Folder' in launcher
-assert 'playButton.isEnabled = NativeEngineStatus.nativeEngineLinked' in launcher
+assert 'playButton.isEnabled = true' in launcher
+assert 'playButton.configuration?.title = NativeEngineStatus.nativeEngineLinked ? "Play GTA V" : "Engine Checks"' in launcher
+assert 'if !NativeEngineStatus.nativeEngineLinked' in launcher
+assert 'openGame() // Engine Checks is explicitly not a gameplay launch.' in launcher
+assert 'No saved missions, FPS, shaders, or gameplay ' in launcher
 assert 'content.addArrangedSubview(LosSantosHeroView())' in launcher
 assert 'Select your GTA V folder on USB-C' in launcher
 assert 'More options and diagnostics' in launcher
@@ -86,13 +90,16 @@ assert 'The local server runs inside the app' not in launcher
 assert 'GTAiOS' in splash and 'LOS SANTOS  /  NATIVE PORT' in splash
 art = read("ios/Sources/UI/LosSantosHeroView.swift")
 assert "class LosSantosHeroView" in art
-assert 'heightAnchor.constraint(equalToConstant: 216)' in art
+assert 'heightAnchor.constraint(equalToConstant: 270)' in art
 assert 'title.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18)' in art
 assert "class SunsetSkylineView" in art
 assert "GRAND THEFT" in art and "AUTO V" in art
 assert "PORT IN PROGRESS" not in art
 assert "NATIVE iPHONE PROJECT" not in art
-assert "GTATheme.coral" in launcher and "LosSantosHeroView()" in launcher
+assert "GTATheme.neonPink" in launcher and "LosSantosHeroView()" in launcher
+assert 'usbStatusLabel.text = !connected ? "No game folder selected"' in launcher
+assert "documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls:" in launcher
+assert "hardwareStatusLabel.text = name ==" in launcher
 assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
 assert "GTATheme.section" in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert "import GameController" in input_source
