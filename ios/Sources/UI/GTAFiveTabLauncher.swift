@@ -392,10 +392,10 @@ final class GTAReferenceHomeController: GTAReferencePage {
         let cityText = GTAReference.label("Los Santos", size: 16, weight: .bold)
         cityText.textAlignment = .center
         city.addArrangedSubview(cityText)
-        let subtitle = GTAReference.label("Grand Theft Auto V · Local USB game library", size: 12,
+        let citySubtitle = GTAReference.label("Grand Theft Auto V · Local USB game library", size: 12,
                                          color: GTAReference.secondary)
-        subtitle.textAlignment = .center
-        city.addArrangedSubview(subtitle)
+        citySubtitle.textAlignment = .center
+        city.addArrangedSubview(citySubtitle)
         stack.addArrangedSubview(city)
     }
     override func viewWillAppear(_ animated: Bool) {
