@@ -40,6 +40,7 @@ final class NativePCMOutput {
                         mode: .default, options: [.mixWithOthers])
                     try AVAudioSession.sharedInstance().setActive(true)
                     try self.engine.start()
+                    self.player.volume = Float(GTALaunchPreferences.fraction("masterVolume", fallback: 1.0))
                     self.player.play()
                     self.active = true
                 }
@@ -74,6 +75,12 @@ final class NativePCMOutput {
                 result = .success(())
             } catch { result = .failure(error) }
             DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    func setMasterVolume(_ value: Float) {
+        queue.async {
+            self.player.volume = min(1, max(0, value))
         }
     }
 

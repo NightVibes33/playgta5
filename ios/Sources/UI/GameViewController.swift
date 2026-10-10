@@ -53,6 +53,7 @@ final class GameViewController: UIViewController {
         touchControls.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(touchControls)
         let storedVisibility = UserDefaults.standard.object(forKey: "gtaios.touch.visible")
+        touchControls.alpha = CGFloat(GTALaunchPreferences.fraction("touchOpacity", fallback: 0.7))
         touchControls.isHidden = storedVisibility == nil
             ? false : !UserDefaults.standard.bool(forKey: "gtaios.touch.visible")
 

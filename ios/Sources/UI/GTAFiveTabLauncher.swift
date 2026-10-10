@@ -2,6 +2,8 @@ import UIKit
 import UniformTypeIdentifiers
 import Metal
 import GameController
+import AVKit
+import AVFoundation
 
 // Reference-driven native navigation: every destination has its own controller.
 // Decorative GTA V images are bundled; all action/status data comes from iOS or runtime APIs.
@@ -426,104 +428,330 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
 }
 
 final class GTAReferenceGraphicsController: GTAReferencePage {
-    private let metalStatus = GTAReference.label("", size: 12, weight: .semibold)
-    private let engineStatus = GTAReference.label("", size: 12, color: GTAReference.secondary)
-    private let thermalStatus = GTAReference.label("", size: 12, color: GTAReference.secondary)
+    private let metal = GTAReference.label("", size: 11, weight: .semibold)
+    private let thermal = GTAReference.label("", size: 11, color: GTAReference.secondary)
+    private let readiness = GTAReference.label("", size: 11, color: GTAReference.secondary)
+    private var engineButtons: [(UIButton, String)] = []
+    private var valueLabels: [(UILabel, String)] = []
+    private var presetButton: UIButton?
+    private let controlScheme = GTAReference.label("", size: 12, color: GTAReference.green)
+    private let outputRoute = GTAReference.label("", size: 12, color: GTAReference.secondary)
+
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Settings"))
-        installHero("gtav-official-hero", height: 205)
-        let info = GTAReference.panelView()
-        info.addArrangedSubview(GTAReference.label("Graphics", size: 19, weight: .bold))
-        info.addArrangedSubview(GTAReference.label("Current device capability and stored renderer preferences",
-                                                      size: 12, color: GTAReference.secondary))
-        info.addArrangedSubview(metalStatus)
-        info.addArrangedSubview(thermalStatus)
-        info.addArrangedSubview(engineStatus)
-        stack.addArrangedSubview(info)
-        let graphics = GTAReference.panelView(8)
-        graphics.addArrangedSubview(GTAReference.label("Graphics Settings", size: 18, weight: .bold))
-        for specID in ["scale", "textureQuality", "shadowQuality", "reflectionQuality", "particleQuality", "grassQuality"] {
-            addSetting(specID, to: graphics)
+        installHero("gtav-official-hero", height: 195)
+
+        let performance = GTAReference.panelView(11)
+        performance.addArrangedSubview(GTAReference.label("Performance Monitor", size: 18, weight: .bold))
+        performance.addArrangedSubview(GTAReference.label(
+            "Real iPhone hardware status · gameplay telemetry is unavailable", size: 11,
+            color: GTAReference.secondary))
+        performance.addArrangedSubview(metal)
+        performance.addArrangedSubview(thermal)
+        performance.addArrangedSubview(readiness)
+        stack.addArrangedSubview(performance)
+
+        let display = GTAReference.panelView(9)
+        display.addArrangedSubview(GTAReference.label("Graphics", size: 19, weight: .bold))
+        let preset = GTAReference.control("Graphics Preset", symbol: "camera.filters")
+        preset.accessibilityIdentifier = "graphics-preset"
+        preset.addTarget(self, action: #selector(showPresets), for: .touchUpInside)
+        display.addArrangedSubview(preset)
+        presetButton = preset
+        addScale(to: display)
+        addSwitch(to: display, title: "VSync", detail: "Preference saved; game renderer pending",
+                  symbol: "arrow.triangle.2.circlepath", key: "vsync", fallback: true)
+        for id in ["textureQuality", "shadowQuality", "reflectionQuality", "particleQuality", "grassQuality"] {
+            addEngineOption(id, to: display)
         }
-        stack.addArrangedSubview(graphics)
-        let advanced = GTAReference.panelView(8)
-        advanced.addArrangedSubview(GTAReference.label("Advanced", size: 18, weight: .bold))
-        addSetting("fps", to: advanced)
+        let aa = GTAReference.control("Anti-Aliasing", symbol: "circle.hexagongrid")
+        aa.accessibilityIdentifier = "staged-anti-aliasing"
+        aa.addAction(UIAction { [weak self, weak aa] _ in
+            guard let self, let aa else { return }
+            let sheet = UIAlertController(title: "Anti-Aliasing",
+                message: "Stored for future GTA V renderer integration; not yet an active shader setting.",
+                preferredStyle: .actionSheet)
+            for quality in ["Off", "FXAA", "TAA"] {
+                sheet.addAction(UIAlertAction(title: quality, style: .default) { _ in
+                    GTALaunchPreferences.setText("antiAliasing", value: quality)
+                    aa.configuration?.title = "Anti-Aliasing · " + quality + " (staged)"
+                })
+            }
+            sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            sheet.popoverPresentationController?.sourceView = aa
+            self.present(sheet, animated: true)
+        }, for: .touchUpInside)
+        display.addArrangedSubview(aa)
+        stack.addArrangedSubview(display)
+
+        let controls = GTAReference.panelView(9)
+        controls.addArrangedSubview(GTAReference.label("Controls", size: 19, weight: .bold))
+        let scheme = GTAReference.control("Control Scheme", symbol: "gamecontroller.fill")
+        scheme.addAction(UIAction { [weak self, weak scheme] _ in
+            guard let self, let scheme else { return }
+            let sheet = UIAlertController(title: "Control Scheme",
+                message: "Preferred input mode saved locally. Hardware detection always remains active.",
+                preferredStyle: .actionSheet)
+            for value in ["Automatic", "Touch", "Controller"] {
+                sheet.addAction(UIAlertAction(title: value, style: .default) { _ in
+                    GTALaunchPreferences.setText("controlScheme", value: value)
+                    scheme.configuration?.title = "Control Scheme · " + value + " (staged)"
+                })
+            }
+            sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            sheet.popoverPresentationController?.sourceView = scheme
+            self.present(sheet, animated: true)
+        }, for: .touchUpInside)
+        controls.addArrangedSubview(scheme)
+        controlScheme.numberOfLines = 2
+        controls.addArrangedSubview(controlScheme)
+        addSwitch(to: controls, title: "Vibration", detail: "Real connected-controller haptic test",
+                  symbol: "dot.radiowaves.left.and.right", key: "controllerVibration", fallback: true)
+        addFraction(to: controls, title: "Touch Control Opacity", symbol: "hand.tap",
+                    key: "touchOpacity", fallback: 0.7,
+                    footnote: "Applied to the native touch overlay")
+        addFraction(to: controls, title: "Aim Sensitivity", symbol: "scope",
+                    key: "aimSensitivity", fallback: 0.5,
+                    footnote: "Saved for engine integration; analog camera tuning is in Controls")
+        let mapping = GTAReference.control("Controller Mapping & Deadzone", symbol: "slider.horizontal.3")
+        mapping.addAction(UIAction { [weak self] _ in
+            self?.tabBarController?.selectedIndex = 3
+        }, for: .touchUpInside)
+        controls.addArrangedSubview(mapping)
+        stack.addArrangedSubview(controls)
+
+        let advanced = GTAReference.panelView(9)
+        advanced.addArrangedSubview(GTAReference.label("Advanced", size: 19, weight: .bold))
+        addEngineOption("fps", to: advanced)
         stack.addArrangedSubview(advanced)
+
+        let audio = GTAReference.panelView(9)
+        audio.addArrangedSubview(GTAReference.label("Audio & Haptics", size: 19, weight: .bold))
+        let route = UIStackView()
+        route.axis = .horizontal
+        route.spacing = 8
+        route.alignment = .center
+        route.addArrangedSubview(GTAReference.label("Audio Output", size: 13, weight: .semibold))
+        route.addArrangedSubview(UIView())
+        let picker = AVRoutePickerView(frame: CGRect(x: 0, y: 0, width: 45, height: 45))
+        picker.tintColor = GTAReference.blue
+        picker.activeTintColor = GTAReference.green
+        picker.widthAnchor.constraint(equalToConstant: 45).isActive = true
+        picker.heightAnchor.constraint(equalToConstant: 45).isActive = true
+        route.addArrangedSubview(picker)
+        audio.addArrangedSubview(route)
+        audio.addArrangedSubview(outputRoute)
+        addFraction(to: audio, title: "Master Volume", symbol: "speaker.wave.2",
+                    key: "masterVolume", fallback: 1.0,
+                    footnote: "Live native PCM mixer gain")
+        addFraction(to: audio, title: "Music Volume", symbol: "music.note",
+                    key: "musicVolume", fallback: 0.6,
+                    footnote: "Staged until the game engine exposes music streams")
+        addFraction(to: audio, title: "Dialogue Volume", symbol: "text.bubble",
+                    key: "dialogueVolume", fallback: 0.8,
+                    footnote: "Staged until the game engine exposes dialogue streams")
+        stack.addArrangedSubview(audio)
+
         let note = GTAReference.panelView()
-        note.addArrangedSubview(GTAReference.label("Native engine status", size: 17, weight: .bold))
         note.addArrangedSubview(GTAReference.label(
-            "The values above are saved locally. The Metal frame target is available in the native " +
-            "preview; GTA V graphics options will apply only after the ARM64 game engine is integrated.",
-            size: 12, color: GTAReference.secondary))
+            "Controls marked staged are saved, not simulated. Real GTA V graphics and separate audio " +
+            "mixing require the unlinked native game engine.", size: 11,
+            color: GTAReference.secondary))
         stack.addArrangedSubview(note)
-        let reset = GTAReference.control("Reset saved preferences", symbol: "arrow.counterclockwise")
+
+        let reset = GTAReference.control("Reset All Preferences", symbol: "arrow.counterclockwise")
         reset.addTarget(self, action: #selector(resetPressed), for: .touchUpInside)
         stack.addArrangedSubview(reset)
+        refresh()
     }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        metalStatus.text = MTLCreateSystemDefaultDevice().map { "Metal GPU: " + $0.name } ??
-            "Metal GPU unavailable"
-        let thermal: String
-        switch ProcessInfo.processInfo.thermalState {
-        case .nominal: thermal = "Nominal"
-        case .fair: thermal = "Fair"
-        case .serious: thermal = "Serious"
-        case .critical: thermal = "Critical"
-        @unknown default: thermal = "Unavailable"
+        refresh()
+    }
+
+    private func refresh() {
+        metal.text = MTLCreateSystemDefaultDevice().map { "Metal GPU: " + $0.name }
+            ?? "Metal GPU: unavailable"
+        let thermals = ["Nominal", "Fair", "Serious", "Critical"]
+        let state = ProcessInfo.processInfo.thermalState.rawValue
+        thermal.text = "Device thermal state: " +
+            (state >= 0 && state < thermals.count ? thermals[state] : "Unknown")
+        readiness.text = NativeEngineStatus.nativeEngineLinked ?
+            "Native engine linked · game FPS must be measured inside gameplay" :
+            "GTA V engine not linked · game FPS / shader usage unavailable"
+        controlScheme.text = GCController.controllers().first(where: { $0.extendedGamepad != nil })
+            .flatMap { $0.vendorName }.map { "Hardware detected: " + $0 } ??
+            "Hardware detected: none"
+        outputRoute.text = "Current audio route: " +
+            (AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "Unavailable")
+        presetButton?.configuration?.title = "Graphics Preset · " +
+            GTALaunchPreferences.text("preset", fallback: "Custom")
+        for (button, id) in engineButtons {
+            if let spec = EngineOptions.option(id) {
+                button.configuration?.title = spec.title + " · " + EngineOptions.display(id)
+            }
         }
-        thermalStatus.text = "Device thermal state: " + thermal
-        engineStatus.text = NativeEngineStatus.nativeEngineLinked ? "Native GTA V engine linked" :
-            "Native GTA V engine not linked · in-game FPS unavailable"
-    }
-    private func addSetting(_ id: String, to panel: UIStackView) {
-        guard let spec = EngineOptions.option(id) else { return }
-        let button = GTAReference.control(spec.title + "   ·   " + EngineOptions.display(id),
-                                          symbol: symbol(for: id))
-        button.accessibilityIdentifier = "engine-option-" + id
-        button.addAction(UIAction { [weak self, weak button] _ in
-            guard let self, let button else { return }
-            self.presentOption(spec, button: button)
-        }, for: .touchUpInside)
-        panel.addArrangedSubview(button)
-    }
-    private func symbol(for id: String) -> String {
-        switch id {
-        case "fps": return "speedometer"
-        case "scale": return "rectangle.expand.vertical"
-        case "textureQuality": return "square.3.layers.3d"
-        case "shadowQuality": return "sun.max"
-        default: return "slider.horizontal.3"
+        for (label, id) in valueLabels where id == "scale" {
+            label.text = EngineOptions.display("scale")
         }
     }
-    private func presentOption(_ spec: EngineOptions.Option, button: UIButton) {
-        let sheet = UIAlertController(title: spec.title, message: spec.subtitle +
-            "\nSaved locally · full-game support pending", preferredStyle: .actionSheet)
-        for (label, value) in spec.choices {
-            let selected = EngineOptions.value(spec.id) == value
-            sheet.addAction(UIAlertAction(title: (selected ? "✓  " : "") + label, style: .default) { _ in
-                EngineOptions.set(spec.id, value: value)
-                button.configuration?.title = spec.title + "   ·   " + EngineOptions.display(spec.id)
-                UISelectionFeedbackGenerator().selectionChanged()
+
+    @objc private func showPresets(_ sender: UIButton) {
+        let sheet = UIAlertController(title: "Graphics Preset",
+            message: "Presets write actual engine-option configuration; they are not proof of playable GTA V.",
+            preferredStyle: .actionSheet)
+        for name in ["Low", "Balanced", "High"] {
+            sheet.addAction(UIAlertAction(title: name, style: .default) { [weak self] _ in
+                GTALaunchPreferences.applyPreset(name)
+                self?.refresh()
             })
         }
         sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        sheet.popoverPresentationController?.sourceView = button
+        sheet.popoverPresentationController?.sourceView = sender
         present(sheet, animated: true)
     }
-    @objc private func resetPressed() {
-        EngineOptions.resetAll()
-        for container in stack.arrangedSubviews {
-            guard let panel = container as? UIStackView else { continue }
-            for view in panel.arrangedSubviews {
-                guard let button = view as? UIButton,
-                      let id = button.accessibilityIdentifier?.replacingOccurrences(of: "engine-option-", with: ""),
-                      let option = EngineOptions.option(id) else { continue }
-                button.configuration?.title = option.title + "   ·   " + EngineOptions.display(id)
+
+    private func addEngineOption(_ id: String, to panel: UIStackView) {
+        guard let spec = EngineOptions.option(id) else { return }
+        let button = GTAReference.control(spec.title, symbol: "slider.horizontal.3")
+        button.accessibilityIdentifier = "engine-option-" + id
+        button.addAction(UIAction { [weak self, weak button] _ in
+            guard let self, let button else { return }
+            let sheet = UIAlertController(title: spec.title,
+                message: spec.subtitle + "\nSaved for the native engine; effective in-game state pending.",
+                preferredStyle: .actionSheet)
+            for (label, value) in spec.choices {
+                sheet.addAction(UIAlertAction(title: label, style: .default) { [weak self] _ in
+                    EngineOptions.set(id, value: value)
+                    GTALaunchPreferences.setText("preset", value: "Custom")
+                    button.configuration?.title = spec.title + " · " + EngineOptions.display(id)
+                    self?.refresh()
+                })
             }
-        }
+            sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            sheet.popoverPresentationController?.sourceView = button
+            self.present(sheet, animated: true)
+        }, for: .touchUpInside)
+        panel.addArrangedSubview(button)
+        engineButtons.append((button, id))
+    }
+
+    private func addScale(to panel: UIStackView) {
+        let row = GTAReference.panelView(9)
+        row.addArrangedSubview(GTAReference.label("Resolution Scale", size: 13, weight: .semibold))
+        let track = UIStackView()
+        track.axis = .horizontal
+        track.spacing = 10
+        track.alignment = .center
+        let slider = UISlider()
+        slider.minimumValue = 0
+        slider.maximumValue = 4
+        slider.tintColor = GTAReference.green
+        let choices = EngineOptions.option("scale")?.choices ?? []
+        slider.value = Float(choices.firstIndex(where: { $0.1 == EngineOptions.value("scale") }) ?? 0)
+        let value = GTAReference.label(EngineOptions.display("scale"), size: 12,
+                                      color: GTAReference.green)
+        value.widthAnchor.constraint(equalToConstant: 49).isActive = true
+        slider.addAction(UIAction { _ in
+            let index = Int(slider.value.rounded())
+            guard choices.indices.contains(index) else { return }
+            slider.value = Float(index)
+            EngineOptions.set("scale", value: choices[index].1)
+            GTALaunchPreferences.setText("preset", value: "Custom")
+            value.text = EngineOptions.display("scale")
+        }, for: .valueChanged)
+        track.addArrangedSubview(slider)
+        track.addArrangedSubview(value)
+        row.addArrangedSubview(track)
+        panel.addArrangedSubview(row)
+        valueLabels.append((value, "scale"))
+    }
+
+    private func addSwitch(to panel: UIStackView, title: String, detail: String,
+                           symbol: String, key: String, fallback: Bool) {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 9
+        row.alignment = .center
+        let icon = UIImageView(image: UIImage(systemName: symbol))
+        icon.tintColor = GTAReference.blue
+        icon.contentMode = .scaleAspectFit
+        icon.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        row.addArrangedSubview(icon)
+        let text = UIStackView()
+        text.axis = .vertical
+        text.spacing = 3
+        text.addArrangedSubview(GTAReference.label(title, size: 13, weight: .semibold))
+        text.addArrangedSubview(GTAReference.label(detail, size: 10, color: GTAReference.secondary))
+        row.addArrangedSubview(text)
+        let toggle = UISwitch()
+        toggle.onTintColor = GTAReference.green
+        toggle.isOn = GTALaunchPreferences.enabled(key, fallback: fallback)
+        toggle.addAction(UIAction { _ in
+            GTALaunchPreferences.setEnabled(key, value: toggle.isOn)
+            if key == "controllerVibration" && toggle.isOn {
+                _ = ControllerManager.shared.testRumble()
+            }
+        }, for: .valueChanged)
+        row.addArrangedSubview(toggle)
+        panel.addArrangedSubview(row)
+    }
+
+    private func addFraction(to panel: UIStackView, title: String, symbol: String,
+                             key: String, fallback: Double, footnote: String) {
+        let group = GTAReference.panelView(8)
+        let heading = UIStackView()
+        heading.axis = .horizontal
+        heading.spacing = 7
+        let icon = UIImageView(image: UIImage(systemName: symbol))
+        icon.tintColor = GTAReference.blue
+        icon.widthAnchor.constraint(equalToConstant: 20).isActive = true
+        heading.addArrangedSubview(icon)
+        heading.addArrangedSubview(GTAReference.label(title, size: 13, weight: .semibold))
+        group.addArrangedSubview(heading)
+        let controls = UIStackView()
+        controls.axis = .horizontal
+        controls.spacing = 9
+        controls.alignment = .center
+        let slider = UISlider()
+        slider.minimumValue = 0
+        slider.maximumValue = 1
+        slider.value = Float(GTALaunchPreferences.fraction(key, fallback: fallback))
+        slider.tintColor = GTAReference.green
+        let value = GTAReference.label(String(Int(slider.value * 100)) + "%", size: 12,
+                                       color: GTAReference.green)
+        value.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        slider.addAction(UIAction { _ in
+            GTALaunchPreferences.setFraction(key, value: Double(slider.value))
+            value.text = String(Int(slider.value * 100)) + "%"
+            if key == "masterVolume" { NativePCMOutput.shared.setMasterVolume(slider.value) }
+        }, for: .valueChanged)
+        controls.addArrangedSubview(slider)
+        controls.addArrangedSubview(value)
+        group.addArrangedSubview(controls)
+        group.addArrangedSubview(GTAReference.label(footnote, size: 10,
+                                                    color: GTAReference.secondary))
+        panel.addArrangedSubview(group)
+    }
+
+    @objc private func resetPressed() {
+        let sheet = UIAlertController(title: "Reset All Settings?",
+            message: "Restore all graphics, controls and audio preferences to defaults.",
+            preferredStyle: .alert)
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.addAction(UIAlertAction(title: "Reset", style: .destructive) { [weak self] _ in
+            EngineOptions.resetAll()
+            GTALaunchPreferences.reset()
+            NativePCMOutput.shared.setMasterVolume(1)
+            guard let self else { return }
+            self.stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            self.engineButtons.removeAll()
+            self.valueLabels.removeAll()
+            self.viewDidLoad()
+        })
+        present(sheet, animated: true)
     }
 }
 
