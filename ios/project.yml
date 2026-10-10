@@ -25,6 +25,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.gtaios
         PRODUCT_NAME: GTAiOS
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: NO
         SWIFT_OBJC_BRIDGING_HEADER: "$(SRCROOT)/Sources/Engine/NativeWasmtimeHost.h"
         HEADER_SEARCH_PATHS:

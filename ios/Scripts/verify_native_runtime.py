@@ -225,7 +225,19 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>30</string>" in plist
+assert "<key>CFBundleVersion</key><string>31</string>" in plist
+assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
+assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
+assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa
+import json
+import struct
+icon_root = root / "ios/Sources/Resources/Assets.xcassets/AppIcon.appiconset"
+manifest = json.loads((icon_root / "Contents.json").read_text(encoding="utf-8"))
+assert manifest["images"] == [{"filename": "AppIcon-1024.png",
+    "idiom": "universal", "platform": "ios", "size": "1024x1024"}]
+icon_data = (icon_root / "AppIcon-1024.png").read_bytes()
+assert icon_data[:8] == b"\x89PNG\r\n\x1a\n"
+assert struct.unpack(">II", icon_data[16:24]) == (1024, 1024)
 
 print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

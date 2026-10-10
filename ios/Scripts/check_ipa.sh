@@ -16,6 +16,13 @@ if /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:1' "$app/Info.plist" >/dev/
   echo 'ERROR: IPA must target iPhone only, not iPad' >&2
   exit 1
 fi
+# Apple must resolve the actual asset-catalog app icon from the IPA.
+icon_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$app/Info.plist")
+if [ "$icon_name" != "AppIcon" ] || [ ! -s "$app/Assets.car" ]; then
+  echo 'ERROR: GTAiOS app icon missing from the IPA metadata or asset catalog' >&2
+  exit 1
+fi
+echo 'GTA V iOS icon metadata and compiled Assets.car: PASS'
 echo 'Modern full-screen iPhone launch manifest: PASS'
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" | while read -r exe; do test -x "$app/$exe"; done
