@@ -302,3 +302,11 @@ assert 'USBStorageManager.shared.missingStartupAssets()' in reference
 assert 'GCController.controllers().first(where:' in reference
 assert 'installHero("gtav-official-hero", height: 174)' in reference
 assert 'GTAReference.image("gtav-car-gameplay", height: 131)' in reference
+
+# Reference-style Controls prioritizes active native options over optional debug data.
+controls_source = read("ios/Sources/UI/ControllerSettingsViewController.swift")
+assert '"Show live input diagnostics"' in controls_source
+assert 'live.isHidden = true' in controls_source
+assert 'native-control-scheme' in controls_source
+assert 'GTALaunchPreferences.setText("controlScheme"' in controls_source
+assert controls_source.index('stack.addArrangedSubview(scheme)') < controls_source.index('stack.addArrangedSubview(GTATheme.section("Advanced"))')

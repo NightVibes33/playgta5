@@ -11,6 +11,7 @@ final class ControllerSettingsViewController: UIViewController {
     private let sensitivity = UISlider()
     private let invert = UISwitch()
     private var mappingButtons: [UIButton] = []
+    private weak var controlSchemeButton: UIButton?
     private let inputs = ["a", "b", "x", "y", "lb", "rb", "l3", "r3", "menu"]
     private let labels = ["A / Cross", "B / Circle", "X / Square", "Y / Triangle",
                           "L1 / LB", "R1 / RB", "L3", "R3", "Menu / Options"]
@@ -63,7 +64,7 @@ final class ControllerSettingsViewController: UIViewController {
         let titles = UIStackView()
         titles.axis = .vertical
         titles.spacing = 3
-        titles.addArrangedSubview(GTATheme.section("Controller setup"))
+        titles.addArrangedSubview(GTATheme.section("GTA V Controls"))
         titles.addArrangedSubview(GTATheme.caption("Bluetooth · wired · touch"))
         top.addArrangedSubview(controllerIcon)
         top.addArrangedSubview(titles)
@@ -84,6 +85,8 @@ final class ControllerSettingsViewController: UIViewController {
         live.numberOfLines = 0
         live.textColor = GTATheme.subdued
         live.text = "Connect an Xbox, PlayStation, or iOS-supported controller."
+        // Input diagnostics stay available, but no longer crowd out controls.
+        live.isHidden = true
         let signalCard = UIStackView(arrangedSubviews: [hardware, live])
         signalCard.axis = .vertical
         signalCard.spacing = 8
@@ -91,35 +94,42 @@ final class ControllerSettingsViewController: UIViewController {
         signalCard.directionalLayoutMargins = NSDirectionalEdgeInsets(
             top: 17, leading: 17, bottom: 17, trailing: 17)
         GTATheme.card(signalCard)
+        let diagnosticToggle = UIButton(type: .system)
+        diagnosticToggle.setTitle("Show live input diagnostics", for: .normal)
+        diagnosticToggle.tintColor = GTAReference.blue
+        diagnosticToggle.contentHorizontalAlignment = .leading
+        diagnosticToggle.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        diagnosticToggle.addAction(UIAction { [weak self, weak diagnosticToggle] _ in
+            guard let self, let diagnosticToggle else { return }
+            self.live.isHidden.toggle()
+            diagnosticToggle.setTitle(self.live.isHidden ?
+                "Show live input diagnostics" : "Hide live input diagnostics", for: .normal)
+        }, for: .touchUpInside)
+        signalCard.addArrangedSubview(diagnosticToggle)
         stack.addArrangedSubview(signalCard)
-        stack.addArrangedSubview(GTATheme.section("Analog tuning"))
-
         let store = UserDefaults.standard
-        deadzone.minimumValue = 0.02
-        deadzone.maximumValue = 0.45
-        deadzone.value = store.object(forKey: ControllerManager.deadzoneKey) == nil
-            ? 0.15 : Float(store.double(forKey: ControllerManager.deadzoneKey))
-        deadzone.addTarget(self, action: #selector(save), for: .valueChanged)
-        addSlider("Analog stick deadzone", slider: deadzone)
-        sensitivity.minimumValue = 0.25
-        sensitivity.maximumValue = 3
-        sensitivity.value = store.object(forKey: ControllerManager.sensitivityKey) == nil
-            ? 1 : Float(store.double(forKey: ControllerManager.sensitivityKey))
-        sensitivity.addTarget(self, action: #selector(save), for: .valueChanged)
-        addSlider("Camera sensitivity", slider: sensitivity)
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.alignment = .center
-        row.spacing = 8
-        row.isLayoutMarginsRelativeArrangement = true
-        row.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 14, leading: 17, bottom: 14, trailing: 17)
-        GTATheme.card(row)
-        row.addArrangedSubview(label("Invert vertical camera"))
-        row.addArrangedSubview(invert)
-        invert.isOn = store.bool(forKey: ControllerManager.invertYKey)
-        invert.addTarget(self, action: #selector(save), for: .valueChanged)
-        stack.addArrangedSubview(row)
-        invert.onTintColor = GTAReference.green
+        let scheme = GTAReference.settingsRow("Control Scheme",
+            symbol: "gamecontroller.fill",
+            value: GTALaunchPreferences.text("controlScheme", fallback: "Automatic"))
+        scheme.accessibilityIdentifier = "native-control-scheme"
+        controlSchemeButton = scheme
+        scheme.addAction(UIAction { [weak self, weak scheme] _ in
+            guard let self, let scheme else { return }
+            let sheet = UIAlertController(title: "Control Scheme",
+                message: "Selects the native touch and gamepad input mode.",
+                preferredStyle: .actionSheet)
+            for option in ["Automatic", "Touch", "Controller"] {
+                sheet.addAction(UIAlertAction(title: option, style: .default) { _ in
+                    GTALaunchPreferences.setText("controlScheme", value: option)
+                    GTAReference.updateSetting(scheme, value: option)
+                })
+            }
+            sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            sheet.popoverPresentationController?.sourceView = scheme
+            self.present(sheet, animated: true)
+        }, for: .touchUpInside)
+        stack.addArrangedSubview(scheme)
+
         // Native iOS controller vibration: setting is persisted and consumed
         // by ControllerManager.testRumble() when a real controller supports it.
         let vibrationRow = UIStackView()
@@ -130,7 +140,7 @@ final class ControllerSettingsViewController: UIViewController {
         vibrationRow.directionalLayoutMargins = .init(top: 12, leading: 16,
                                                        bottom: 12, trailing: 16)
         GTATheme.card(vibrationRow)
-        let vibrationName = GTAReference.label("Vibration · hardware haptics", size: 13,
+        let vibrationName = GTAReference.label("Controller Vibration", size: 13,
                                                weight: .semibold)
         vibrationRow.addArrangedSubview(vibrationName)
         let vibration = UISwitch()
@@ -152,6 +162,32 @@ final class ControllerSettingsViewController: UIViewController {
         }, for: .valueChanged)
         addSlider("Touch overlay opacity", slider: opacity)
 
+        sensitivity.minimumValue = 0.25
+        sensitivity.maximumValue = 3
+        sensitivity.value = store.object(forKey: ControllerManager.sensitivityKey) == nil
+            ? 1 : Float(store.double(forKey: ControllerManager.sensitivityKey))
+        sensitivity.addTarget(self, action: #selector(save), for: .valueChanged)
+        addSlider("Camera sensitivity", slider: sensitivity)
+        stack.addArrangedSubview(GTATheme.section("Advanced"))
+        deadzone.minimumValue = 0.02
+        deadzone.maximumValue = 0.45
+        deadzone.value = store.object(forKey: ControllerManager.deadzoneKey) == nil
+            ? 0.15 : Float(store.double(forKey: ControllerManager.deadzoneKey))
+        deadzone.addTarget(self, action: #selector(save), for: .valueChanged)
+        addSlider("Analog stick deadzone", slider: deadzone)
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 8
+        row.isLayoutMarginsRelativeArrangement = true
+        row.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 14, leading: 17, bottom: 14, trailing: 17)
+        GTATheme.card(row)
+        row.addArrangedSubview(label("Invert vertical camera"))
+        row.addArrangedSubview(invert)
+        invert.isOn = store.bool(forKey: ControllerManager.invertYKey)
+        invert.addTarget(self, action: #selector(save), for: .valueChanged)
+        stack.addArrangedSubview(row)
+        invert.onTintColor = GTAReference.green
         stack.addArrangedSubview(GTATheme.section("Button mapping"))
         stack.addArrangedSubview(GTATheme.caption("Customize your on-foot bindings"))
         for index in inputs.indices {
@@ -259,6 +295,10 @@ final class ControllerSettingsViewController: UIViewController {
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        if let scheme = controlSchemeButton {
+            GTAReference.updateSetting(scheme, value:
+                GTALaunchPreferences.text("controlScheme", fallback: "Automatic"))
+        }
         ControllerManager.shared.onConnection = { [weak self] name in
             self?.hardware.text = name == "No controller" ? "No controller connected" : "Connected: \(name)"
         }
