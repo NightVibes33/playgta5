@@ -25,6 +25,12 @@ if [ -e "$app/WebRuntime/index.html" ] || [ -e "$app/WebRuntime/game.js" ]; then
   exit 1
 fi
 echo 'Native runtime package: no WebKit gameplay or browser assets'
+# Keep the GTA V launcher cinematic and fully offline.
+if ! find "$app" -type f -name 'gtaios-hero.jpg' | grep -q .; then
+  echo 'ERROR: locally bundled GTA V launcher hero artwork missing' >&2
+  exit 1
+fi
+echo 'Offline GTA V launcher artwork: PASS'
 if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then
   echo "ERROR: proprietary game data must not be bundled in the IPA" >&2
   exit 1
