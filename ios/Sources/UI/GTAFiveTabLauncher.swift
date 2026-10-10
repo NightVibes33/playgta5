@@ -120,7 +120,7 @@ final class GTAFiveTabController: UITabBarController {
             (GTAReferenceMoreController(), "More", "ellipsis")
         ]
         viewControllers = pages.map { entry in
-            let nav = UINavigationController(rootViewController: entry.0)
+            let nav = GameNavigationController(rootViewController: entry.0)
             nav.setNavigationBarHidden(true, animated: false)
             nav.navigationBar.tintColor = GTAReference.green
             nav.navigationBar.barStyle = .black
@@ -155,12 +155,19 @@ final class GTAFiveTabController: UITabBarController {
         return .portrait
     }
     func select(_ index: Int) { selectedIndex = index }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        (selectedViewController as? UINavigationController)?.supportedInterfaceOrientations ?? .portrait
+    }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        (selectedViewController as? UINavigationController)?.preferredInterfaceOrientationForPresentation ?? .portrait
+    }
 }
 extension GTAFiveTabController: UITabBarControllerDelegate {}
 
 class GTAReferencePage: UIViewController {
     let scroll = UIScrollView()
     let stack = UIStackView()
+    var extendsHeroUnderStatusBar: Bool { false }
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = GTAReference.night
@@ -173,20 +180,26 @@ class GTAReferencePage: UIViewController {
         stack.spacing = 15
         scroll.addSubview(stack)
         NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scroll.topAnchor.constraint(equalTo: extendsHeroUnderStatusBar ? view.topAnchor : view.safeAreaLayoutGuide.topAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 12),
+            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: extendsHeroUnderStatusBar ? 0 : 12),
             stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -30),
             stack.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor, constant: 17),
             stack.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor, constant: -17)
         ])
     }
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
     func switchTab(_ index: Int) { (tabBarController as? GTAFiveTabController)?.select(index) }
     func openEngineReport() {
         navigationController?.setNavigationBarHidden(false, animated: true)
-        navigationController?.pushViewController(GameViewController(), animated: true)
+        let gameplay = GameViewController()
+        gameplay.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(gameplay, animated: true)
     }
     func installHero(_ name: String, height: CGFloat) {
         let cover = GTAReference.image(name, height: height)
@@ -196,11 +209,12 @@ class GTAReferencePage: UIViewController {
 }
 
 final class GTAReferenceHomeController: GTAReferencePage {
+    override var extendsHeroUnderStatusBar: Bool { true }
     private let play = GTAReference.control("Play GTA V", symbol: "play.fill", color: GTAReference.green)
     private let readiness = GTAReference.label("", size: 11, weight: .medium, color: GTAReference.secondary)
     override func viewDidLoad() {
         super.viewDidLoad()
-        installHero("gtaios-reference-home", height: 395)
+        installHero("gtaios-reference-home", height: 370)
         play.titleLabel?.font = .systemFont(ofSize: 19, weight: .bold)
         play.heightAnchor.constraint(equalToConstant: 63).isActive = true
         play.layer.borderWidth = 1
@@ -289,7 +303,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         stack.addArrangedSubview(GTAReference.section("Quick Actions"))
         let actions = UIStackView()
         actions.axis = .horizontal
-        actions.spacing = 9
+        actions.spacing = 8
         actions.distribution = .fillEqually
         let browse = GTAReference.control("Browse Files", symbol: "folder.fill")
         browse.addTarget(self, action: #selector(browsePressed), for: .touchUpInside)
@@ -322,17 +336,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
             connection.text = missing.isEmpty ? "Game data readable ✓" : "Game folder selected · missing assets"
             connection.textColor = missing.isEmpty ? GTAReference.green : GTAReference.blue
             diskInfo.text = "Selected folder: " + root.lastPathComponent
-            let sizeURL = USBStorageManager.shared.file("b/8b0b5899ed/game.wasm")
-            let bytes: NSNumber?
-            if let url = sizeURL,
-               let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) {
-                bytes = attributes[.size] as? NSNumber
-            } else {
-                bytes = nil
-            }
-            engineInfo.text = bytes.map { "Game engine archive: " +
-                ByteCountFormatter.string(fromByteCount: $0.int64Value, countStyle: .file) } ??
-                "Game engine archive size unavailable"
+            engineInfo.text = "Run Validate to inspect real engine file bytes"
         } else {
             connection.text = "Not selected"
             connection.textColor = GTAReference.blue
@@ -380,6 +384,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
             switch result {
             case .success(let value):
                 let bytes = ByteCountFormatter.string(fromByteCount: value.byteCount, countStyle: .file)
+                self.engineInfo.text = "Inspected game.wasm: " + bytes
                 GTAReference.present("Game files inspected", message:
                     "WebAssembly engine readable: " + bytes +
                     ". Shader index found. This does not establish playable GTA V runtime.", from: self)
@@ -394,6 +399,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
 final class GTAReferenceGraphicsController: GTAReferencePage {
     private let metalStatus = GTAReference.label("", size: 12, weight: .semibold)
     private let engineStatus = GTAReference.label("", size: 12, color: GTAReference.secondary)
+    private let thermalStatus = GTAReference.label("", size: 12, color: GTAReference.secondary)
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Settings"))
@@ -403,19 +409,19 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         info.addArrangedSubview(GTAReference.label("Current device capability and stored renderer preferences",
                                                       size: 12, color: GTAReference.secondary))
         info.addArrangedSubview(metalStatus)
+        info.addArrangedSubview(thermalStatus)
         info.addArrangedSubview(engineStatus)
         stack.addArrangedSubview(info)
-        for specID in ["fps", "scale", "textureQuality", "shadowQuality", "reflectionQuality", "particleQuality", "grassQuality"] {
-            guard let spec = EngineOptions.option(specID) else { continue }
-            let button = GTAReference.control(spec.title + "   ·   " + EngineOptions.display(specID),
-                                              symbol: symbol(for: specID))
-            button.accessibilityIdentifier = "engine-option-" + specID
-            button.addAction(UIAction { [weak self, weak button] _ in
-                guard let self, let button else { return }
-                self.presentOption(spec, button: button)
-            }, for: .touchUpInside)
-            stack.addArrangedSubview(button)
+        let graphics = GTAReference.panelView(8)
+        graphics.addArrangedSubview(GTAReference.label("Graphics Settings", size: 18, weight: .bold))
+        for specID in ["scale", "textureQuality", "shadowQuality", "reflectionQuality", "particleQuality", "grassQuality"] {
+            addSetting(specID, to: graphics)
         }
+        stack.addArrangedSubview(graphics)
+        let advanced = GTAReference.panelView(8)
+        advanced.addArrangedSubview(GTAReference.label("Advanced", size: 18, weight: .bold))
+        addSetting("fps", to: advanced)
+        stack.addArrangedSubview(advanced)
         let note = GTAReference.panelView()
         note.addArrangedSubview(GTAReference.label("Native engine status", size: 17, weight: .bold))
         note.addArrangedSubview(GTAReference.label(
@@ -431,8 +437,28 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         super.viewWillAppear(animated)
         metalStatus.text = MTLCreateSystemDefaultDevice().map { "Metal GPU: " + $0.name } ??
             "Metal GPU unavailable"
+        let thermal: String
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: thermal = "Nominal"
+        case .fair: thermal = "Fair"
+        case .serious: thermal = "Serious"
+        case .critical: thermal = "Critical"
+        @unknown default: thermal = "Unavailable"
+        }
+        thermalStatus.text = "Device thermal state: " + thermal
         engineStatus.text = NativeEngineStatus.nativeEngineLinked ? "Native GTA V engine linked" :
-            "Native GTA V engine not linked · gameplay graphics unavailable"
+            "Native GTA V engine not linked · in-game FPS unavailable"
+    }
+    private func addSetting(_ id: String, to panel: UIStackView) {
+        guard let spec = EngineOptions.option(id) else { return }
+        let button = GTAReference.control(spec.title + "   ·   " + EngineOptions.display(id),
+                                          symbol: symbol(for: id))
+        button.accessibilityIdentifier = "engine-option-" + id
+        button.addAction(UIAction { [weak self, weak button] _ in
+            guard let self, let button else { return }
+            self.presentOption(spec, button: button)
+        }, for: .touchUpInside)
+        panel.addArrangedSubview(button)
     }
     private func symbol(for id: String) -> String {
         switch id {
@@ -460,11 +486,14 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
     }
     @objc private func resetPressed() {
         EngineOptions.resetAll()
-        for view in stack.arrangedSubviews {
-            guard let button = view as? UIButton,
-                  let id = button.accessibilityIdentifier?.replacingOccurrences(of: "engine-option-", with: ""),
-                  let option = EngineOptions.option(id) else { continue }
-            button.configuration?.title = option.title + "   ·   " + EngineOptions.display(id)
+        for container in stack.arrangedSubviews {
+            guard let panel = container as? UIStackView else { continue }
+            for view in panel.arrangedSubviews {
+                guard let button = view as? UIButton,
+                      let id = button.accessibilityIdentifier?.replacingOccurrences(of: "engine-option-", with: ""),
+                      let option = EngineOptions.option(id) else { continue }
+                button.configuration?.title = option.title + "   ·   " + EngineOptions.display(id)
+            }
         }
     }
 }

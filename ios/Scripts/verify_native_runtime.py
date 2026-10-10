@@ -104,6 +104,7 @@ assert "documentPicker(_ controller: UIDocumentPickerViewController, didPickDocu
 assert "hardwareStatusLabel.text = name ==" in launcher
 reference = read("ios/Sources/UI/GTAFiveTabLauncher.swift")
 assert "GTAFiveTabController()" in scene
+assert "extendsHeroUnderStatusBar" in reference
 assert "viewControllers = pages.map" in reference
 for title in ['"Home"', '"Library"', '"Graphics"', '"Controls"', '"More"']:
     assert title in reference
@@ -243,7 +244,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>34</string>" in plist
+assert "<key>CFBundleVersion</key><string>35</string>" in plist
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa
