@@ -234,8 +234,14 @@ jobs:
           echo "GTAiOS remained alive and visible after simulator launch"
           for destination in library graphics controls more; do
             xcrun simctl terminate "$UDID" com.nightvibes33.gtaios
-            xcrun simctl launch "$UDID" com.nightvibes33.gtaios "--snapshot-$destination"
+            TAB_OUTPUT=$(xcrun simctl launch "$UDID" com.nightvibes33.gtaios "--snapshot-$destination")
+            TAB_PID=$(echo "$TAB_OUTPUT" | awk -F\x27: \x27 \x27/com.nightvibes33.gtaios:/ {print $2}\x27 | tr -dc \x270-9\x27)
+            test -n "$TAB_PID"
             sleep 3
+            if ! kill -0 "$TAB_PID" 2>/dev/null; then
+              echo "ERROR: GTAiOS crashed on $destination screen" >&2
+              exit 1
+            fi
             xcrun simctl io "$UDID" screenshot "iphone-$destination.png"
             test -s "iphone-$destination.png"
           done
