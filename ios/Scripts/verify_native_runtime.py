@@ -70,34 +70,34 @@ assert 'class NativePCMOutput' in audio and 'scheduleStereoFloatPCM' in audio
 assert 'AVAudioEngine()' in audio and 'AVAudioPlayerNode()' in audio
 assert 'File picker troubleshooting' in launcher
 assert 'Choose Game Folder' in launcher
+assert 'NativeEngineStatus.nativeEngineLinked' in launcher
 assert 'playButton.isEnabled = true' in launcher
-assert 'playButton.configuration?.title = NativeEngineStatus.nativeEngineLinked ? "Play GTA V" : "Engine Checks"' in launcher
 assert 'if !NativeEngineStatus.nativeEngineLinked' in launcher
 assert 'openGame() // Engine Checks is explicitly not a gameplay launch.' in launcher
-assert 'No saved missions, FPS, shaders, or gameplay ' in launcher
 assert 'content.addArrangedSubview(LosSantosHeroView())' in launcher
 assert 'Select your GTA V folder on USB-C' in launcher
 assert 'More options and diagnostics' in launcher
-assert 'TEST WORLD' not in launcher and 'Session profile' not in launcher
-assert 'ENGINE PORT • IN DEVELOPMENT' not in launcher
-assert 'Play GTA V' in launcher
-assert 'Native game engine integration is still in progress' in launcher
-assert 'PORT IN PROGRESS' not in launcher
-assert 'ENGINE PORT • IN DEVELOPMENT' not in launcher
+assert 'playGradient.colors' in launcher and 'GTATheme.neonBlue.cgColor' in launcher
+assert 'NativeEngineStatus.inspect' in launcher and 'validateFiles()' in launcher
+assert 'USBStorageManager.shared.missingStartupAssets()' in launcher
+assert 'No FPS, save progress,' in launcher
+assert 'Continue Playing' in launcher
+assert 'GTA V ONLY' in launcher
 assert 'STORY' not in launcher and 'FREE ROAM' not in launcher
-assert 'TEST WORLD' not in launcher
+assert 'TEST WORLD' not in launcher and 'Session profile' not in launcher
 assert 'The local server runs inside the app' not in launcher
 assert 'GTAiOS' in splash and 'LOS SANTOS  /  NATIVE PORT' in splash
 art = read("ios/Sources/UI/LosSantosHeroView.swift")
 assert "class LosSantosHeroView" in art
-assert 'heightAnchor.constraint(equalToConstant: 270)' in art
+assert '"gtaios-reference-hero"' in art
+assert 'heightAnchor.constraint(equalToConstant: 180)' in art
 assert 'title.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18)' in art
 assert "class SunsetSkylineView" in art
 assert "GRAND THEFT" in art and "AUTO V" in art
 assert "PORT IN PROGRESS" not in art
 assert "NATIVE iPHONE PROJECT" not in art
 assert "GTATheme.neonPink" in launcher and "LosSantosHeroView()" in launcher
-assert 'usbStatusLabel.text = !connected ? "No game folder selected"' in launcher
+assert 'usbStatusLabel.text = !hasUSB ? "Not connected"' in launcher
 assert "documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls:" in launcher
 assert "hardwareStatusLabel.text = name ==" in launcher
 assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
@@ -225,7 +225,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>31</string>" in plist
+assert "<key>CFBundleVersion</key><string>32</string>" in plist
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa

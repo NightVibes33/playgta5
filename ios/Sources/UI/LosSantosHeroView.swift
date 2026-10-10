@@ -13,7 +13,7 @@ enum GTATheme {
     static let neonBlue = UIColor(red: 0.27, green: 0.71, blue: 1, alpha: 1)
     static let mint = UIColor(red: 0.27, green: 0.95, blue: 0.68, alpha: 1)
     static let cream = UIColor(red: 0.97, green: 0.97, blue: 0.965, alpha: 1)
-    static let subdued = UIColor(red: 0.66, green: 0.69, blue: 0.73, alpha: 1)
+    static let subdued = UIColor(red: 0.70, green: 0.73, blue: 0.84, alpha: 1)
     static let success = UIColor(red: 0.54, green: 0.82, blue: 0.63, alpha: 1)
 
     static func caption(_ text: String) -> UILabel {
@@ -39,7 +39,7 @@ enum GTATheme {
         view.layer.cornerRadius = 18
         view.layer.cornerCurve = .continuous
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.white.withAlphaComponent(0.085).cgColor
+        view.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
     }
 }
 
@@ -159,7 +159,7 @@ final class LosSantosHeroView: UIView {
 
         // Bundled, locally generated GTA V hero art. No network access, no
         // external storage reads and no synthetic gameplay/UI data involved.
-        if let imageURL = Bundle.main.url(forResource: "gtaios-hero", withExtension: "jpg"),
+        if let imageURL = Bundle.main.url(forResource: "gtaios-reference-hero", withExtension: "jpg"),
            let image = UIImage(contentsOfFile: imageURL.path) {
             let artwork = UIImageView(image: image)
             artwork.translatesAutoresizingMaskIntoConstraints = false
@@ -174,8 +174,10 @@ final class LosSantosHeroView: UIView {
             ])
         }
 
+        let isReferenceArtwork = Bundle.main.url(forResource: "gtaios-reference-hero", withExtension: "jpg") != nil
         let eyebrow = UILabel()
         eyebrow.text = "LOS SANTOS  /  GTA V"
+        eyebrow.isHidden = isReferenceArtwork
         eyebrow.textColor = GTATheme.cream.withAlphaComponent(0.90)
         eyebrow.font = .systemFont(ofSize: 10, weight: .heavy)
         eyebrow.letterSpacingIfAvailable()
@@ -184,6 +186,7 @@ final class LosSantosHeroView: UIView {
 
         let title = UILabel()
         title.text = "GRAND THEFT\nAUTO V"
+        title.isHidden = isReferenceArtwork
         title.font = .systemFont(ofSize: 43, weight: .black, width: .condensed)
         title.textColor = .white
         title.numberOfLines = 2
@@ -196,6 +199,7 @@ final class LosSantosHeroView: UIView {
 
         let tagline = UILabel()
         tagline.text = "GTA V  ·  LOCAL USB-C GAME LIBRARY"
+        tagline.isHidden = isReferenceArtwork
         tagline.textColor = GTATheme.cream.withAlphaComponent(0.82)
         tagline.font = .systemFont(ofSize: 10, weight: .semibold)
         tagline.numberOfLines = 1
@@ -205,7 +209,7 @@ final class LosSantosHeroView: UIView {
         addSubview(tagline)
 
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 270),
+            heightAnchor.constraint(equalToConstant: 180),
             eyebrow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
             eyebrow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
             eyebrow.topAnchor.constraint(equalTo: topAnchor, constant: 20),

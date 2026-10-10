@@ -38,6 +38,10 @@ if ! find "$app" -type f -name 'gtaios-hero.jpg' | grep -q .; then
   exit 1
 fi
 echo 'Offline GTA V launcher artwork: PASS'
+if ! find "$app" -type f -name 'gtaios-reference-hero.jpg' | grep -q .; then
+  echo 'ERROR: GTA V screenshot-matched cinematic header is missing' >&2
+  exit 1
+fi
 if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then
   echo "ERROR: proprietary game data must not be bundled in the IPA" >&2
   exit 1
