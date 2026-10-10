@@ -504,16 +504,17 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
         let controls = GTAReference.panelView(9)
         controls.addArrangedSubview(GTAReference.label("Controls", size: 19, weight: .bold))
-        let scheme = GTAReference.control("Control Scheme", symbol: "gamecontroller.fill")
+        let scheme = GTAReference.control("Control Scheme · " +
+            GTALaunchPreferences.text("controlScheme", fallback: "Automatic"), symbol: "gamecontroller.fill")
         scheme.addAction(UIAction { [weak self, weak scheme] _ in
             guard let self, let scheme else { return }
             let sheet = UIAlertController(title: "Control Scheme",
-                message: "Preferred input mode saved locally. Hardware detection always remains active.",
+                message: "Selects real touch/controller input mode in the native preview. GTA V engine is pending.",
                 preferredStyle: .actionSheet)
             for value in ["Automatic", "Touch", "Controller"] {
                 sheet.addAction(UIAlertAction(title: value, style: .default) { _ in
                     GTALaunchPreferences.setText("controlScheme", value: value)
-                    scheme.configuration?.title = "Control Scheme · " + value + " (staged)"
+                    scheme.configuration?.title = "Control Scheme · " + value
                 })
             }
             sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -529,8 +530,8 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
                     key: "touchOpacity", fallback: 0.7,
                     footnote: "Applied to the native touch overlay")
         addFraction(to: controls, title: "Aim Sensitivity", symbol: "scope",
-                    key: "aimSensitivity", fallback: 0.5,
-                    footnote: "Saved for engine integration; analog camera tuning is in Controls")
+                    key: "aimSensitivity", fallback: (1.0 - 0.25) / 2.75,
+                    footnote: "Applied to the native controller camera-stick input")
         let mapping = GTAReference.control("Controller Mapping & Deadzone", symbol: "slider.horizontal.3")
         mapping.addAction(UIAction { [weak self] _ in
             self?.tabBarController?.selectedIndex = 3
@@ -744,6 +745,10 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             GTALaunchPreferences.setFraction(key, value: Double(slider.value))
             value.text = String(Int(slider.value * 100)) + "%"
             if key == "masterVolume" { NativePCMOutput.shared.setMasterVolume(slider.value) }
+            if key == "aimSensitivity" {
+                UserDefaults.standard.set(0.25 + Double(slider.value) * 2.75,
+                    forKey: ControllerManager.sensitivityKey)
+            }
         }, for: .valueChanged)
         controls.addArrangedSubview(slider)
         controls.addArrangedSubview(value)
