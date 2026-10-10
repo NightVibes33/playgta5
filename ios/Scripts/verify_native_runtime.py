@@ -192,7 +192,7 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 32' in game
+assert 'registered != 33' in game
 assert 'native-aot-smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
