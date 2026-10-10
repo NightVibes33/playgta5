@@ -4,6 +4,9 @@
 #include <string.h>
 #include <time.h>
 #include <limits.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "NativeTextHostABI.h"
 
 /* WASI preview1 errno values, not POSIX errno. */
@@ -19,6 +22,62 @@ static uint64_t guest_length;
  * do not guess an app process POSIX fd or grant arbitrary filesystem access.
  */
 static unsigned char stdio_open[3] = { 1, 1, 1 };
+
+/* Guest fd values never alias POSIX descriptors. Registration duplicates a
+ * caller-authorized regular-file descriptor while its security scope is live;
+ * the guest cannot select arbitrary process fds or follow paths.
+ * Guest reads use pread, with an independent serialized guest cursor.
+ */
+#define GTA_WASI_FILES 64
+#define GTA_WASI_FILE_BASE 3
+#define GTA_WASI_MAX_TRANSFER UINT64_C(1048576)
+typedef struct {
+    int owned_fd;
+    uint64_t position;
+} gta_wasi_file;
+static gta_wasi_file wasi_files[GTA_WASI_FILES];
+static pthread_once_t wasi_files_once = PTHREAD_ONCE_INIT;
+static void gta_wasi_files_init(void) {
+    for (size_t i = 0; i < GTA_WASI_FILES; ++i) wasi_files[i].owned_fd = -1;
+}
+static gta_wasi_file *gta_wasi_lookup(uint32_t fd) {
+    if (fd < GTA_WASI_FILE_BASE || fd - GTA_WASI_FILE_BASE >= GTA_WASI_FILES)
+        return NULL;
+    gta_wasi_file *file = &wasi_files[fd - GTA_WASI_FILE_BASE];
+    return file->owned_fd >= 0 ? file : NULL;
+}
+int32_t gta_wasi_register_readonly_fd(int host_fd) {
+    pthread_once(&wasi_files_once, gta_wasi_files_init);
+    if (host_fd < 0) return -1;
+    struct stat info;
+    if (fstat(host_fd, &info) || !S_ISREG(info.st_mode)) return -1;
+    pthread_mutex_lock(&wasi_mutex);
+    int32_t result = -1;
+    for (size_t i = 0; i < GTA_WASI_FILES; ++i) {
+        if (wasi_files[i].owned_fd >= 0) continue;
+        int duplicate = dup(host_fd);
+        if (duplicate >= 0) {
+            wasi_files[i].owned_fd = duplicate;
+            wasi_files[i].position = 0;
+            result = (int32_t)(GTA_WASI_FILE_BASE + i);
+        }
+        break;
+    }
+    pthread_mutex_unlock(&wasi_mutex);
+    return result;
+}
+void gta_wasi_reset_files(void) {
+    pthread_once(&wasi_files_once, gta_wasi_files_init);
+    pthread_mutex_lock(&wasi_mutex);
+    for (size_t i = 0; i < GTA_WASI_FILES; ++i) {
+        if (wasi_files[i].owned_fd >= 0) close(wasi_files[i].owned_fd);
+        wasi_files[i].owned_fd = -1;
+        wasi_files[i].position = 0;
+    }
+    stdio_open[0] = stdio_open[1] = stdio_open[2] = 1;
+    pthread_mutex_unlock(&wasi_mutex);
+}
+
 static int wasi_std_is_open(uint32_t fd) {
     return fd < 3 && stdio_open[fd];
 }
@@ -170,61 +229,142 @@ int32_t gta_wasi_fd_write(uint32_t fd, uint64_t iovs,
  * for game archives) are NOT silently mapped to unrelated host OS fds.
  * A native virtual-fd table and USB-backed openat are still required.
  */
+/* Lifetime is owned by the virtual fd table, never the caller's host fd. */
 int32_t gta_wasi_fd_close(uint32_t fd) {
+    pthread_once(&wasi_files_once, gta_wasi_files_init);
     pthread_mutex_lock(&wasi_mutex);
-    if (!wasi_std_is_open(fd)) {
+    gta_wasi_file *file = gta_wasi_lookup(fd);
+    if (file) {
+        close(file->owned_fd);
+        file->owned_fd = -1;
+        file->position = 0;
+    } else if (wasi_std_is_open(fd)) {
+        stdio_open[fd] = 0;
+    } else {
         pthread_mutex_unlock(&wasi_mutex);
         return GTA_WASI_BADF;
     }
-    stdio_open[fd] = 0;
     pthread_mutex_unlock(&wasi_mutex);
     return GTA_WASI_SUCCESS;
 }
 
-/* iOS apps have no meaningful interactive WASI stdin. An open fd=0 returns
- * EOF (0 bytes) after verifying all 64-bit guest iovecs and nread pointer.
- * stdout/stderr cannot be read. No fabricated game/archive data is returned.
- */
+/* Validate every guest iovec before doing filesystem IO; never read outside
+ * the externally bound shared memory and cap each call to 1 MiB.
+ * pread does not modify the underlying OS file offset. */
+static int gta_wasi_validate_read_iovecs(uint64_t iovs, uint64_t count,
+                                         uint64_t nread) {
+    if (count > 256 || count > UINT64_MAX / 16 ||
+        !span_valid(iovs, count * 16) || !span_valid(nread, 8))
+        return 0;
+    uint64_t total = 0;
+    for (uint64_t i = 0; i < count; ++i) {
+        uint64_t ptr = get_u64_le(iovs + i * 16);
+        uint64_t len = get_u64_le(iovs + i * 16 + 8);
+        if (!span_valid(ptr, len) || len > GTA_WASI_MAX_TRANSFER - total)
+            return 0;
+        total += len;
+    }
+    return 1;
+}
+static int32_t gta_wasi_file_read(gta_wasi_file *file, uint64_t iovs,
+    uint64_t count, uint64_t at, uint64_t nread, int advance) {
+    if (!gta_wasi_validate_read_iovecs(iovs, count, nread))
+        return GTA_WASI_FAULT;
+    uint64_t consumed = 0;
+    for (uint64_t i = 0; i < count; ++i) {
+        uint64_t ptr = get_u64_le(iovs + i * 16);
+        uint64_t len = get_u64_le(iovs + i * 16 + 8);
+        if (!len) continue;
+        if (at > INT64_MAX || consumed > (uint64_t)INT64_MAX - at)
+            return GTA_WASI_OVERFLOW;
+        ssize_t nr;
+        do {
+            nr = pread(file->owned_fd, guest_memory + (size_t)ptr,
+                       (size_t)len, (off_t)(at + consumed));
+        } while (nr < 0 && errno == EINTR);
+        if (nr < 0) return GTA_WASI_IO;
+        consumed += (uint64_t)nr;
+        if ((uint64_t)nr != len) break; /* EOF or short read */
+    }
+    put_u64_le(nread, consumed);
+    if (advance) file->position = at + consumed;
+    return GTA_WASI_SUCCESS;
+}
 int32_t gta_wasi_fd_read(uint32_t fd, uint64_t iovs,
                         uint64_t iovcnt, uint64_t nread) {
+    pthread_once(&wasi_files_once, gta_wasi_files_init);
     pthread_mutex_lock(&wasi_mutex);
+    gta_wasi_file *file = gta_wasi_lookup(fd);
+    if (file) {
+        int32_t result = gta_wasi_file_read(file, iovs, iovcnt,
+                                           file->position, nread, 1);
+        pthread_mutex_unlock(&wasi_mutex);
+        return result;
+    }
     if (fd != 0 || !wasi_std_is_open(fd)) {
         pthread_mutex_unlock(&wasi_mutex);
         return GTA_WASI_BADF;
     }
-    if (iovcnt > 256 || iovcnt > UINT64_MAX/16 ||
-        !span_valid(iovs, iovcnt*16) || !span_valid(nread, 8)) {
+    if (!gta_wasi_validate_read_iovecs(iovs, iovcnt, nread)) {
         pthread_mutex_unlock(&wasi_mutex);
         return GTA_WASI_FAULT;
     }
-    for (uint64_t i=0; i<iovcnt; ++i) {
-        uint64_t ptr = get_u64_le(iovs + i*16);
-        uint64_t len = get_u64_le(iovs + i*16 + 8);
-        if (!span_valid(ptr, len)) {
-            pthread_mutex_unlock(&wasi_mutex);
-            return GTA_WASI_FAULT;
-        }
-    }
-    put_u64_le(nread, 0);
+    put_u64_le(nread, 0); /* native iOS stdin EOF, not fabricated game data */
     pthread_mutex_unlock(&wasi_mutex);
     return GTA_WASI_SUCCESS;
 }
-
 int32_t gta_wasi_fd_seek(uint32_t fd, int64_t offset,
                         uint32_t whence, uint64_t new_offset) {
-    (void)offset; (void)whence; (void)new_offset;
+    pthread_once(&wasi_files_once, gta_wasi_files_init);
     pthread_mutex_lock(&wasi_mutex);
-    int rc = wasi_std_is_open(fd) ? GTA_WASI_SPIPE : GTA_WASI_BADF;
+    gta_wasi_file *file = gta_wasi_lookup(fd);
+    if (!file) {
+        int result = wasi_std_is_open(fd) ? GTA_WASI_SPIPE : GTA_WASI_BADF;
+        pthread_mutex_unlock(&wasi_mutex);
+        return result;
+    }
+    if (!span_valid(new_offset, 8)) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_FAULT;
+    }
+    uint64_t base = 0;
+    if (whence == 1) base = file->position;
+    else if (whence == 2) {
+        struct stat info;
+        if (fstat(file->owned_fd, &info) || info.st_size < 0) {
+            pthread_mutex_unlock(&wasi_mutex);
+            return GTA_WASI_IO;
+        }
+        base = (uint64_t)info.st_size;
+    } else if (whence != 0) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_INVAL;
+    }
+    if (base > INT64_MAX || offset < 0 && (uint64_t)(-(offset + 1)) + 1 > base ||
+        offset > 0 && (uint64_t)offset > (uint64_t)INT64_MAX - base) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_INVAL;
+    }
+    uint64_t next = offset < 0 ? base - ((uint64_t)(-(offset + 1)) + 1)
+                               : base + (uint64_t)offset;
+    file->position = next;
+    put_u64_le(new_offset, next);
     pthread_mutex_unlock(&wasi_mutex);
-    return rc;
+    return GTA_WASI_SUCCESS;
 }
 int32_t gta_wasi_fd_pread(uint32_t fd, uint64_t iovs,
                          uint64_t iovcnt, uint64_t offset,
                          uint64_t nread) {
-    (void)iovs; (void)iovcnt; (void)offset; (void)nread;
+    pthread_once(&wasi_files_once, gta_wasi_files_init);
     pthread_mutex_lock(&wasi_mutex);
-    int rc = (fd==0 && wasi_std_is_open(fd)) ? GTA_WASI_SPIPE
-             : GTA_WASI_BADF;
+    gta_wasi_file *file = gta_wasi_lookup(fd);
+    if (file) {
+        int32_t result = gta_wasi_file_read(file, iovs, iovcnt,
+                                           offset, nread, 0);
+        pthread_mutex_unlock(&wasi_mutex);
+        return result;
+    }
+    int result = (fd == 0 && wasi_std_is_open(fd)) ? GTA_WASI_SPIPE : GTA_WASI_BADF;
     pthread_mutex_unlock(&wasi_mutex);
-    return rc;
+    return result;
 }

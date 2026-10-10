@@ -444,3 +444,22 @@ equivalent to functioning GTA archive I/O. The original engine is still
 not instantiated; there are no real in-game frames, textures, shaders, input,
 audio playback or completed loading sequence. Signed-device testing remains
 necessary for the native Wasmtime runtime.
+
+## Build 28 — real read-only file-backed WASI descriptors (23/85 maintained)
+
+The existing verified `fd_read`, `fd_pread`, `fd_seek`, and `fd_close`
+imports now support bounded **real file bytes**, in addition to standard
+streams. A native API duplicates an explicitly authorized regular-file
+descriptor into a 64-slot **guest-only** fd table, separate from POSIX fd
+numbers. Sequential reads have their own cursor; pread does not change it.
+Reads validate all memory64 iovecs up front and cap each operation at 1 MiB.
+Seek supports SET/CUR/END, overflow checks, and actual file sizes; close and
+reset release every owned descriptor. Native tests write a temporary real
+file and assert its bytes pass through memory64 ABI reads and seeks.
+
+**This does not increment 23/85 import coverage.** It replaces incomplete
+standard-stream-only behavior for four already-registered imports. An
+engine-aware `__syscall_openat` bridge and a security-scoped USB root are
+still needed to register GTA archives; no GTA asset is invented or embedded.
+The private GTA engine AOT is not in this repo and cannot be instantiated or
+declared playable by these unit tests.

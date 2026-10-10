@@ -11,6 +11,10 @@ extern "C" {
  */
 void gta_wasi_bind_memory(void *memory, uint64_t length);
 void gta_wasi_unbind_memory(void);
+/* Duplicates only a caller-authorized regular-file FD. Returns guest FD >=3
+ * or -1; closes all owned duplicates on reset, never the original FD. */
+int32_t gta_wasi_register_readonly_fd(int host_fd);
+void gta_wasi_reset_files(void);
 int32_t gta_wasi_clock_time_get(uint32_t clock_id, uint64_t precision_ns,
                                  uint64_t out_pointer);
 int32_t gta_wasi_environ_sizes_get(uint64_t count_pointer,

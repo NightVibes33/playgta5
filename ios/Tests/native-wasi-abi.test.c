@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 static uint64_t le64(const unsigned char *p) {
     uint64_t n=0;
@@ -76,6 +79,43 @@ int main(void) {
     assert(gta_wasi_fd_read(0, 40, 257, 64)==21);
     write_le64(memory+40, UINT64_MAX);
     assert(gta_wasi_fd_read(0, 40, 1, 64)==21);
+
+    /* Real, read-only guest descriptors backed by actual file contents.
+     * The WASI fd is not a process fd; reads cannot escape the registered file.
+     */
+    char tmpname[]="/tmp/gta-wasi-test-XXXXXX";
+    int actual=mkstemp(tmpname);
+    assert(actual>=0);
+    unlink(tmpname);
+    const char *bytes="HELLO GTA ENGINE";
+    assert(write(actual,bytes,16)==16);
+    int32_t gamefd=gta_wasi_register_readonly_fd(actual);
+    assert(gamefd>=3);
+    close(actual); /* guest owns a duplicate, not the source */
+    write_le64(memory+40,4);
+    write_le64(memory+48,5);
+    assert(gta_wasi_fd_read((uint32_t)gamefd,40,1,64)==0);
+    assert(le64(memory+64)==5 && memcmp(memory+4,"HELLO",5)==0);
+    assert(gta_wasi_fd_seek((uint32_t)gamefd,6,0,72)==0);
+    assert(le64(memory+72)==6);
+    write_le64(memory+48,3);
+    assert(gta_wasi_fd_read((uint32_t)gamefd,40,1,64)==0);
+    assert(le64(memory+64)==3 && memcmp(memory+4,"GTA",3)==0);
+    write_le64(memory+48,5);
+    assert(gta_wasi_fd_pread((uint32_t)gamefd,40,1,0,64)==0);
+    assert(memcmp(memory+4,"HELLO",5)==0);
+    /* pread must leave the virtual sequential cursor at 9. */
+    assert(gta_wasi_fd_seek((uint32_t)gamefd,0,1,72)==0);
+    assert(le64(memory+72)==9);
+    assert(gta_wasi_fd_seek((uint32_t)gamefd,-3,2,72)==0);
+    assert(le64(memory+72)==13);
+    assert(gta_wasi_fd_seek((uint32_t)gamefd,0,88,72)==28);
+    assert(gta_wasi_fd_read((uint32_t)gamefd,40,257,64)==21);
+    write_le64(memory+40,UINT64_MAX);
+    assert(gta_wasi_fd_pread((uint32_t)gamefd,40,1,0,64)==21);
+    assert(gta_wasi_fd_close((uint32_t)gamefd)==0);
+    assert(gta_wasi_fd_close((uint32_t)gamefd)==8);
+    assert(gta_wasi_fd_read((uint32_t)gamefd,40,1,64)==8);
     assert(gta_wasi_fd_close(5)==8);
     gta_wasi_unbind_memory();
     assert(gta_wasi_fd_read(0, 40, 1, 64)==21);
@@ -90,6 +130,7 @@ int main(void) {
     assert(gta_wasi_fd_write(1,40,1,64)==8);
     assert(gta_wasi_environ_sizes_get(0, 8)==21);
     assert(gta_wasi_clock_time_get(1, 0, 8)==21);
-    printf("PASS: memory64 WASI clock/env, fd_write and stdio fd_close/read/seek/pread; bounds, EOF and EBADF\n");
+    gta_wasi_reset_files();
+    printf("PASS: memory64 WASI stdio and real readonly virtual fd read/seek/pread; bounds, EOF and EBADF\n");
     return 0;
 }
