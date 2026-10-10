@@ -139,6 +139,44 @@ enum GTAReference {
     }
 }
 
+// A responsive gradient action, not a pre-rendered / fake Play image.
+final class GTAVNeonLaunchButton: UIButton {
+    private let glow = CAGradientLayer()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        glow.colors = [
+            UIColor(red: 0.035, green: 0.72, blue: 0.30, alpha: 1).cgColor,
+            UIColor(red: 0.015, green: 0.29, blue: 0.25, alpha: 1).cgColor,
+            GTAReference.night.cgColor
+        ]
+        glow.locations = [0, 0.52, 1]
+        glow.startPoint = CGPoint(x: 0, y: 0.1)
+        glow.endPoint = CGPoint(x: 0.85, y: 1)
+        layer.insertSublayer(glow, at: 0)
+        layer.cornerRadius = 19
+        layer.masksToBounds = true
+        var cfg = UIButton.Configuration.plain()
+        cfg.title = "Play GTA V"
+        cfg.image = UIImage(systemName: "play.fill")
+        cfg.imagePadding = 11
+        cfg.baseForegroundColor = .white
+        cfg.contentInsets = .init(top: 14, leading: 12, bottom: 14, trailing: 12)
+        cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+            var copy = attrs
+            copy.font = .systemFont(ofSize: 19, weight: .heavy)
+            return copy
+        }
+        configuration = cfg
+        accessibilityIdentifier = "gtav-native-launch-action"
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        glow.frame = bounds
+        glow.cornerRadius = layer.cornerRadius
+    }
+}
+
 final class GTAFiveTabController: UITabBarController {
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -249,7 +287,7 @@ class GTAReferencePage: UIViewController {
 
 final class GTAReferenceHomeController: GTAReferencePage {
     override var extendsHeroUnderStatusBar: Bool { true }
-    private let play = GTAReference.control("Play GTA V", symbol: "play.fill", color: GTAReference.green)
+    private let play = GTAVNeonLaunchButton(frame: .zero)
     private let readiness = GTAReference.label("", size: 11, weight: .medium, color: GTAReference.secondary)
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -267,6 +305,26 @@ final class GTAReferenceHomeController: GTAReferencePage {
         let art = GTAReference.image("gtav-story-trio", height: 214, radius: 0)
         art.contentMode = .scaleAspectFit
         hero.addSubview(art)
+        let identity = UIStackView()
+        identity.axis = .vertical
+        identity.spacing = 0
+        identity.translatesAutoresizingMaskIntoConstraints = false
+        let name = GTAReference.label("GTAiOS", size: 23, weight: .black)
+        let subtitle = GTAReference.label("GRAND THEFT AUTO V  ·  iPHONE", size: 9,
+                                          weight: .semibold, color: GTAReference.secondary)
+        identity.addArrangedSubview(name)
+        identity.addArrangedSubview(subtitle)
+        hero.addSubview(identity)
+        let localBadge = GTAReference.label("LOCAL", size: 11,
+                                           weight: .heavy, color: GTAReference.green)
+        localBadge.translatesAutoresizingMaskIntoConstraints = false
+        hero.addSubview(localBadge)
+        NSLayoutConstraint.activate([
+            identity.leadingAnchor.constraint(equalTo: hero.leadingAnchor, constant: 13),
+            identity.topAnchor.constraint(equalTo: hero.topAnchor, constant: 8),
+            localBadge.trailingAnchor.constraint(equalTo: hero.trailingAnchor, constant: -13),
+            localBadge.topAnchor.constraint(equalTo: hero.topAnchor, constant: 17)
+        ])
         let tagline = GTAReference.label("GRAND THEFT AUTO V  ·  LOCAL iPHONE LAUNCHER",
                                          size: 10, weight: .bold, color: GTAReference.secondary)
         tagline.textAlignment = .center
