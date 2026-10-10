@@ -68,10 +68,17 @@ assert '32 * 1024 * 1024' in save and 'Data(contentsOf:' in save
 assert 'options: [.atomic, .completeFileProtectionUnlessOpen]' in save
 assert 'class NativePCMOutput' in audio and 'scheduleStereoFloatPCM' in audio
 assert 'AVAudioEngine()' in audio and 'AVAudioPlayerNode()' in audio
-assert 'ADVANCED  ·  FILE PICKER TESTS' in launcher
-assert 'CHECK NATIVE RUNTIME' in launcher
+assert 'File picker troubleshooting' in launcher
+assert 'RUN NATIVE CHECKS' in launcher
 assert 'The local server runs inside the app' not in launcher
-assert 'GTAiOS' in splash and 'NATIVE RUNTIME  /  SIDELOADED' in splash
+assert 'GTAiOS' in splash and 'LOS SANTOS  /  NATIVE PORT' in splash
+art = read("ios/Sources/UI/LosSantosHeroView.swift")
+assert "class LosSantosHeroView" in art
+assert "class SunsetSkylineView" in art
+assert "PORT IN PROGRESS" in art and "NATIVE iPHONE PROJECT" in art
+assert "GTATheme.coral" in launcher and "LosSantosHeroView()" in launcher
+assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
+assert "GTATheme.section" in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert "import GameController" in input_source
 for control in ["leftThumbstick", "rightThumbstick", "leftTrigger", "rightTrigger",
                 "buttonA", "buttonB", "buttonX", "buttonY", "buttonMenu",
@@ -195,7 +202,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>27</string>" in plist
+assert "<key>CFBundleVersion</key><string>28</string>" in plist
 
 print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

@@ -4,55 +4,76 @@ import UIKit
 /// Only the native Metal frame rate is currently active; other values are
 /// saved presets, NOT functional rendering controls without the ARM64 engine.
 final class SettingsViewController: UITableViewController {
-    private let ink = UIColor(red: 0.035, green: 0.051, blue: 0.061, alpha: 1)
-    private let panel = UIColor(red: 0.085, green: 0.106, blue: 0.12, alpha: 1)
-    private let accent = UIColor(red: 0.58, green: 0.88, blue: 0.65, alpha: 1)
+    private let ink = GTATheme.night
+    private let panel = GTATheme.raised
+    private let accent = GTATheme.coral
 
     init() { super.init(style: .insetGrouped) }
     required init?(coder: NSCoder) { super.init(coder: coder) }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "GAME SETTINGS"
+        title = "Graphics & performance"
         view.backgroundColor = ink
         tableView.backgroundColor = ink
         tableView.separatorColor = UIColor.white.withAlphaComponent(0.075)
-        tableView.sectionHeaderTopPadding = 14
-        tableView.estimatedRowHeight = 58
+        tableView.sectionHeaderTopPadding = 22
+        tableView.estimatedRowHeight = 78
         tableView.rowHeight = UITableView.automaticDimension
 
-        let header = UIView(frame: CGRect(x: 0, y: 0, width: 480, height: 76))
-        let eyebrow = UILabel()
-        eyebrow.text = "NATIVE METAL CONFIGURATION  /  ENGINE NOT LINKED"
-        eyebrow.font = .monospacedSystemFont(ofSize: 10, weight: .semibold)
-        eyebrow.textColor = accent
-        eyebrow.translatesAutoresizingMaskIntoConstraints = false
-        let title = UILabel()
-        title.text = "REQUESTED ENGINE PRESETS"
-        title.font = .systemFont(ofSize: 23, weight: .black)
-        title.textColor = .white
-        title.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(eyebrow); header.addSubview(title)
+        // A native editorial section header rather than a generic settings list.
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: 393, height: 151))
+        let accentRule = UIView()
+        accentRule.backgroundColor = accent
+        accentRule.layer.cornerRadius = 2
+        accentRule.translatesAutoresizingMaskIntoConstraints = false
+        let heading = GTATheme.section("Make it yours.")
+        heading.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(
+            for: .systemFont(ofSize: 31, weight: .black))
+        heading.translatesAutoresizingMaskIntoConstraints = false
+        let description = GTATheme.caption("Video • performance • engine profiles")
+        description.textColor = GTATheme.cream.withAlphaComponent(0.88)
+        description.translatesAutoresizingMaskIntoConstraints = false
+        let state = GTATheme.caption("Native game engine integration is still in progress.")
+        state.textColor = accent
+        state.numberOfLines = 0
+        state.translatesAutoresizingMaskIntoConstraints = false
+        header.addSubview(accentRule)
+        header.addSubview(heading)
+        header.addSubview(description)
+        header.addSubview(state)
         NSLayoutConstraint.activate([
-            eyebrow.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
-            eyebrow.topAnchor.constraint(equalTo: header.topAnchor, constant: 14),
-            title.leadingAnchor.constraint(equalTo: eyebrow.leadingAnchor),
-            title.topAnchor.constraint(equalTo: eyebrow.bottomAnchor, constant: 8)
+            accentRule.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
+            accentRule.topAnchor.constraint(equalTo: header.topAnchor, constant: 20),
+            accentRule.widthAnchor.constraint(equalToConstant: 4),
+            accentRule.heightAnchor.constraint(equalToConstant: 51),
+            heading.leadingAnchor.constraint(equalTo: accentRule.trailingAnchor, constant: 14),
+            heading.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -18),
+            heading.topAnchor.constraint(equalTo: header.topAnchor, constant: 15),
+            description.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
+            description.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -18),
+            description.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 2),
+            state.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
+            state.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -22),
+            state.topAnchor.constraint(equalTo: description.bottomAnchor, constant: 20)
         ])
         tableView.tableHeaderView = header
 
-        let footer = UIView(frame: CGRect(x: 0, y: 0, width: 480, height: 118))
+        let footer = UIView(frame: CGRect(x: 0, y: 0, width: 393, height: 154))
         let note = UILabel()
-        note.text = "Only FPS currently adjusts the native Metal surface. The game engine, shaders and remaining gameplay options are NOT connected: settings here do not make GTA playable. Values are saved for a future verified ARM64 engine."
+        note.text = "Only the Metal frame-rate setting currently applies to the native preview. Other preferences are saved for later integration. This screen does not enable GTA V gameplay."
         note.numberOfLines = 0
-        note.textColor = UIColor(white: 0.57, alpha: 1)
-        note.font = .systemFont(ofSize: 11)
+        note.textColor = GTATheme.subdued
+        note.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
+            for: .systemFont(ofSize: 13))
+        note.adjustsFontForContentSizeCategory = true
         note.translatesAutoresizingMaskIntoConstraints = false
         footer.addSubview(note)
         NSLayoutConstraint.activate([
             note.topAnchor.constraint(equalTo: footer.topAnchor, constant: 14),
             note.leadingAnchor.constraint(equalTo: footer.leadingAnchor, constant: 25),
-            note.trailingAnchor.constraint(equalTo: footer.trailingAnchor, constant: -25)
+            note.trailingAnchor.constraint(equalTo: footer.trailingAnchor, constant: -25),
+            note.bottomAnchor.constraint(lessThanOrEqualTo: footer.bottomAnchor, constant: -16)
         ])
         tableView.tableFooterView = footer
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Reset", style: .plain,
@@ -63,6 +84,7 @@ final class SettingsViewController: UITableViewController {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
         navigationController?.navigationBar.tintColor = accent
+        navigationController?.navigationBar.barStyle = .black
         navigationController?.navigationBar.titleTextAttributes = [
             .foregroundColor: UIColor.white,
             .font: UIFont.systemFont(ofSize: 15, weight: .bold)
@@ -86,21 +108,29 @@ final class SettingsViewController: UITableViewController {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
         cell.backgroundColor = panel
         cell.selectionStyle = .default
+        cell.tintColor = accent
+        cell.accessibilityHint = "Double-tap to change the preset"
         cell.textLabel?.text = spec.title
-        cell.textLabel?.textColor = UIColor.white
-        cell.textLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        cell.textLabel?.textColor = GTATheme.cream
+        cell.textLabel?.font = UIFontMetrics(forTextStyle: .body).scaledFont(
+            for: .systemFont(ofSize: 16, weight: .semibold))
+        cell.textLabel?.adjustsFontForContentSizeCategory = true
         cell.detailTextLabel?.text = spec.subtitle
-        cell.detailTextLabel?.font = UIFont.systemFont(ofSize: 10)
-        cell.detailTextLabel?.textColor = UIColor(white: 0.57, alpha: 1)
+        cell.detailTextLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
+            for: .systemFont(ofSize: 12))
+        cell.detailTextLabel?.adjustsFontForContentSizeCategory = true
+        cell.detailTextLabel?.textColor = GTATheme.subdued
         cell.detailTextLabel?.numberOfLines = 2
         let value = UILabel()
         value.text = EngineOptions.display(spec.id)
         value.textColor = accent
-        value.font = .systemFont(ofSize: 12, weight: .bold)
+        value.font = UIFontMetrics(forTextStyle: .callout).scaledFont(
+            for: .systemFont(ofSize: 13, weight: .bold))
+        value.adjustsFontForContentSizeCategory = true
         value.textAlignment = .right
         value.numberOfLines = 2
         value.lineBreakMode = .byWordWrapping
-        value.frame = CGRect(x: 0, y: 0, width: 130, height: 44)
+        value.frame = CGRect(x: 0, y: 0, width: 103, height: 51)
         cell.accessoryView = value
         return cell
     }

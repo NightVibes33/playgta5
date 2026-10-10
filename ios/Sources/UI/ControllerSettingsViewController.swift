@@ -32,12 +32,12 @@ final class ControllerSettingsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Controller Setup"
-        view.backgroundColor = UIColor(red: 0.05, green: 0.06, blue: 0.08, alpha: 1)
+        title = "Controller studio"
+        view.backgroundColor = GTATheme.night
         scroll.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
-        stack.spacing = 10
+        stack.spacing = 16
         view.addSubview(scroll)
         scroll.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -45,20 +45,52 @@ final class ControllerSettingsViewController: UIViewController {
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 14),
+            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 18),
             stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -20),
             stack.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor, constant: 20),
             stack.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor, constant: -20)
         ])
-        hardware.font = .boldSystemFont(ofSize: 16)
-        hardware.textColor = .systemGreen
-        hardware.numberOfLines = 2
-        stack.addArrangedSubview(hardware)
-        live.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        live.numberOfLines = 5
-        live.textColor = .white
-        live.text = "Connect a supported Bluetooth or wired controller."
-        stack.addArrangedSubview(live)
+        let top = UIStackView()
+        top.axis = .horizontal
+        top.alignment = .center
+        top.spacing = 12
+        let controllerIcon = UIImageView(image: UIImage(systemName: "gamecontroller.fill"))
+        controllerIcon.tintColor = GTATheme.coral
+        controllerIcon.contentMode = .scaleAspectFit
+        controllerIcon.translatesAutoresizingMaskIntoConstraints = false
+        controllerIcon.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        controllerIcon.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        let titles = UIStackView()
+        titles.axis = .vertical
+        titles.spacing = 3
+        titles.addArrangedSubview(GTATheme.section("Take control."))
+        titles.addArrangedSubview(GTATheme.caption("Bluetooth · wired · touch"))
+        top.addArrangedSubview(controllerIcon)
+        top.addArrangedSubview(titles)
+        stack.addArrangedSubview(top)
+
+        hardware.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
+            for: .systemFont(ofSize: 17, weight: .bold))
+        hardware.adjustsFontForContentSizeCategory = true
+        hardware.textColor = GTATheme.coral
+        hardware.numberOfLines = 0
+        hardware.text = "Searching for controllers…"
+        live.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
+            for: .monospacedSystemFont(ofSize: 12, weight: .medium))
+        live.adjustsFontForContentSizeCategory = true
+        live.numberOfLines = 0
+        live.textColor = GTATheme.subdued
+        live.text = "Connect an Xbox, PlayStation, or iOS-supported controller."
+        let signalCard = UIStackView(arrangedSubviews: [hardware, live])
+        signalCard.axis = .vertical
+        signalCard.spacing = 8
+        signalCard.isLayoutMarginsRelativeArrangement = true
+        signalCard.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: 17, leading: 17, bottom: 17, trailing: 17)
+        GTATheme.card(signalCard)
+        stack.addArrangedSubview(signalCard)
+        stack.addArrangedSubview(GTATheme.section("Analog tuning"))
+
         let store = UserDefaults.standard
         deadzone.minimumValue = 0.02
         deadzone.maximumValue = 0.45
@@ -75,34 +107,48 @@ final class ControllerSettingsViewController: UIViewController {
         let row = UIStackView()
         row.axis = .horizontal
         row.alignment = .center
+        row.spacing = 8
+        row.isLayoutMarginsRelativeArrangement = true
+        row.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 14, leading: 17, bottom: 14, trailing: 17)
+        GTATheme.card(row)
         row.addArrangedSubview(label("Invert vertical camera"))
         row.addArrangedSubview(invert)
         invert.isOn = store.bool(forKey: ControllerManager.invertYKey)
         invert.addTarget(self, action: #selector(save), for: .valueChanged)
         stack.addArrangedSubview(row)
-        stack.addArrangedSubview(label("Button mapping (on-foot profile)"))
+        invert.onTintColor = GTATheme.coral
+        stack.addArrangedSubview(GTATheme.section("Button mapping"))
+        stack.addArrangedSubview(GTATheme.caption("Customize your on-foot bindings"))
         for index in inputs.indices {
             let button = UIButton(type: .system)
             button.tag = index
             button.contentHorizontalAlignment = .left
-            button.tintColor = .white
-            button.backgroundColor = UIColor.white.withAlphaComponent(0.11)
-            button.layer.cornerRadius = 9
-            button.heightAnchor.constraint(equalToConstant: 40).isActive = true
+            button.tintColor = GTATheme.cream
+            button.backgroundColor = GTATheme.inset
+            button.layer.cornerRadius = 11
+            button.layer.cornerCurve = .continuous
+            button.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
             button.addTarget(self, action: #selector(remap), for: .touchUpInside)
             mappingButtons.append(button)
             stack.addArrangedSubview(button)
         }
         let rumble = UIButton(type: .system)
         rumble.setTitle("TEST CONTROLLER VIBRATION", for: .normal)
-        rumble.tintColor = .systemGreen
-        rumble.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        rumble.tintColor = GTATheme.night
+        rumble.backgroundColor = GTATheme.coral
+        rumble.layer.cornerRadius = 13
+        rumble.layer.cornerCurve = .continuous
+        rumble.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
+        rumble.heightAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
         rumble.addTarget(self, action: #selector(testRumble), for: .touchUpInside)
         stack.addArrangedSubview(rumble)
         let limitation = label("Game analog sticks/triggers are captured correctly. The current game binary exposes only keyboard/mouse input, so true analog vehicle steering and throttle still require an engine-level gamepad interface.")
         limitation.numberOfLines = 0
-        limitation.font = .systemFont(ofSize: 12)
-        limitation.textColor = .lightGray
+        limitation.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
+            for: .systemFont(ofSize: 13))
+        limitation.adjustsFontForContentSizeCategory = true
+        limitation.textColor = GTATheme.subdued
         stack.addArrangedSubview(limitation)
         updateBindings()
     }
@@ -110,13 +156,23 @@ final class ControllerSettingsViewController: UIViewController {
     private func label(_ text: String) -> UILabel {
         let l = UILabel()
         l.text = text
-        l.textColor = .white
-        l.font = .systemFont(ofSize: 14, weight: .medium)
+        l.textColor = GTATheme.cream
+        l.font = UIFontMetrics(forTextStyle: .body).scaledFont(
+            for: .systemFont(ofSize: 15, weight: .medium))
+        l.adjustsFontForContentSizeCategory = true
         return l
     }
     private func addSlider(_ name: String, slider: UISlider) {
-        stack.addArrangedSubview(label(name))
-        stack.addArrangedSubview(slider)
+        slider.tintColor = GTATheme.coral
+        slider.accessibilityLabel = name
+        let group = UIStackView(arrangedSubviews: [label(name), slider])
+        group.axis = .vertical
+        group.spacing = 11
+        group.isLayoutMarginsRelativeArrangement = true
+        group.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: 13, leading: 17, bottom: 13, trailing: 17)
+        GTATheme.card(group)
+        stack.addArrangedSubview(group)
     }
     private func bindings() -> [String: String] {
         var m = Self.defaults
