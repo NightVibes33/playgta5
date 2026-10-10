@@ -54,8 +54,13 @@ final class GameViewController: UIViewController {
         view.addSubview(touchControls)
         let storedVisibility = UserDefaults.standard.object(forKey: "gtaios.touch.visible")
         touchControls.alpha = CGFloat(GTALaunchPreferences.fraction("touchOpacity", fallback: 0.7))
-        touchControls.isHidden = storedVisibility == nil
-            ? false : !UserDefaults.standard.bool(forKey: "gtaios.touch.visible")
+        switch GTALaunchPreferences.text("controlScheme", fallback: "Automatic") {
+        case "Controller": touchControls.isHidden = true
+        case "Touch": touchControls.isHidden = false
+        default:
+            touchControls.isHidden = storedVisibility == nil
+                ? false : !UserDefaults.standard.bool(forKey: "gtaios.touch.visible")
+        }
 
         heading.text = "GTA V • NATIVE ARM64"
         heading.textAlignment = .center

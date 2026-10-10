@@ -210,6 +210,8 @@ final class ControllerSettingsViewController: UIViewController {
         let db = UserDefaults.standard
         db.set(Double(deadzone.value), forKey: ControllerManager.deadzoneKey)
         db.set(Double(sensitivity.value), forKey: ControllerManager.sensitivityKey)
+        GTALaunchPreferences.setFraction("aimSensitivity",
+            value: (Double(sensitivity.value) - 0.25) / 2.75)
         db.set(invert.isOn, forKey: ControllerManager.invertYKey)
     }
     @objc private func testRumble() {

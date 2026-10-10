@@ -88,8 +88,16 @@ final class ControllerManager {
         let dead = min(0.45, max(0.02, threshold))
         let (lx, ly) = deadzone(Double(g.leftThumbstick.xAxis.value),
                                Double(g.leftThumbstick.yAxis.value), threshold: dead)
-        let (rx, ry) = deadzone(Double(g.rightThumbstick.xAxis.value),
-                               Double(g.rightThumbstick.yAxis.value), threshold: dead)
+        let (rawRX, rawRY) = deadzone(Double(g.rightThumbstick.xAxis.value),
+                                     Double(g.rightThumbstick.yAxis.value), threshold: dead)
+        let gain = saved.object(forKey: Self.sensitivityKey) == nil ? 1.0 :
+            min(3.0, max(0.25, saved.double(forKey: Self.sensitivityKey)))
+        let rx = max(-1.0, min(1.0, rawRX * gain))
+        let ry = max(-1.0, min(1.0, rawRY * gain))
+        if GTALaunchPreferences.text("controlScheme", fallback: "Automatic") == "Touch" {
+            onState?(["connected": 0])
+            return
+        }
         let invert = saved.bool(forKey: Self.invertYKey)
         onState?([
             "connected": 1,
@@ -108,6 +116,10 @@ final class ControllerManager {
 
     @discardableResult
     func testRumble() -> Bool {
+        guard GTALaunchPreferences.enabled("controllerVibration", fallback: true) else {
+            LogStore.shared.write("controller", "Haptics disabled by user")
+            return false
+        }
         guard let info = controller?.haptics,
               let engine = info.createEngine(withLocality: .default) else {
             LogStore.shared.write("controller", "Controller vibration unavailable")
