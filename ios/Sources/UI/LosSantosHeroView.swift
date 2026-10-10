@@ -5,10 +5,13 @@ import CoreGraphics
 /// Restrained launcher palette, inspired by the game's city-at-dusk setting.
 /// No runtime asset downloads, shaders, animation loops or artwork IO.
 enum GTATheme {
-    static let night = UIColor(red: 0.047, green: 0.056, blue: 0.073, alpha: 1)
-    static let raised = UIColor(red: 0.102, green: 0.116, blue: 0.140, alpha: 1)
+    static let night = UIColor(red: 0.025, green: 0.031, blue: 0.056, alpha: 1)
+    static let raised = UIColor(red: 0.075, green: 0.085, blue: 0.135, alpha: 1)
     static let inset = UIColor(red: 0.145, green: 0.158, blue: 0.181, alpha: 1)
-    static let coral = UIColor(red: 0.98, green: 0.67, blue: 0.44, alpha: 1)
+    static let coral = UIColor(red: 0.98, green: 0.34, blue: 0.67, alpha: 1)
+    static let neonPink = UIColor(red: 0.98, green: 0.30, blue: 0.70, alpha: 1)
+    static let neonBlue = UIColor(red: 0.27, green: 0.71, blue: 1, alpha: 1)
+    static let mint = UIColor(red: 0.27, green: 0.95, blue: 0.68, alpha: 1)
     static let cream = UIColor(red: 0.97, green: 0.97, blue: 0.965, alpha: 1)
     static let subdued = UIColor(red: 0.66, green: 0.69, blue: 0.73, alpha: 1)
     static let success = UIColor(red: 0.54, green: 0.82, blue: 0.63, alpha: 1)
@@ -55,9 +58,9 @@ private final class SunsetSkylineView: UIView {
         let w = rect.width, h = rect.height
         let rgb = CGColorSpaceCreateDeviceRGB()
         let gradient = CGGradient(colorsSpace: rgb, colors: [
-            UIColor(red: 0.13, green: 0.14, blue: 0.25, alpha: 1).cgColor,
-            UIColor(red: 0.42, green: 0.25, blue: 0.34, alpha: 1).cgColor,
-            UIColor(red: 0.92, green: 0.51, blue: 0.40, alpha: 1).cgColor
+            UIColor(red: 0.08, green: 0.08, blue: 0.22, alpha: 1).cgColor,
+            UIColor(red: 0.39, green: 0.16, blue: 0.40, alpha: 1).cgColor,
+            UIColor(red: 0.97, green: 0.43, blue: 0.37, alpha: 1).cgColor
         ] as CFArray, locations: [0, 0.54, 1])!
         ctx.drawLinearGradient(gradient, start: .zero,
             end: CGPoint(x: 0, y: h), options: [])
@@ -164,7 +167,7 @@ final class LosSantosHeroView: UIView {
 
         let title = UILabel()
         title.text = "GRAND THEFT\nAUTO V"
-        title.font = .systemFont(ofSize: 36, weight: .black, width: .condensed)
+        title.font = .systemFont(ofSize: 43, weight: .black, width: .condensed)
         title.textColor = .white
         title.numberOfLines = 2
         title.lineBreakMode = .byWordWrapping
@@ -175,7 +178,7 @@ final class LosSantosHeroView: UIView {
         addSubview(title)
 
         let tagline = UILabel()
-        tagline.text = "LOS SANTOS · YOUR GAME LIBRARY"
+        tagline.text = "GTA V  ·  LOCAL USB-C GAME LIBRARY"
         tagline.textColor = GTATheme.cream.withAlphaComponent(0.82)
         tagline.font = .systemFont(ofSize: 10, weight: .semibold)
         tagline.numberOfLines = 1
@@ -185,7 +188,7 @@ final class LosSantosHeroView: UIView {
         addSubview(tagline)
 
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 216),
+            heightAnchor.constraint(equalToConstant: 270),
             eyebrow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
             eyebrow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
             eyebrow.topAnchor.constraint(equalTo: topAnchor, constant: 20),

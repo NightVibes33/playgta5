@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let background = CAGradientLayer()
     private let scrollView = UIScrollView()
+    private var scrollBottomConstraint: NSLayoutConstraint?
     private let content = UIStackView()
     private let storageTitle = UILabel()
     private let storageDetails = UILabel()
@@ -20,6 +21,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let logsButton = UIButton(type: .system)
     private let statusLine = UILabel()
     private let deviceLabel = UILabel()
+    private let usbStatusLabel = UILabel()
+    private let hardwareStatusLabel = UILabel()
+    private let runtimeButton = UIButton(type: .system)
     private var focusIndex = 0
     private var heldUp = false
     private var heldDown = false
@@ -61,9 +65,10 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         content.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(content)
 
+        scrollBottomConstraint = scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            scrollBottomConstraint!,
             scrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 12),
@@ -73,7 +78,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -40)
         ])
 
-        // Small identity bar; version and technical information stay in About.
+        // Only GTA V is offered; no fictional game catalogue or mock game state.
         let header = UIStackView()
         header.axis = .horizontal
         header.spacing = 11
@@ -91,8 +96,13 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         monogram.heightAnchor.constraint(equalToConstant: 36).isActive = true
 
         let brand = UILabel()
-        brand.text = "GTAiOS"
-        brand.font = .systemFont(ofSize: 21, weight: .bold)
+        let logoText = NSMutableAttributedString(string: "GTA", attributes: [
+            .font: UIFont.systemFont(ofSize: 25, weight: .black, width: .expanded),
+            .foregroundColor: GTATheme.cream])
+        logoText.append(NSAttributedString(string: "iOS", attributes: [
+            .font: UIFont.systemFont(ofSize: 25, weight: .black, width: .expanded),
+            .foregroundColor: GTATheme.neonPink]))
+        brand.attributedText = logoText
         brand.textColor = GTATheme.cream
         brand.setContentCompressionResistancePriority(.required, for: .horizontal)
 
@@ -115,9 +125,13 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         content.setCustomSpacing(18, after: header)
 
         content.addArrangedSubview(LosSantosHeroView())
+        let heroCaption = GTATheme.caption("GRAND THEFT AUTO V  ·  SINGLE GAME LAUNCHER")
+        heroCaption.textColor = GTATheme.neonBlue
+        heroCaption.font = .systemFont(ofSize: 10, weight: .bold)
+        content.addArrangedSubview(heroCaption)
 
         let libraryHeading = UILabel()
-        libraryHeading.text = "MY GAME"
+        libraryHeading.text = "MY GTA V  /  USB-C STORAGE"
         libraryHeading.textColor = GTATheme.cream.withAlphaComponent(0.87)
         libraryHeading.font = .systemFont(ofSize: 11, weight: .heavy)
         content.addArrangedSubview(libraryHeading)
@@ -216,6 +230,70 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         secondary.addArrangedSubview(controllerButton)
         content.addArrangedSubview(secondary)
 
+        let toolsHeading = GTATheme.section("Launcher Tools")
+        toolsHeading.font = .systemFont(ofSize: 18, weight: .bold)
+        content.addArrangedSubview(toolsHeading)
+        let tools = UIStackView()
+        tools.axis = .horizontal
+        tools.spacing = 11
+        tools.distribution = .fillEqually
+        setupSecondary(logsButton, title: "Export Logs", symbol: "square.and.arrow.up",
+            action: #selector(exportLogs))
+        setupSecondary(runtimeButton, title: "Engine Checks", symbol: "cpu",
+            action: #selector(openRuntimeChecks))
+        tools.addArrangedSubview(logsButton)
+        tools.addArrangedSubview(runtimeButton)
+        content.addArrangedSubview(tools)
+
+        let statusHeading = GTATheme.section("Build Status")
+        statusHeading.font = .systemFont(ofSize: 18, weight: .bold)
+        content.addArrangedSubview(statusHeading)
+        let buildPanel = UIStackView()
+        buildPanel.axis = .vertical
+        buildPanel.spacing = 8
+        buildPanel.isLayoutMarginsRelativeArrangement = true
+        buildPanel.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: 15, leading: 15, bottom: 15, trailing: 15)
+        GTATheme.card(buildPanel)
+        let statusTitle = GTATheme.caption("GTA V ASSETS / USB-C")
+        statusTitle.textColor = GTATheme.neonBlue
+        statusTitle.font = .systemFont(ofSize: 10, weight: .bold)
+        buildPanel.addArrangedSubview(statusTitle)
+        usbStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        usbStatusLabel.textColor = GTATheme.cream
+        usbStatusLabel.numberOfLines = 2
+        buildPanel.addArrangedSubview(usbStatusLabel)
+        let rule = UIView()
+        rule.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+        rule.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        buildPanel.addArrangedSubview(rule)
+        let nativeTitle = GTATheme.caption("NATIVE ARM64 GAME ENGINE")
+        nativeTitle.textColor = GTATheme.neonPink
+        nativeTitle.font = .systemFont(ofSize: 10, weight: .bold)
+        buildPanel.addArrangedSubview(nativeTitle)
+        let nativeStatus = GTATheme.caption(NativeEngineStatus.nativeEngineLinked ?
+            "Linked · gameplay execution available" : "Not linked · game not playable yet")
+        nativeStatus.font = .systemFont(ofSize: 13, weight: .semibold)
+        nativeStatus.textColor = NativeEngineStatus.nativeEngineLinked ?
+            GTATheme.mint : GTATheme.cream
+        buildPanel.addArrangedSubview(nativeStatus)
+        let inputTitle = GTATheme.caption("HARDWARE CONTROLLER")
+        inputTitle.textColor = GTATheme.neonBlue
+        inputTitle.font = .systemFont(ofSize: 10, weight: .bold)
+        buildPanel.addArrangedSubview(inputTitle)
+        hardwareStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        hardwareStatusLabel.textColor = GTATheme.cream
+        buildPanel.addArrangedSubview(hardwareStatusLabel)
+        content.addArrangedSubview(buildPanel)
+
+        let runtimeDisclaimer = GTATheme.caption(
+            "This native build validates USB game data, reads hardware controllers, " +
+            "and exports real diagnostics. No saved missions, FPS, shaders, or gameplay " +
+            "progress are simulated.")
+        runtimeDisclaimer.numberOfLines = 0
+        runtimeDisclaimer.font = .systemFont(ofSize: 11)
+        content.addArrangedSubview(runtimeDisclaimer)
+
         let footer = UIStackView()
         footer.axis = .horizontal
         footer.alignment = .center
@@ -230,6 +308,50 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         footer.addArrangedSubview(build)
         content.addArrangedSubview(footer)
 
+        // iPhone gaming-console dock stays visible while content scrolls.
+        let dock = UIView()
+        dock.translatesAutoresizingMaskIntoConstraints = false
+        dock.backgroundColor = GTATheme.night
+        dock.layer.borderWidth = 0.6
+        dock.layer.borderColor = UIColor.white.withAlphaComponent(0.14).cgColor
+        view.addSubview(dock)
+        let nav = UIStackView()
+        nav.axis = .horizontal
+        nav.distribution = .fillEqually
+        nav.translatesAutoresizingMaskIntoConstraints = false
+        dock.addSubview(nav)
+        let entries: [(String, String, Selector)] = [
+            ("Home", "house.fill", #selector(goHome)),
+            ("Graphics", "slider.horizontal.3", #selector(openSettings)),
+            ("Controller", "gamecontroller.fill", #selector(openControllerSetup)),
+            ("More", "ellipsis", #selector(showMore))
+        ]
+        for (index, entry) in entries.enumerated() {
+            let button = UIButton(type: .system)
+            var config = UIButton.Configuration.plain()
+            config.title = entry.0
+            config.image = UIImage(systemName: entry.1)
+            config.imagePlacement = .top
+            config.imagePadding = 3
+            config.baseForegroundColor = index == 0 ? GTATheme.neonPink : GTATheme.subdued
+            button.configuration = config
+            button.accessibilityLabel = entry.0
+            button.addTarget(self, action: entry.2, for: .touchUpInside)
+            nav.addArrangedSubview(button)
+        }
+        NSLayoutConstraint.activate([
+            dock.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            dock.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            dock.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            dock.heightAnchor.constraint(equalToConstant: 64),
+            nav.topAnchor.constraint(equalTo: dock.topAnchor, constant: 3),
+            nav.bottomAnchor.constraint(equalTo: dock.bottomAnchor, constant: -3),
+            nav.leadingAnchor.constraint(equalTo: dock.leadingAnchor, constant: 6),
+            nav.trailingAnchor.constraint(equalTo: dock.trailingAnchor, constant: -6)
+        ])
+        scrollBottomConstraint?.isActive = false
+        scrollView.bottomAnchor.constraint(equalTo: dock.topAnchor).isActive = true
+
         NotificationCenter.default.addObserver(self, selector: #selector(storageChanged),
             name: USBStorageManager.changedNotification, object: nil)
         refresh()
@@ -241,7 +363,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         c.image = UIImage(systemName: "arrow.up.right")
         c.imagePlacement = .trailing
         c.imagePadding = 10
-        c.baseBackgroundColor = GTATheme.coral
+        c.baseBackgroundColor = GTATheme.neonPink
         c.baseForegroundColor = GTATheme.night
         c.cornerStyle = .large
         c.contentInsets = NSDirectionalEdgeInsets(top: 15, leading: 20, bottom: 15, trailing: 20)
@@ -271,12 +393,12 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             storageTitle.text = "Grand Theft Auto V"
             storageDetails.text = "Connected · " + root.lastPathComponent
             fileIndicator.backgroundColor = GTATheme.success
-            playButton.configuration?.title = "Play GTA V"
+            playButton.configuration?.title = NativeEngineStatus.nativeEngineLinked ? "Play GTA V" : "Engine Checks"
             playButton.configuration?.image = UIImage(systemName: "play.fill")
-            playButton.isEnabled = NativeEngineStatus.nativeEngineLinked
-            playButton.alpha = NativeEngineStatus.nativeEngineLinked ? 1 : 0.65
+            playButton.isEnabled = true
+            playButton.alpha = 1
             playButton.accessibilityLabel = NativeEngineStatus.nativeEngineLinked
-                ? "Play Grand Theft Auto V" : "Play unavailable until native engine is ready"
+                ? "Play Grand Theft Auto V" : "Inspect GTA V native engine status"
             statusLine.text = NativeEngineStatus.nativeEngineLinked
                 ? "Ready to play from USB-C"
                 : "Native game engine integration is still in progress"
@@ -291,6 +413,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             playButton.accessibilityLabel = "Choose game folder"
             statusLine.text = "Game data stays on your external drive"
         }
+        let connected = USBStorageManager.shared.root != nil
+        let missing = connected ? USBStorageManager.shared.missingStartupAssets() : []
+        usbStatusLabel.text = !connected ? "No game folder selected" :
+            (missing.isEmpty ? "USB folder readable · startup assets found" :
+                "USB folder selected · missing startup files")
         updateDevice(ControllerManager.shared.currentName)
         highlightFocus()
     }
@@ -328,10 +455,11 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
 
     private func updateDevice(_ name: String) {
         deviceLabel.text = name == "No controller" ? "Controller not connected" : name
+        hardwareStatusLabel.text = name == "No controller" ? "Not connected" : name
     }
 
     private var focusTargets: [UIButton] {
-        [playButton, folderButton, settingsButton, controllerButton, moreButton]
+        [playButton, folderButton, settingsButton, controllerButton, logsButton, runtimeButton, moreButton]
     }
     private func highlightFocus() {
         let connected = ControllerManager.shared.currentName != "No controller"
@@ -363,6 +491,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         heldDown = down
         heldA = a
     }
+
+    @objc private func goHome() { scrollView.setContentOffset(.zero, animated: true) }
+    @objc private func openRuntimeChecks() { openGame() }
 
     @objc private func showMore() {
         let menu = UIAlertController(title: "GTAiOS",
@@ -589,12 +720,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     @objc private func launch() {
         guard USBStorageManager.shared.root != nil else { chooseFolder(); return }
         if !NativeEngineStatus.nativeEngineLinked {
-            let alert = UIAlertController(title: "Game not ready",
-                message: "Your game library is connected, but native GTA V engine integration is not complete. The game cannot launch yet.",
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
-            alert.addAction(UIAlertAction(title: "Runtime details", style: .default) { [weak self] _ in self?.openGame() })
-            present(alert, animated: true)
+            openGame() // Engine Checks is explicitly not a gameplay launch.
             return
         }
         let missing = USBStorageManager.shared.missingStartupAssets()
