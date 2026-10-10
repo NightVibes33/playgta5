@@ -340,8 +340,9 @@ int32_t gta_wasi_fd_seek(uint32_t fd, int64_t offset,
         pthread_mutex_unlock(&wasi_mutex);
         return GTA_WASI_INVAL;
     }
-    if (base > INT64_MAX || offset < 0 && (uint64_t)(-(offset + 1)) + 1 > base ||
-        offset > 0 && (uint64_t)offset > (uint64_t)INT64_MAX - base) {
+    if (base > INT64_MAX ||
+        (offset < 0 && (uint64_t)(-(offset + 1)) + 1 > base) ||
+        (offset > 0 && (uint64_t)offset > (uint64_t)INT64_MAX - base)) {
         pthread_mutex_unlock(&wasi_mutex);
         return GTA_WASI_INVAL;
     }
