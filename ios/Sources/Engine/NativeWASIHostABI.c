@@ -35,6 +35,7 @@ static unsigned char stdio_open[3] = { 1, 1, 1 };
 typedef struct {
     int owned_fd;
     uint64_t position;
+    int32_t flags;
 } gta_wasi_file;
 static gta_wasi_file wasi_files[GTA_WASI_FILES];
 static pthread_once_t wasi_files_once = PTHREAD_ONCE_INIT;
@@ -62,6 +63,7 @@ int32_t gta_wasi_register_readonly_fd(int host_fd) {
         if (duplicate >= 0) {
             wasi_files[i].owned_fd = duplicate;
             wasi_files[i].position = 0;
+            wasi_files[i].flags = 0;
             result = (int32_t)(GTA_WASI_FILE_BASE + i);
         }
         break;
@@ -76,6 +78,7 @@ void gta_wasi_reset_files(void) {
         if (wasi_files[i].owned_fd >= 0) close(wasi_files[i].owned_fd);
         wasi_files[i].owned_fd = -1;
         wasi_files[i].position = 0;
+        wasi_files[i].flags = 0;
     }
     stdio_open[0] = stdio_open[1] = stdio_open[2] = 1;
     pthread_mutex_unlock(&wasi_mutex);
@@ -257,6 +260,94 @@ int32_t gta_wasi_localtime_js(int64_t seconds,uint64_t at) {
     return rc;
 }
 
+
+/* Matches original game.js FS.currentPath, initialized to "/" and not
+ * subsequently changed by the JS bootstrap. Guest i64 buffer+capacity. */
+int32_t gta_wasi_syscall_getcwd(uint64_t at, uint64_t capacity) {
+    if(capacity==0)return -28;
+    if(capacity<2)return -68;
+    pthread_mutex_lock(&wasi_mutex);
+    if(!span_valid(at,2)){
+        pthread_mutex_unlock(&wasi_mutex);
+        return -21;
+    }
+    guest_memory[(size_t)at]='/';
+    guest_memory[(size_t)at+1]=0;
+    pthread_mutex_unlock(&wasi_mutex);
+    return 2;
+}
+/* Browser __emscripten_system implementation forbids shell execution. */
+int32_t gta_wasi_emscripten_system(uint64_t command) {
+    return command ? -52 : 0;
+}
+static uint32_t gta_fcntl_u32(uint64_t at) {
+    uint32_t result=0;
+    for(unsigned i=0;i<4;i++)
+        result|=(uint32_t)guest_memory[(size_t)at+i]<<(8*i);
+    return result;
+}
+static uint64_t gta_fcntl_u64(uint64_t at) {
+    uint64_t result=0;
+    for(unsigned i=0;i<8;i++)
+        result|=(uint64_t)guest_memory[(size_t)at+i]<<(8*i);
+    return result;
+}
+/* Emscripten __syscall_fcntl64 for authorized, read-only virtual file
+ * descriptors. Implements original FS.dupStream, flag and lock branches.
+ * Never exposes iOS process descriptor numbers to WebAssembly. */
+int32_t gta_wasi_syscall_fcntl64(int32_t fd,int32_t cmd,uint64_t varargs) {
+    pthread_once(&wasi_files_once,gta_wasi_files_init);
+    pthread_mutex_lock(&wasi_mutex);
+    gta_wasi_file *f=fd<0?NULL:gta_wasi_lookup((uint32_t)fd);
+    int32_t result=-8;
+    if(!f)goto finish;
+    switch(cmd){
+        case 0: { /* F_DUPFD */
+            if(!span_valid(varargs,4)){result=-21;break;}
+            int32_t min=(int32_t)gta_fcntl_u32(varargs);
+            if(min<0){result=-28;break;}
+            if(min<GTA_WASI_FILE_BASE)min=GTA_WASI_FILE_BASE;
+            result=-24;
+            for(int32_t dest=min;dest<GTA_WASI_FILE_BASE+GTA_WASI_FILES;dest++){
+                gta_wasi_file *target=&wasi_files[dest-GTA_WASI_FILE_BASE];
+                if(target->owned_fd>=0)continue;
+                int copy=dup(f->owned_fd);
+                if(copy<0)break;
+                target->owned_fd=copy;
+                target->position=f->position;
+                target->flags=f->flags;
+                result=dest;
+                break;
+            }
+            break;
+        }
+        case 1: case 2: result=0;break; /* GETFD/SETFD */
+        case 3: result=f->flags;break; /* GETFL */
+        case 4: {
+            if(!span_valid(varargs,4)){result=-21;break;}
+            int32_t mask=289792;
+            int32_t wanted=(int32_t)gta_fcntl_u32(varargs);
+            f->flags=(f->flags & ~mask)|(wanted & mask);
+            result=0;
+            break;
+        }
+        case 5: {
+            if(!span_valid(varargs,8)){result=-21;break;}
+            uint64_t pointer=gta_fcntl_u64(varargs);
+            if(!span_valid(pointer,2)){result=-21;break;}
+            guest_memory[(size_t)pointer]=2; /* F_UNLCK */
+            guest_memory[(size_t)pointer+1]=0;
+            result=0;
+            break;
+        }
+        case 6:case 7:result=0;break; /* no conflicting guest locks */
+        default:result=-28;break;
+    }
+finish:
+    pthread_mutex_unlock(&wasi_mutex);
+    return result;
+}
+
 int32_t gta_wasi_clock_time_get(uint32_t clock_id, uint64_t precision_ns,
                                  uint64_t out_pointer) {
     (void)precision_ns; /* Hint only; never weaken timestamp precision. */
@@ -397,6 +488,7 @@ int32_t gta_wasi_fd_close(uint32_t fd) {
         close(file->owned_fd);
         file->owned_fd = -1;
         file->position = 0;
+        file->flags = 0;
     } else if (wasi_std_is_open(fd)) {
         stdio_open[fd] = 0;
     } else {

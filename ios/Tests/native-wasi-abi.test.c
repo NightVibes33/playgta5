@@ -129,6 +129,25 @@ int main(void) {
     assert(gta_wasi_localtime_js(0,8)==0);
     assert(gta_wasi_localtime_js(0,150)==1);
     assert(gta_wasi_gmtime_js(0,170)==1);
+    /* Emscripten's real currentPath, shell-disable and fcntl guest ABI. */
+    assert(gta_wasi_syscall_getcwd(0,0)==-28);
+    assert(gta_wasi_syscall_getcwd(0,1)==-68);
+    assert(gta_wasi_syscall_getcwd(191,2)==-21);
+    assert(gta_wasi_syscall_getcwd(0,2)==2);
+    assert(large[0]=='/' && large[1]==0);
+    assert(gta_wasi_emscripten_system(0)==0);
+    assert(gta_wasi_emscripten_system(99)==-52);
+    assert(gta_wasi_syscall_fcntl64(-1,3,0)==-8);
+    assert(gta_wasi_syscall_fcntl64(gamefd,3,0)==0);
+    assert(gta_wasi_syscall_fcntl64(gamefd,1,0)==0);
+    assert(gta_wasi_syscall_fcntl64(gamefd,99,0)==-28);
+    large[120]=7;large[121]=0;large[122]=0;large[123]=0;
+    int32_t dup_guest=gta_wasi_syscall_fcntl64(gamefd,0,120);
+    assert(dup_guest==7);
+    assert(gta_wasi_fd_close((uint32_t)dup_guest)==0);
+    assert(gta_wasi_syscall_fcntl64(gamefd,0,190)==-21);
+    assert(gta_wasi_syscall_fcntl64(gamefd,0,120)==7);
+    assert(gta_wasi_fd_close(7)==0);
     gta_wasi_bind_memory(memory,sizeof memory);
     close(actual); /* guest owns a duplicate, not the source */
     write_le64(memory+40,4);

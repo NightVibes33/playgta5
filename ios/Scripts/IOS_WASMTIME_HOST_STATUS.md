@@ -521,3 +521,25 @@ contain or synthesize actual GTA assets.
 ## Build 31 — batch platform imports (29 of 85 registered)
 
 The ARM64 linker now registers five additional original-game imports: `__syscall_fstat64`, `__syscall_stat64`, `__syscall_lstat64`, `_gmtime_js`, and `_localtime_js`. The stat ABI copies the real authorized archive descriptor metadata into the exact original 104-byte guest layout instead of casting Darwin struct stat. Native time services populate the game.js tm offsets and timezone seconds. Tests check real file sizes and bounds. Directory/symlink/pseudo-filesystem semantics remain incomplete; path stat only works for authorized archive files. The 3 GiB memory import and original gameplay are NOT operational, and these registered callbacks have not been verified against a real on-device GTA module instantiation.
+
+
+## Build 32 — grouped Emscripten syscall implementations (32/85)
+
+Implements three actual game.js host imports with the ABI-accurate
+Wasmtime callback types:
+
+- \`env.__syscall_getcwd(i64,i64)->i32\`: obtains the original Emscripten
+  bootstrap currentPath "/" and writes the real NUL-terminated result into
+  bounded guest memory64; preserves short-buffer return behavior
+- \`env._emscripten_system(i64)->i32\`: reproduces the browser runtime's
+  explicit refusal to spawn a shell (null command succeeds, others return
+  -52) rather than running commands on iOS
+- \`env.__syscall_fcntl64(i32,i32,i64)->i32\`: handles the original
+  virtual-descriptor duplication, status flags and advisory lock cases,
+  keeping the authorized guest fd table separate from POSIX process fds
+
+These are actual guest-visible native services, not linker placeholders;
+unit tests check guest pointers and independent descriptor lifetimes.
+The source still requires the other 53 imported functions, 3 GiB shared
+memory, thread lifecycle, native WebGPU-to-Metal rendering and physical
+iPhone world-play testing. Do not describe the IPA as playable.

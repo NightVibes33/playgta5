@@ -182,7 +182,7 @@ assert 'wasm_httpfs_manifest_js' in host
 assert 'stageHTTPFSManifest()' in native
 assert 'data/manifest.json' in native
 assert 'native-httpfs-manifest.test.c' in workflow
-assert 'registered != 29' in game
+assert 'registered != 32' in game
 assert 'native-input-abi.test.c' in workflow
 
 assert 'wasmtime_linker_define_func' in host
@@ -192,7 +192,7 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 29' in game
+assert 'registered != 32' in game
 assert 'native-aot-smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
@@ -213,6 +213,9 @@ assert 'gta_define_userdata_callbacks' in host
 assert 'gta_define_wasi_callbacks' in host
 assert 'gta_define_openat_callback' in host and '__syscall_openat' in host
 assert 'gta_define_platform_callbacks' in host
+assert 'gta_define_more_callbacks' in host
+for new_import in ('__syscall_getcwd','_emscripten_system','__syscall_fcntl64'):
+    assert new_import in host
 for platform_import in ('__syscall_fstat64','__syscall_stat64','__syscall_lstat64','_gmtime_js','_localtime_js'):
     assert platform_import in host
 assert 'gta_wasi_set_openat_provider' in read('ios/Sources/Engine/NativeEngineSupport.swift')

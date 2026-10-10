@@ -475,6 +475,73 @@ static int gta_define_platform_callbacks(wasmtime_linker_t *linker) {
     return 0;
 }
 
+
+/* Three actual imports from the original game.js:
+ * env.__syscall_getcwd(i64,i64)->i32
+ * env._emscripten_system(i64)->i32
+ * env.__syscall_fcntl64(i32,i32,i64)->i32
+ * Do not register placeholder/default callbacks for unsupported imports.
+ */
+enum { GTA_MORE_CWD=1,GTA_MORE_SYSTEM=2,GTA_MORE_FCNTL=3 };
+static wasm_trap_t *gta_more_callback(void *env,wasmtime_caller_t *caller,
+    const wasmtime_val_t *args,size_t nargs,
+    wasmtime_val_t *out,size_t nout) {
+    (void)caller;
+    uintptr_t op=(uintptr_t)env;
+    if(nout!=1)return NULL;
+    int32_t rc;
+    if(op==GTA_MORE_CWD && nargs==2 && args[0].kind==WASMTIME_I64 &&
+       args[1].kind==WASMTIME_I64)
+        rc=gta_wasi_syscall_getcwd((uint64_t)args[0].of.i64,
+                                   (uint64_t)args[1].of.i64);
+    else if(op==GTA_MORE_SYSTEM && nargs==1 && args[0].kind==WASMTIME_I64)
+        rc=gta_wasi_emscripten_system((uint64_t)args[0].of.i64);
+    else if(op==GTA_MORE_FCNTL && nargs==3 &&
+            args[0].kind==WASMTIME_I32 && args[1].kind==WASMTIME_I32 &&
+            args[2].kind==WASMTIME_I64)
+        rc=gta_wasi_syscall_fcntl64(args[0].of.i32,args[1].of.i32,
+                                     (uint64_t)args[2].of.i64);
+    else return NULL;
+    out[0].kind=WASMTIME_I32;
+    out[0].of.i32=rc;
+    return NULL;
+}
+static int gta_define_more_callbacks(wasmtime_linker_t *linker) {
+    const struct {
+        const char *name; uintptr_t op; wasm_valkind_t kinds[3];size_t count;
+    } funcs[]={
+        {"__syscall_getcwd",GTA_MORE_CWD,{WASM_I64,WASM_I64},2},
+        {"_emscripten_system",GTA_MORE_SYSTEM,{WASM_I64},1},
+        {"__syscall_fcntl64",GTA_MORE_FCNTL,{WASM_I32,WASM_I32,WASM_I64},3}
+    };
+    for(size_t i=0;i<sizeof(funcs)/sizeof(funcs[0]);i++){
+        wasm_valtype_t *args[3]={0};
+        for(size_t j=0;j<funcs[i].count;j++){
+            args[j]=wasm_valtype_new(funcs[i].kinds[j]);
+            if(!args[j]){
+                for(size_t k=0;k<j;k++)wasm_valtype_delete(args[k]);
+                return -1;
+            }
+        }
+        wasm_valtype_t *retval=wasm_valtype_new(WASM_I32);
+        if(!retval){
+            for(size_t j=0;j<funcs[i].count;j++)wasm_valtype_delete(args[j]);
+            return -2;
+        }
+        wasm_valtype_vec_t inputs, outputs;
+        wasm_valtype_vec_new(&inputs,funcs[i].count,args);
+        wasm_valtype_vec_new(&outputs,1,&retval);
+        wasm_functype_t *type=wasm_functype_new(&inputs,&outputs);
+        if(!type)return -3;
+        wasmtime_error_t *error=wasmtime_linker_define_func(
+            linker,"env",3,funcs[i].name,strlen(funcs[i].name),
+            type,gta_more_callback,(void *)funcs[i].op,NULL);
+        wasm_functype_delete(type);
+        if(error){wasmtime_error_delete(error);return -4;}
+    }
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -605,10 +672,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if(installed)*installed+=5;
+    rc=gta_define_more_callbacks(linker);
+    if(rc!=0){
+        gta_host_message(message,capacity,"Native Emscripten fcntl/getcwd/system import registration failed");
+        return rc;
+    }
+    if(installed)*installed+=3;
     return 0;
 }
 
-/* Returns 0 only when 29 ABI-matched host functions are registered
+/* Returns 0 only when 32 ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,

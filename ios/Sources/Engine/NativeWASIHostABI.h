@@ -15,6 +15,9 @@ void gta_wasi_unbind_memory(void);
  * or -1; closes all owned duplicates on reset, never the original FD. */
 int32_t gta_wasi_register_readonly_fd(int host_fd);
 void gta_wasi_reset_files(void);
+int32_t gta_wasi_syscall_getcwd(uint64_t destination,uint64_t capacity);
+int32_t gta_wasi_emscripten_system(uint64_t command);
+int32_t gta_wasi_syscall_fcntl64(int32_t fd,int32_t command,uint64_t varargs);
 int32_t gta_wasi_syscall_fstat64(int32_t fd,uint64_t stat_pointer);
 int32_t gta_wasi_syscall_stat64(uint64_t path,uint64_t stat_pointer);
 int32_t gta_wasi_syscall_lstat64(uint64_t path,uint64_t stat_pointer);
