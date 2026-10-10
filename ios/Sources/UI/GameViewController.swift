@@ -248,8 +248,8 @@ final class GameViewController: UIViewController {
                             self.status.text = "USB engine validated.\nFor native AOT compatibility testing, place real-gta-ios.cwasm next to index.html on the USB drive.\n\nGTA V gameplay is NOT implemented."
                             LogStore.shared.write("native", "Optional AOT module absent from USB root. No game engine linked.")
                         case .deserialized(let imports, let linked, let details):
-                            let headline = details.components(separatedBy: "\\n").first ?? details
-                            self.status.text = "Actual AArch64 GTA AOT module deserialized.\\nImported host bindings: \\(imports).\\nVerified native callbacks: \\(linked).\\n\\n\\(headline)\\n\\nFull unresolved ABI list is in exported logs. Game NOT instantiated."
+                            let headline = details.components(separatedBy: "\n").first ?? details
+                            self.status.text = "Actual AArch64 GTA AOT module deserialized.\nImported host bindings: \(imports).\nVerified native callbacks: \(linked).\n\n\(headline)\n\nFull unresolved ABI list is in exported logs. Game NOT instantiated."
                             LogStore.shared.write("native", "Actual GTA Wasmtime AOT module parsed, imports=\(imports), linked=\(linked), no instantiation")
                         case .failed(let why):
                             self.status.text = "Native AOT compatibility test failed:\n\(why)\n\nNo game execution attempted."
