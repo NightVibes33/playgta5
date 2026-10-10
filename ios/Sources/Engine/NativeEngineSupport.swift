@@ -56,9 +56,9 @@ enum NativeEngineStatus {
     private static let nativeArchiveOpen: @convention(c) (UnsafePointer<CChar>?) -> Int32 = { rawPath in
         guard let rawPath, let relative = String(validatingCString: rawPath),
               relative.hasPrefix("data/") || relative.hasPrefix("b/"),
-              let file = USBStorageManager.shared.file(relative) else { return -2 }
+                let file = USBStorageManager.shared.file(relative) else { return -44 }
         var coordinationError: NSError?
-        var result: Int32 = -5
+        var result: Int32 = -29
         NSFileCoordinator(filePresenter: nil).coordinate(
             readingItemAt: file, options: [], error: &coordinationError
         ) { coordinated in
@@ -66,12 +66,12 @@ enum NativeEngineStatus {
                 let handle = try FileHandle(forReadingFrom: coordinated)
                 result = gta_wasi_register_readonly_fd(handle.fileDescriptor)
                 try handle.close()
-                if result < 3 { result = -24 } // EMFILE: guest fd table exhausted
+                if result < 3 { result = -33 } // Emscripten EMFILE: guest fd table exhausted
             } catch {
                 LogStore.shared.write("native", "Archive open denied: \(relative): \(error.localizedDescription)")
             }
         }
-        return coordinationError == nil ? result : -5
+        return coordinationError == nil ? result : -29
     }
 
     private static func inspectSync() throws -> Inspection {
@@ -350,7 +350,7 @@ final class NativeUSBAssetReader {
             let result: Result<Data, Error>
             do {
                 guard length > 0 && length <= 4 * 1024 * 1024 else {
-                    throw NativeEngineStatus.Failure.io("range size must be 1–4 MiB")
+                    throw NativeEngineStatus.Failure.io("range size must be 1-4 MiB")
                 }
                 guard let file = USBStorageManager.shared.file(relativePath) else {
                     throw NativeEngineStatus.Failure.missing(relativePath)

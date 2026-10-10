@@ -101,9 +101,9 @@ int main(void) {
     archive_test_fd=actual;
     gta_wasi_set_openat_provider(archive_test_open);
     strcpy((char*)memory, "data/test.bin");
-    assert(gta_wasi_syscall_openat(-100,0,O_WRONLY,0)==-13);
-    assert(gta_wasi_syscall_openat(7,0,O_RDONLY,0)==-9);
-    assert(gta_wasi_syscall_openat(-100,UINT64_MAX,O_RDONLY,0)==-14);
+    assert(gta_wasi_syscall_openat(-100,0,1,0)==-2);
+    assert(gta_wasi_syscall_openat(7,0,O_RDONLY,0)==-8);
+    assert(gta_wasi_syscall_openat(-100,UINT64_MAX,O_RDONLY,0)==-21);
     int32_t opened=gta_wasi_syscall_openat(-100,0,O_RDONLY,0);
     assert(opened>=3 && opened!=gamefd);
     assert(gta_wasi_fd_close((uint32_t)opened)==0);
@@ -112,15 +112,15 @@ int main(void) {
     assert(opened>=3);
     assert(gta_wasi_fd_close((uint32_t)opened)==0);
     /* Linux/Emscripten creation bits, independent of Darwin O_CREAT. */
-    assert(gta_wasi_syscall_openat(-100,0,64,0)==-13);
-    assert(gta_wasi_syscall_openat(-100,0,512,0)==-13);
-    assert(gta_wasi_syscall_openat(-100,0,1024,0)==-13);
+    assert(gta_wasi_syscall_openat(-100,0,64,0)==-2);
+    assert(gta_wasi_syscall_openat(-100,0,512,0)==-2);
+    assert(gta_wasi_syscall_openat(-100,0,1024,0)==-2);
     strcpy((char*)memory,"data/../b/secret");
-    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
+    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-2);
     strcpy((char*)memory,"data//broken");
-    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
+    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-2);
     strcpy((char*)memory,"data/./broken");
-    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
+    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-2);
     gta_wasi_set_openat_provider(NULL);
     archive_test_fd=-1;
     /* Real Emscripten stat64 memory64 struct and native calendar fields. */

@@ -109,36 +109,36 @@ int32_t gta_wasi_syscall_openat(int32_t dirfd, uint64_t path_pointer,
                                 int32_t flags, uint64_t varargs_pointer) {
     (void)varargs_pointer;
     if (!gta_archive_flags_readonly(flags))
-        return -13; /* EACCES, read-only game archives */
+        return -2; /* Emscripten EACCES, read-only game archives */
     char name[1024];
     gta_wasi_openat_provider provider = NULL;
     pthread_mutex_lock(&wasi_mutex);
     if (!span_valid(path_pointer, 1)) {
         pthread_mutex_unlock(&wasi_mutex);
-        return -14; /* EFAULT */
+        return -21; /* Emscripten EFAULT */
     }
     size_t i = 0;
     for (; i < sizeof(name) - 1; ++i) {
         if (!span_valid(path_pointer + i, 1)) {
             pthread_mutex_unlock(&wasi_mutex);
-            return -14;
+            return -21;
         }
         name[i] = (char)guest_memory[(size_t)(path_pointer + i)];
         if (!name[i]) break;
     }
     if (i == sizeof(name) - 1) {
         pthread_mutex_unlock(&wasi_mutex);
-        return -36; /* ENAMETOOLONG */
+        return -37; /* Emscripten ENAMETOOLONG */
     }
     provider = wasi_openat_provider;
     pthread_mutex_unlock(&wasi_mutex);
-    if (dirfd != -100 && name[0] != '/') return -9; /* EBADF */
+    if (dirfd != -100 && name[0] != '/') return -8; /* Emscripten EBADF */
     /* Do not trust the embedding provider alone to reject path escape,
      * doubled separators or dot segments. Never normalize a malicious
      * path into an unintended file outside the authorized archive root. */
     char relative[1024];
-    if (!gta_archive_relative_path(name, relative, sizeof(relative))) return -13;
-    if (!provider) return -2;
+    if (!gta_archive_relative_path(name, relative, sizeof(relative))) return -2;
+    if (!provider) return -44; /* Emscripten ENOENT */
     return provider(relative);
 }
 
