@@ -122,6 +122,10 @@ assert "GTAReference.settingsRow" in reference
 for artwork_name in ("gtav-story-trio", "gtav-vinewood-view", "gtav-car-gameplay",
                      "gtav-city-helicopter", "gtav-franklin-race"):
     assert (root / "ios/Sources/Resources" / (artwork_name + ".jpg")).is_file()
+assert '"gtav-official-hero"' in reference, "More must have unique authentic art"
+assert "GTACinematicSurface" in reference, "Home must avoid repeated blurred copy art"
+assert "actionTile" in reference, "Library needs fully interactive native action tiles"
+assert "updateSetting" in reference, "Option rows must reflect saved/live state"
 assert "GTAReferenceGraphicsController" in reference
 assert "NativeEngineStatus.inspect" in reference
 assert "USBStorageManager.shared.chooseAsync" in reference

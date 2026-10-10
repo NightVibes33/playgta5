@@ -1052,6 +1052,12 @@ final class GTAReferenceMoreController: GTAReferencePage {
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("More"))
+        // Distinct, bundled Rockstar artwork for the fifth tab.
+        // This image is not shared with Home, Library, Graphics, or Controls.
+        let visual = GTAReference.image("gtav-official-hero", height: 131)
+        visual.accessibilityLabel = "Official Grand Theft Auto V promotional artwork"
+        stack.addArrangedSubview(visual)
+
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
         let about = GTAReference.panelView()
@@ -1060,6 +1066,7 @@ final class GTAReferenceMoreController: GTAReferencePage {
                                                        size: 12, color: GTAReference.secondary))
         about.addArrangedSubview(controllerStatus)
         stack.addArrangedSubview(about)
+        stack.addArrangedSubview(GTAReference.section("Local Tools"))
         let operations: [(String, String, Selector)] = [
             ("Game Library", "externaldrive", #selector(library)),
             ("Graphics", "display", #selector(graphics)),
