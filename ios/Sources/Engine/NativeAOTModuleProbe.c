@@ -50,7 +50,7 @@ static void gta_audit_append(char *buffer, size_t capacity, size_t *used,
 static void gta_audit_import(char *buffer, size_t capacity, size_t *used,
                              const wasm_name_t *module, const wasm_name_t *name,
                              const wasm_externtype_t *type, bool mismatch) {
-    gta_audit_append(buffer, capacity, used, "\\n%s %.*s.%.*s",
+    gta_audit_append(buffer, capacity, used, "\n%s %.*s.%.*s",
         mismatch ? "TYPE_MISMATCH" : "UNRESOLVED",
         (int)(module->size > 96 ? 96 : module->size), module->data,
         (int)(name->size > 128 ? 128 : name->size), name->data);
@@ -213,7 +213,7 @@ int gta_ios_wasmtime_aot_probe(const char *path,
             first_missing[0]?first_missing:"(none)");
         size_t used = strlen(error_message);
         gta_audit_append(error_message, error_capacity, &used,
-            "\\nVerified module unresolved import signatures:%s", missing_report);
+            "\nVerified module unresolved import signatures:%s", missing_report);
     }
     wasmtime_store_delete(store);
     wasmtime_linker_delete(linker);
