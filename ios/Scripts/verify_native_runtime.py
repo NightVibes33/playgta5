@@ -78,6 +78,8 @@ assert 'content.addArrangedSubview(LosSantosHeroView())' in launcher
 assert 'Select your GTA V folder on USB-C' in launcher
 assert 'More options and diagnostics' in launcher
 assert 'playGradient.colors' in launcher and 'GTATheme.neonBlue.cgColor' in launcher
+assert launcher.index('launchRow.addArrangedSubview(playButton)') < launcher.index('playButton.widthAnchor.constraint(equalTo: launchRow.widthAnchor')
+assert launcher.index('continueCard.addArrangedSubview(preview)') < launcher.index('preview.widthAnchor.constraint(equalTo: continueCard.widthAnchor')
 assert 'NativeEngineStatus.inspect' in launcher and 'validateFiles()' in launcher
 assert 'USBStorageManager.shared.missingStartupAssets()' in launcher
 assert 'No FPS, save progress,' in launcher
@@ -225,7 +227,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>32</string>" in plist
+assert "<key>CFBundleVersion</key><string>33</string>" in plist
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa

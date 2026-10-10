@@ -177,8 +177,8 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         configureMainAction()
         playButton.addTarget(self, action: #selector(launch), for: .touchUpInside)
         playButton.heightAnchor.constraint(equalToConstant: 66).isActive = true
-        playButton.widthAnchor.constraint(equalTo: launchRow.widthAnchor, multiplier: 0.48).isActive = true
         launchRow.addArrangedSubview(playButton)
+        playButton.widthAnchor.constraint(equalTo: launchRow.widthAnchor, multiplier: 0.48).isActive = true
         launchRow.addArrangedSubview(statusTile("GAME FILES", icon: "checkmark.shield.fill",
                                                 output: assetBadge, accent: GTATheme.mint))
         launchRow.addArrangedSubview(statusTile("NATIVE ENGINE", icon: "cpu.fill",
@@ -219,9 +219,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         preview.contentMode = .scaleAspectFill
         preview.clipsToBounds = true
         preview.layer.cornerRadius = 10
-        preview.widthAnchor.constraint(equalTo: continueCard.widthAnchor, multiplier: 0.39).isActive = true
         preview.heightAnchor.constraint(equalToConstant: 86).isActive = true
         continueCard.addArrangedSubview(preview)
+        preview.widthAnchor.constraint(equalTo: continueCard.widthAnchor, multiplier: 0.39).isActive = true
         let resumeCopy = UIStackView()
         resumeCopy.axis = .vertical
         resumeCopy.spacing = 5

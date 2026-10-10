@@ -210,7 +210,7 @@ jobs:
           xcrun simctl install "$UDID" "$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/GTAiOS.app"
           LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.nightvibes33.gtaios)
           echo "$LAUNCH_OUTPUT"
-          APP_PID=$(printf '%s\\n' "$LAUNCH_OUTPUT" | awk -F': ' '/com.nightvibes33.gtaios:/ {print $2}' | tail -1)
+          APP_PID=$(echo "$LAUNCH_OUTPUT" | awk -F': ' '/com.nightvibes33.gtaios:/ {print $2}' | tr -dc '0-9')
           test -n "$APP_PID"
           sleep 8
           xcrun simctl io "$UDID" screenshot iphone-launcher.png
@@ -223,8 +223,7 @@ jobs:
               --predicate '(process == "GTAiOS") OR (process == "SpringBoard") OR (eventMessage CONTAINS[c] "gtaios")' \
               > "$RUNNER_TEMP/simulator-runtime.log" 2>&1 || true
             find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 \
-              -iname '*GTAiOS*' -type f -print \
-              -exec cp {} "$RUNNER_TEMP/" \\; 2>/dev/null || true
+              -iname '*GTAiOS*' -type f -print 2>/dev/null || true
             tail -100 "$RUNNER_TEMP/simulator-runtime.log" || true
             exit 1
           fi
