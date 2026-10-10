@@ -323,20 +323,20 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         var config = UIButton.Configuration.plain()
         config.title = title
         config.image = UIImage(systemName: symbol)
-        config.imagePadding = 5
-        config.imagePlacement = filled ? .trailing : .leading
+        config.imagePadding = filled ? 8 : 5
+        config.imagePlacement = filled ? .trailing : .top
         config.titleLineBreakMode = .byTruncatingTail
         config.baseForegroundColor = filled ? GTATheme.night : GTATheme.cream
         config.background.backgroundColor = filled ? GTATheme.coral : GTATheme.inset
         config.cornerStyle = .large
         config.contentInsets = NSDirectionalEdgeInsets(top: 11, leading: 10, bottom: 11, trailing: 10)
         b.configuration = config
-        b.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
+        b.titleLabel?.font = .systemFont(ofSize: filled ? 13 : 11, weight: .bold)
         b.titleLabel?.numberOfLines = 1
         b.titleLabel?.lineBreakMode = .byTruncatingTail
         b.titleLabel?.adjustsFontSizeToFitWidth = true
         b.titleLabel?.minimumScaleFactor = 0.75
-        b.heightAnchor.constraint(greaterThanOrEqualToConstant: filled ? 56 : 54).isActive = true
+        b.heightAnchor.constraint(greaterThanOrEqualToConstant: filled ? 56 : 64).isActive = true
     }
     private func refresh() {
         updateMode()
@@ -386,6 +386,7 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     }
     private func updateDevice(_ name: String) {
         deviceLabel.text = name == "No controller" ? "No controller · Pair in iOS Settings" : "Controller connected · " + name
+        highlightFocus()
     }
     @objc private func selectMode(_ sender: UIButton) {
         EngineOptions.set("mode", value: ["story", "sandbox5", "sandbox6"][sender.tag])
@@ -394,10 +395,16 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     }
     private var buttons: [UIButton] { [playButton, folderButton, settingsButton, controllerButton] + modeButtons + [logsButton] }
     private func highlightFocus() {
+        // Present the focus ring only when a game controller is connected.
+        let controllerConnected = ControllerManager.shared.currentName != "No controller"
         for (i, b) in buttons.enumerated() {
-            b.layer.borderColor = (i == focusIndex ? GTATheme.coral : UIColor.clear).cgColor
-            b.layer.borderWidth = i == focusIndex ? 2 : 0
-            b.accessibilityValue = i == focusIndex ? "Controller focused" : nil
+            let focused = controllerConnected && i == focusIndex
+            b.layer.cornerRadius = 14
+            b.layer.cornerCurve = .continuous
+            b.clipsToBounds = true
+            b.layer.borderColor = (focused ? GTATheme.coral : UIColor.clear).cgColor
+            b.layer.borderWidth = focused ? 2 : 0
+            b.accessibilityValue = focused ? "Controller focused" : nil
         }
     }
     private func handleController(_ state: [String: Double]) {

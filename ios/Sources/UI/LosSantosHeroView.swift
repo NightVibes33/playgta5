@@ -162,14 +162,14 @@ final class LosSantosHeroView: UIView {
         top.alignment = .center
         top.translatesAutoresizingMaskIntoConstraints = false
         let mark = UILabel()
-        mark.text = "V"
+        mark.text = "LS"
         mark.textAlignment = .center
         mark.textColor = GTATheme.night
         mark.backgroundColor = GTATheme.coral
         mark.layer.cornerRadius = 9
         mark.layer.cornerCurve = .continuous
         mark.clipsToBounds = true
-        mark.font = .systemFont(ofSize: 20, weight: .black)
+        mark.font = .systemFont(ofSize: 13, weight: .black)
         mark.widthAnchor.constraint(equalToConstant: 34).isActive = true
         mark.heightAnchor.constraint(equalToConstant: 34).isActive = true
         let section = UILabel()
