@@ -79,3 +79,115 @@ replace('ios/project.yml', 'TARGETED_DEVICE_FAMILY: "1,2"', 'TARGETED_DEVICE_FAM
 
 replace('ios/Launcher.swift', '            VStack(spacing: 16) {\n                Text("GTAiOS").font(.largeTitle.weight(.bold))', '            ScrollView {\n            VStack(spacing: 16) {\n                Text("GTAiOS").font(.largeTitle.weight(.bold))\n                Image("gtav-story-trio").resizable().scaledToFill()\n                    .frame(height: 100).clipped().accessibilityHidden(true)')
 replace('ios/Launcher.swift', '            .padding(24)\n            .frame(maxWidth: .infinity)\n            Form {', '            .padding(24)\n            }\n            .frame(maxWidth: .infinity)\n            Form {')
+
+
+# Keep the existing five-tab GTAiOS UIKit launcher. Muguet's native Rust
+# executable presents it, and the Play action invokes its actual game loop.
+# Do not compile or show Muguet's stock SwiftUI launcher.
+project = base.parent
+launcher = (project / "ios/Sources/UI/GTAFiveTabLauncher.swift").read_text(encoding="utf-8")
+launcher = launcher.replace("GameNavigationController(rootViewController: entry.0)",
+                            "UINavigationController(rootViewController: entry.0)")
+launcher = launcher.replace("ControllerSettingsViewController()", "GTANativeControlsViewController()")
+old_navigation = """        navigationController?.setNavigationBarHidden(false, animated: true)
+        let gameplay = GameViewController()
+        gameplay.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(gameplay, animated: true)"""
+assert launcher.count(old_navigation) == 1, "Original GTAiOS launch callback changed"
+launcher = launcher.replace(old_navigation, "        NativeRuntimeBridge.play()")
+launcher = launcher.replace('"Inspected game.wasm: "', '"Inspected game manifest: "')
+launcher = launcher.replace('"WebAssembly engine readable: "', '"Game manifest readable: "')
+launcher = launcher.replace('". Shader index found. This does not establish playable GTA V runtime."',
+                            '". Shaders located. The engine is embedded in the app."')
+launcher = launcher.replace('"Native Runtime Checks"', '"Start Native Engine"')
+launcher = launcher.replace('"Live native PCM mixer gain"', '"Applied to real native CoreAudio output at launch"')
+launcher = launcher.replace('        addScale(to: display)',
+                            '        addEngineOption("mode", to: display)\n        addEngineOption("newgame", to: display)\n        addScale(to: display)')
+# Only Muguet's actually-supported game modes are offered.
+options = (project / "ios/Sources/Engine/EngineOptions.swift").read_text(encoding="utf-8")
+options = options.replace('("Sandbox · Los Santos", "sandbox5"), ("Sandbox · env_test", "sandbox6")',
+                          '("Sandbox · Los Santos", "sandbox5")')
+(source / "ios/Launcher.swift").write_text(
+    (base / "NativeFiveTabEntry.swift").read_text(encoding="utf-8"), encoding="utf-8")
+(source / "ios/GTAFiveTabLauncher.swift").write_text(launcher, encoding="utf-8")
+(source / "ios/EngineOptions.swift").write_text(options, encoding="utf-8")
+(source / "ios/GTALaunchPreferences.swift").write_text(
+    (project / "ios/Sources/UI/GTALaunchPreferences.swift").read_text(encoding="utf-8"), encoding="utf-8")
+(source / "ios/LogStore.swift").write_text(
+    (project / "ios/Sources/Support/LogStore.swift").read_text(encoding="utf-8"), encoding="utf-8")
+
+# The iOS Swift launcher is statically compiled by Muguet/build.rs rather than
+# by XcodeGen's stub target; all five-tab sources must be linked in that archive.
+replace("build.rs", '.arg("ios/Launcher.swift")',
+        '.args(["ios/Launcher.swift", "ios/GTAFiveTabLauncher.swift",\n'
+        '               "ios/EngineOptions.swift", "ios/GTALaunchPreferences.swift",\n'
+        '               "ios/LogStore.swift"])')
+# Copy across the original Rockstar artwork, without image generation/reuse.
+replace("ios/project.yml",
+        '- path: ../../../ios/Sources/Resources/gtav-story-trio.jpg',
+        '\n'.join('- path: ../../../ios/Sources/Resources/' + f for f in [
+            "gtav-story-trio.jpg", "gtav-official-cover.jpg",
+            "gtav-official-hero.jpg", "gtav-car-gameplay.jpg",
+            "gtav-vinewood-view.jpg", "gtav-city-helicopter.jpg",
+            "gtav-franklin-race.jpg", "gtav-official-header.jpg"
+        ]))
+
+# Detaching the Files provider must also unmount the native Rust game root.
+replace("src/config.rs",
+        '// Read-only mount: never extract, prune, write, or copy the selected library.',
+        '''pub fn unmount_external() {
+    *EXTERNAL_GAME.lock().unwrap() = None;
+}
+
+// Read-only mount: never extract, prune, write, or copy the selected library.''')
+replace("src/import.rs",
+        '    #[no_mangle]\n    pub extern "C" fn muguet_import_error()',
+        '''    #[no_mangle]
+    pub extern "C" fn muguet_unmount_external() {
+        crate::config::unmount_external();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn muguet_import_error()''')
+
+# Native audio uses real CoreAudio output; the user's Master Volume slider
+# sets an output gain rather than changing a cosmetic preference.
+replace("src/config.rs",
+        '    if flag("mute") { set_default("MUGUET_MUTE", "1"); }',
+        '''    if flag("mute") { set_default("MUGUET_MUTE", "1"); }
+    if let Some(gain) = num("master_volume") {
+        set_default("MUGUET_MASTER_VOLUME", gain.clamp(0.0, 1.0).to_string());
+    }''')
+replace("src/audio.rs",
+        '    let (base, _) = crate::mem_base_len(&RT.get().unwrap().mem);',
+        '''    let gain = std::env::var("MUGUET_MASTER_VOLUME").ok()
+        .and_then(|v| v.parse::<f32>().ok()).unwrap_or(1.0).clamp(0.0, 1.0);
+    let (base, _) = crate::mem_base_len(&RT.get().unwrap().mem);''')
+replace("src/audio.rs", 'out[2 * i] = *p;', 'out[2 * i] = *p * gain;')
+replace("src/audio.rs", 'out[2 * i + 1] = *p.add(1);', 'out[2 * i + 1] = *p.add(1) * gain;')
+
+# Make actual native stdout/stderr available in Files > GTAiOS > GTAiOS-Logs.
+replace("src/config.rs",
+        '''    if cfg!(target_os = "ios") {
+        return;
+    }''',
+        '''    if cfg!(target_os = "ios") {
+        use std::os::fd::IntoRawFd;
+        extern "C" { fn dup2(old: i32, new: i32) -> i32; }
+        let dir = support_dir().join("GTAiOS-Logs");
+        if std::fs::create_dir_all(&dir).is_ok() {
+            if let Ok(file) = std::fs::OpenOptions::new()
+                .create(true).append(true).open(dir.join("engine.txt")) {
+                let fd = file.into_raw_fd();
+                unsafe { dup2(fd, 1); dup2(fd, 2); }
+            }
+        }
+        return;
+    }''')
+
+replace("ios/Info.plist",
+        '<key>CFBundleDisplayName</key><string>GTAiOS Native</string>',
+        '<key>CFBundleDisplayName</key><string>GTA V iOS</string>\n'
+        '  <key>UIFileSharingEnabled</key><true/>\n'
+        '  <key>LSSupportsOpeningDocumentsInPlace</key><true/>')
+print("Native engine uses original GTAiOS five-tab UIKit UI and engine-backed settings")
