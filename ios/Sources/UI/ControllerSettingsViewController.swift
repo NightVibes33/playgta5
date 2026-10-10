@@ -32,7 +32,7 @@ final class ControllerSettingsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Controller studio"
+        title = "Controller"
         view.backgroundColor = GTATheme.night
         scroll.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -63,7 +63,7 @@ final class ControllerSettingsViewController: UIViewController {
         let titles = UIStackView()
         titles.axis = .vertical
         titles.spacing = 3
-        titles.addArrangedSubview(GTATheme.section("Take control."))
+        titles.addArrangedSubview(GTATheme.section("Controller setup"))
         titles.addArrangedSubview(GTATheme.caption("Bluetooth · wired · touch"))
         top.addArrangedSubview(controllerIcon)
         top.addArrangedSubview(titles)
@@ -134,7 +134,7 @@ final class ControllerSettingsViewController: UIViewController {
             stack.addArrangedSubview(button)
         }
         let rumble = UIButton(type: .system)
-        rumble.setTitle("TEST CONTROLLER VIBRATION", for: .normal)
+        rumble.setTitle("Test controller vibration", for: .normal)
         rumble.tintColor = GTATheme.night
         rumble.backgroundColor = GTATheme.coral
         rumble.layer.cornerRadius = 13

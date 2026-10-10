@@ -1,49 +1,45 @@
+
 import UIKit
 import CoreGraphics
 
-/// GTAiOS visual language: warm Los Santos sunset, editorial condensed display,
-/// native iOS controls, and explicit native-engine readiness. Entirely drawn
-/// in UIKit/CoreGraphics; no bitmap downloads or runtime web content.
+/// Restrained launcher palette, inspired by the game's city-at-dusk setting.
+/// No runtime asset downloads, shaders, animation loops or artwork IO.
 enum GTATheme {
-    static let night = UIColor(red: 0.055, green: 0.066, blue: 0.080, alpha: 1)
-    static let raised = UIColor(red: 0.108, green: 0.123, blue: 0.145, alpha: 1)
-    static let inset = UIColor(red: 0.138, green: 0.152, blue: 0.177, alpha: 1)
-    static let coral = UIColor(red: 1.0, green: 0.717, blue: 0.509, alpha: 1)
-    static let cream = UIColor(red: 0.995, green: 0.973, blue: 0.932, alpha: 1)
-    static let subdued = UIColor(red: 0.725, green: 0.749, blue: 0.762, alpha: 1)
-    static let success = UIColor(red: 0.622, green: 0.890, blue: 0.726, alpha: 1)
+    static let night = UIColor(red: 0.047, green: 0.056, blue: 0.073, alpha: 1)
+    static let raised = UIColor(red: 0.102, green: 0.116, blue: 0.140, alpha: 1)
+    static let inset = UIColor(red: 0.145, green: 0.158, blue: 0.181, alpha: 1)
+    static let coral = UIColor(red: 0.98, green: 0.67, blue: 0.44, alpha: 1)
+    static let cream = UIColor(red: 0.97, green: 0.97, blue: 0.965, alpha: 1)
+    static let subdued = UIColor(red: 0.66, green: 0.69, blue: 0.73, alpha: 1)
+    static let success = UIColor(red: 0.54, green: 0.82, blue: 0.63, alpha: 1)
 
     static func caption(_ text: String) -> UILabel {
-        let label = UILabel()
-        label.text = text
-        label.textColor = subdued
-        label.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .systemFont(ofSize: 12, weight: .semibold))
-        label.adjustsFontForContentSizeCategory = true
-        return label
+        let l = UILabel()
+        l.text = text
+        l.textColor = subdued
+        l.font = .systemFont(ofSize: 12, weight: .medium)
+        l.adjustsFontForContentSizeCategory = true
+        return l
     }
 
     static func section(_ title: String) -> UILabel {
-        let label = UILabel()
-        label.text = title
-        label.textColor = cream
-        label.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: .systemFont(ofSize: 20, weight: .bold))
-        label.adjustsFontForContentSizeCategory = true
-        return label
+        let l = UILabel()
+        l.text = title
+        l.textColor = cream
+        l.font = .systemFont(ofSize: 20, weight: .bold)
+        l.adjustsFontForContentSizeCategory = true
+        return l
     }
 
     static func card(_ view: UIView) {
         view.backgroundColor = raised
-        view.layer.cornerRadius = 17
+        view.layer.cornerRadius = 18
         view.layer.cornerCurve = .continuous
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.white.withAlphaComponent(0.075).cgColor
+        view.layer.borderColor = UIColor.white.withAlphaComponent(0.085).cgColor
     }
 }
 
-/// Static custom-drawn local skyline. Drawing is triggered by bounds changes;
-/// it never performs USB reads, animations, allocation spikes or web requests.
 private final class SunsetSkylineView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -136,17 +132,19 @@ private final class SunsetSkylineView: UIView {
     }
 }
 
-/// The distinctive first viewport, with correct status copy that never claims
-/// native gameplay is available simply because Metal/USB initialization works.
+
+/// Compact, fixed-height cinematic artwork. Fixed text widths and line
+/// breaking prevent "GRAND THEFT..." truncation on a 393pt iPhone.
 final class LosSantosHeroView: UIView {
     private let skyline = SunsetSkylineView()
     override init(frame: CGRect) {
         super.init(frame: frame)
         clipsToBounds = true
-        layer.cornerRadius = 20
+        layer.cornerRadius = 18
         layer.cornerCurve = .continuous
         layer.borderWidth = 1
-        layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
+        layer.borderColor = UIColor.white.withAlphaComponent(0.10).cgColor
+
         skyline.translatesAutoresizingMaskIntoConstraints = false
         addSubview(skyline)
         NSLayoutConstraint.activate([
@@ -156,96 +154,62 @@ final class LosSantosHeroView: UIView {
             skyline.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
 
-        let top = UIStackView()
-        top.axis = .horizontal
-        top.spacing = 8
-        top.alignment = .center
-        top.translatesAutoresizingMaskIntoConstraints = false
-        let mark = UILabel()
-        mark.text = "LS"
-        mark.textAlignment = .center
-        mark.textColor = GTATheme.night
-        mark.backgroundColor = GTATheme.coral
-        mark.layer.cornerRadius = 9
-        mark.layer.cornerCurve = .continuous
-        mark.clipsToBounds = true
-        mark.font = .systemFont(ofSize: 13, weight: .black)
-        mark.widthAnchor.constraint(equalToConstant: 34).isActive = true
-        mark.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        let section = UILabel()
-        section.text = "LOS SANTOS"
-        section.textColor = GTATheme.cream
-        section.font = .systemFont(ofSize: 11, weight: .heavy)
-        section.setContentHuggingPriority(.required, for: .horizontal)
-        let spacer = UIView()
-        let state = UILabel()
-        state.text = "PORT IN PROGRESS"
-        state.font = .systemFont(ofSize: 9, weight: .heavy)
-        state.textColor = GTATheme.cream
-        state.textAlignment = .center
-        state.backgroundColor = GTATheme.night.withAlphaComponent(0.68)
-        state.layer.cornerRadius = 9
-        state.layer.cornerCurve = .continuous
-        state.clipsToBounds = true
-        state.numberOfLines = 1
-        state.widthAnchor.constraint(greaterThanOrEqualToConstant: 111).isActive = true
-        state.heightAnchor.constraint(equalToConstant: 30).isActive = true
-        top.addArrangedSubview(mark)
-        top.addArrangedSubview(section)
-        top.addArrangedSubview(spacer)
-        top.addArrangedSubview(state)
+        let eyebrow = UILabel()
+        eyebrow.text = "LOS SANTOS  /  GTA V"
+        eyebrow.textColor = GTATheme.cream.withAlphaComponent(0.90)
+        eyebrow.font = .systemFont(ofSize: 10, weight: .heavy)
+        eyebrow.letterSpacingIfAvailable()
+        eyebrow.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(eyebrow)
 
         let title = UILabel()
         title.text = "GRAND THEFT\nAUTO V"
-        title.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(
-            for: .systemFont(ofSize: 39, weight: .black))
-        title.adjustsFontForContentSizeCategory = true
-        title.textColor = GTATheme.cream
+        title.font = .systemFont(ofSize: 36, weight: .black, width: .condensed)
+        title.textColor = .white
         title.numberOfLines = 2
-        title.minimumScaleFactor = 0.7
+        title.lineBreakMode = .byWordWrapping
         title.adjustsFontSizeToFitWidth = true
-        title.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        title.minimumScaleFactor = 0.72
+        title.setContentCompressionResistancePriority(.required, for: .vertical)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(title)
 
-        let subtitle = UILabel()
-        subtitle.text = "THE NATIVE iPHONE PROJECT"
-        subtitle.textColor = GTATheme.cream.withAlphaComponent(0.88)
-        subtitle.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .systemFont(ofSize: 12, weight: .bold))
-        subtitle.adjustsFontForContentSizeCategory = true
+        let tagline = UILabel()
+        tagline.text = "LOS SANTOS · YOUR GAME LIBRARY"
+        tagline.textColor = GTATheme.cream.withAlphaComponent(0.82)
+        tagline.font = .systemFont(ofSize: 10, weight: .semibold)
+        tagline.numberOfLines = 1
+        tagline.adjustsFontSizeToFitWidth = true
+        tagline.minimumScaleFactor = 0.7
+        tagline.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(tagline)
 
-        let copy = UIStackView(arrangedSubviews: [title, subtitle])
-        copy.axis = .vertical
-        copy.spacing = 5
-        copy.alignment = .leading
-        copy.translatesAutoresizingMaskIntoConstraints = false
-
-        let footer = UILabel()
-        footer.text = "A18 CPU     •     APPLE METAL     •     USB-C"
-        footer.textColor = GTATheme.cream.withAlphaComponent(0.82)
-        footer.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
-            for: .monospacedSystemFont(ofSize: 10, weight: .semibold))
-        footer.adjustsFontForContentSizeCategory = true
-        footer.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(top)
-        addSubview(copy)
-        addSubview(footer)
-
-        let constraints = [
-            top.topAnchor.constraint(equalTo: topAnchor, constant: 17),
-            top.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
-            top.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
-            copy.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
-            copy.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
-            copy.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 7),
-            footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
-            footer.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
-            footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -17),
-            heightAnchor.constraint(greaterThanOrEqualToConstant: 255)
-        ]
-        NSLayoutConstraint.activate(constraints)
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 216),
+            eyebrow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            eyebrow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            eyebrow.topAnchor.constraint(equalTo: topAnchor, constant: 20),
+            title.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            title.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            title.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 2),
+            tagline.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            tagline.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            tagline.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -18)
+        ])
         isAccessibilityElement = true
-        accessibilityLabel = "Grand Theft Auto V native iPhone project. Port in progress. A18, Apple Metal, USB-C."
         accessibilityTraits = .staticText
+        accessibilityLabel = "Grand Theft Auto V, Los Santos game library"
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+}
+
+private extension UILabel {
+    func letterSpacingIfAvailable() {
+        guard let text = text else { return }
+        let fontAttributes: [NSAttributedString.Key: Any] = [
+            .kern: 1.4, .foregroundColor: textColor as Any,
+            .font: font as Any
+        ]
+        attributedText = NSAttributedString(string: text, attributes: fontAttributes)
+    }
 }
