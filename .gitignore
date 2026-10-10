@@ -1,2 +1,7 @@
 mirror/
 media/
+playgta5-engine-input/
+native/Muguet/target/
+native/Muguet/build/
+native/__pycache__/
+.engine-input/
