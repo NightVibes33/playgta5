@@ -20,6 +20,16 @@ int32_t gta_wasi_environ_get(uint64_t environ_pointer,
 /* Real game.wasm memory64 signature: i32,i64,i64,i64 -> i32 */
 int32_t gta_wasi_fd_write(uint32_t fd, uint64_t iovs, uint64_t count,
                           uint64_t written_pointer);
+/* Verified memory64 game.wasm imports; currently operate on standard FDs
+ * only. Archive file descriptors require a separate native USB fd table.
+ */
+int32_t gta_wasi_fd_close(uint32_t fd);
+int32_t gta_wasi_fd_read(uint32_t fd, uint64_t iovs,
+                         uint64_t iovcnt, uint64_t nread);
+int32_t gta_wasi_fd_seek(uint32_t fd, int64_t offset,
+                         uint32_t whence, uint64_t new_offset);
+int32_t gta_wasi_fd_pread(uint32_t fd, uint64_t iovs,
+                          uint64_t iovcnt, uint64_t offset, uint64_t nread);
 #ifdef __cplusplus
 }
 #endif

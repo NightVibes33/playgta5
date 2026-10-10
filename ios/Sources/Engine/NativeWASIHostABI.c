@@ -7,12 +7,21 @@
 #include "NativeTextHostABI.h"
 
 /* WASI preview1 errno values, not POSIX errno. */
-enum { GTA_WASI_SUCCESS=0, GTA_WASI_FAULT=21, GTA_WASI_INVAL=28,
-       GTA_WASI_IO=29, GTA_WASI_NOTSUP=58, GTA_WASI_OVERFLOW=61 };
+enum { GTA_WASI_SUCCESS=0, GTA_WASI_BADF=8, GTA_WASI_FAULT=21,
+       GTA_WASI_INVAL=28, GTA_WASI_IO=29, GTA_WASI_NOTSUP=58,
+       GTA_WASI_OVERFLOW=61, GTA_WASI_SPIPE=70 };
 
 static pthread_mutex_t wasi_mutex = PTHREAD_MUTEX_INITIALIZER;
 static unsigned char *guest_memory;
 static uint64_t guest_length;
+/* The game's original browser process exposes 0/1/2 as standard streams.
+ * File-backed descriptors must later be registered by the USB/fd-table ABI;
+ * do not guess an app process POSIX fd or grant arbitrary filesystem access.
+ */
+static unsigned char stdio_open[3] = { 1, 1, 1 };
+static int wasi_std_is_open(uint32_t fd) {
+    return fd < 3 && stdio_open[fd];
+}
 
 void gta_wasi_bind_memory(void *memory, uint64_t length) {
     pthread_mutex_lock(&wasi_mutex);
@@ -110,8 +119,11 @@ static uint64_t get_u64_le(uint64_t at) {
 }
 int32_t gta_wasi_fd_write(uint32_t fd, uint64_t iovs,
                           uint64_t iovcnt, uint64_t nwritten) {
-    if (fd != 1 && fd != 2) return 8; /* WASI EBADF */
     pthread_mutex_lock(&wasi_mutex);
+    if ((fd!=1 && fd!=2) || !wasi_std_is_open(fd)) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_BADF;
+    }
     if (iovcnt > 256 || iovcnt > UINT64_MAX / 16 ||
         !span_valid(iovs, iovcnt*16) || !span_valid(nwritten, 8)) {
         pthread_mutex_unlock(&wasi_mutex);
@@ -146,4 +158,73 @@ int32_t gta_wasi_fd_write(uint32_t fd, uint64_t iovs,
     if (preview_n) gta_text_host_enqueue_bytes(
         fd==1 ? "[wasi-stdout]" : "[wasi-stderr]", preview, preview_n);
     return GTA_WASI_SUCCESS;
+}
+
+/* WASI Preview1 FD services with the verified memory64 signatures:
+ * fd_close(i32)->i32
+ * fd_read(i32,i64,i64,i64)->i32
+ * fd_seek(i32,i64,i32,i64)->i32
+ * fd_pread(i32,i64,i64,i64,i64)->i32
+ *
+ * Correct standard-stream behavior only. Regular file descriptors (needed
+ * for game archives) are NOT silently mapped to unrelated host OS fds.
+ * A native virtual-fd table and USB-backed openat are still required.
+ */
+int32_t gta_wasi_fd_close(uint32_t fd) {
+    pthread_mutex_lock(&wasi_mutex);
+    if (!wasi_std_is_open(fd)) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_BADF;
+    }
+    stdio_open[fd] = 0;
+    pthread_mutex_unlock(&wasi_mutex);
+    return GTA_WASI_SUCCESS;
+}
+
+/* iOS apps have no meaningful interactive WASI stdin. An open fd=0 returns
+ * EOF (0 bytes) after verifying all 64-bit guest iovecs and nread pointer.
+ * stdout/stderr cannot be read. No fabricated game/archive data is returned.
+ */
+int32_t gta_wasi_fd_read(uint32_t fd, uint64_t iovs,
+                        uint64_t iovcnt, uint64_t nread) {
+    pthread_mutex_lock(&wasi_mutex);
+    if (fd != 0 || !wasi_std_is_open(fd)) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_BADF;
+    }
+    if (iovcnt > 256 || iovcnt > UINT64_MAX/16 ||
+        !span_valid(iovs, iovcnt*16) || !span_valid(nread, 8)) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return GTA_WASI_FAULT;
+    }
+    for (uint64_t i=0; i<iovcnt; ++i) {
+        uint64_t ptr = get_u64_le(iovs + i*16);
+        uint64_t len = get_u64_le(iovs + i*16 + 8);
+        if (!span_valid(ptr, len)) {
+            pthread_mutex_unlock(&wasi_mutex);
+            return GTA_WASI_FAULT;
+        }
+    }
+    put_u64_le(nread, 0);
+    pthread_mutex_unlock(&wasi_mutex);
+    return GTA_WASI_SUCCESS;
+}
+
+int32_t gta_wasi_fd_seek(uint32_t fd, int64_t offset,
+                        uint32_t whence, uint64_t new_offset) {
+    (void)offset; (void)whence; (void)new_offset;
+    pthread_mutex_lock(&wasi_mutex);
+    int rc = wasi_std_is_open(fd) ? GTA_WASI_SPIPE : GTA_WASI_BADF;
+    pthread_mutex_unlock(&wasi_mutex);
+    return rc;
+}
+int32_t gta_wasi_fd_pread(uint32_t fd, uint64_t iovs,
+                         uint64_t iovcnt, uint64_t offset,
+                         uint64_t nread) {
+    (void)iovs; (void)iovcnt; (void)offset; (void)nread;
+    pthread_mutex_lock(&wasi_mutex);
+    int rc = (fd==0 && wasi_std_is_open(fd)) ? GTA_WASI_SPIPE
+             : GTA_WASI_BADF;
+    pthread_mutex_unlock(&wasi_mutex);
+    return rc;
 }

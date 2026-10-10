@@ -55,10 +55,41 @@ int main(void) {
     assert(gta_wasi_fd_write(1,40,1,64)==28);
     write_le64(memory+40,4);
     assert(gta_wasi_fd_write(1,40,1,79)==21);
+    /* Real standard-FD semantics for the engine's additional WASI ABI.
+     * stdin reaches EOF; stdout/stderr cannot be read or seeked.
+     * Foreign archive file descriptors remain EBADF, never process FDs.
+     */
+    assert(gta_wasi_fd_seek(0, 0, 0, 64)==70);
+    assert(gta_wasi_fd_seek(1, -1, 1, 64)==70);
+    assert(gta_wasi_fd_seek(99, 0, 0, 64)==8);
+    assert(gta_wasi_fd_pread(0, 40, 1, 0, 64)==70);
+    assert(gta_wasi_fd_pread(99, 40, 1, 0, 64)==8);
+    assert(gta_wasi_fd_read(1, 40, 1, 64)==8);
+    assert(gta_wasi_fd_read(2, 40, 1, 64)==8);
+    write_le64(memory+40, 4);
+    write_le64(memory+48, 3);
+    memory[4]='Z';
+    write_le64(memory+64, UINT64_MAX);
+    assert(gta_wasi_fd_read(0, 40, 1, 64)==0);
+    assert(le64(memory+64)==0 && memory[4]=='Z');
+    assert(gta_wasi_fd_read(0, 40, 1, 79)==21);
+    assert(gta_wasi_fd_read(0, 40, 257, 64)==21);
+    write_le64(memory+40, UINT64_MAX);
+    assert(gta_wasi_fd_read(0, 40, 1, 64)==21);
+    assert(gta_wasi_fd_close(5)==8);
     gta_wasi_unbind_memory();
-    assert(gta_wasi_fd_write(1,40,1,64)==21);
+    assert(gta_wasi_fd_read(0, 40, 1, 64)==21);
+    assert(gta_wasi_fd_close(1)==0);
+    assert(gta_wasi_fd_close(1)==8);
+    assert(gta_wasi_fd_write(1,40,1,64)==8);
+    assert(gta_wasi_fd_close(2)==0);
+    assert(gta_wasi_fd_close(0)==0);
+    assert(gta_wasi_fd_read(0, 40, 1, 64)==8);
+    assert(gta_wasi_fd_seek(0, 0, 0, 64)==8);
+    assert(gta_wasi_fd_close(0)==8);
+    assert(gta_wasi_fd_write(1,40,1,64)==8);
     assert(gta_wasi_environ_sizes_get(0, 8)==21);
     assert(gta_wasi_clock_time_get(1, 0, 8)==21);
-    printf("PASS: actual memory64 WASI clock_time_get, environ_sizes_get, environ_get, fd_write; bounds/unbind/secret-free env\n");
+    printf("PASS: memory64 WASI clock/env, fd_write and stdio fd_close/read/seek/pread; bounds, EOF and EBADF\n");
     return 0;
 }

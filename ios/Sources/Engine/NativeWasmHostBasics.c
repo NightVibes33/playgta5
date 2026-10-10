@@ -273,7 +273,9 @@ static int gta_define_userdata_callbacks(wasmtime_linker_t *linker) {
  * and write the actual expected WASI output cells. The embedding runtime
  * must bind the live shared memory before GTA can call these callbacks.
  */
-enum { GTA_WASI_CLOCK=1, GTA_WASI_ENV_SIZES=2, GTA_WASI_ENV_GET=3, GTA_WASI_FD_WRITE=4 };
+enum { GTA_WASI_CLOCK=1, GTA_WASI_ENV_SIZES=2, GTA_WASI_ENV_GET=3,
+       GTA_WASI_FD_WRITE=4, GTA_WASI_FD_CLOSE=5, GTA_WASI_FD_READ=6,
+       GTA_WASI_FD_SEEK=7, GTA_WASI_FD_PREAD=8 };
 static wasm_trap_t *gta_wasi_callback(
     void *env, wasmtime_caller_t *caller, const wasmtime_val_t *args,
     size_t nargs, wasmtime_val_t *results, size_t nresults
@@ -301,6 +303,28 @@ static wasm_trap_t *gta_wasi_callback(
         rc=gta_wasi_fd_write((uint32_t)args[0].of.i32,
             (uint64_t)args[1].of.i64,(uint64_t)args[2].of.i64,
             (uint64_t)args[3].of.i64);
+    } else if (op==GTA_WASI_FD_CLOSE && nargs==1 &&
+        args[0].kind==WASMTIME_I32) {
+        rc=gta_wasi_fd_close((uint32_t)args[0].of.i32);
+    } else if (op==GTA_WASI_FD_READ && nargs==4 &&
+        args[0].kind==WASMTIME_I32 && args[1].kind==WASMTIME_I64 &&
+        args[2].kind==WASMTIME_I64 && args[3].kind==WASMTIME_I64) {
+        rc=gta_wasi_fd_read((uint32_t)args[0].of.i32,
+            (uint64_t)args[1].of.i64, (uint64_t)args[2].of.i64,
+            (uint64_t)args[3].of.i64);
+    } else if (op==GTA_WASI_FD_SEEK && nargs==4 &&
+        args[0].kind==WASMTIME_I32 && args[1].kind==WASMTIME_I64 &&
+        args[2].kind==WASMTIME_I32 && args[3].kind==WASMTIME_I64) {
+        rc=gta_wasi_fd_seek((uint32_t)args[0].of.i32,
+            args[1].of.i64, (uint32_t)args[2].of.i32,
+            (uint64_t)args[3].of.i64);
+    } else if (op==GTA_WASI_FD_PREAD && nargs==5 &&
+        args[0].kind==WASMTIME_I32 && args[1].kind==WASMTIME_I64 &&
+        args[2].kind==WASMTIME_I64 && args[3].kind==WASMTIME_I64 &&
+        args[4].kind==WASMTIME_I64) {
+        rc=gta_wasi_fd_pread((uint32_t)args[0].of.i32,
+            (uint64_t)args[1].of.i64, (uint64_t)args[2].of.i64,
+            (uint64_t)args[3].of.i64, (uint64_t)args[4].of.i64);
     }
     results[0].kind=WASMTIME_I32;
     results[0].of.i32=rc;
@@ -308,12 +332,18 @@ static wasm_trap_t *gta_wasi_callback(
 }
 static int gta_define_wasi_callback(wasmtime_linker_t *linker,
                                      const char *name, uintptr_t op) {
-    const int number=(op==GTA_WASI_FD_WRITE) ? 4 :
+    const int number=(op==GTA_WASI_FD_PREAD) ? 5 :
+                     (op==GTA_WASI_FD_CLOSE) ? 1 :
+                     (op==GTA_WASI_FD_WRITE || op==GTA_WASI_FD_READ ||
+                      op==GTA_WASI_FD_SEEK) ? 4 :
                      (op==GTA_WASI_CLOCK) ? 3 : 2;
-    wasm_valtype_t *params[4]={0};
+    wasm_valtype_t *params[5]={0};
     for(int i=0;i<number;++i) {
         params[i]=wasm_valtype_new(
-            ((op==GTA_WASI_CLOCK || op==GTA_WASI_FD_WRITE) && i==0)
+            (i==0 && (op==GTA_WASI_CLOCK || op==GTA_WASI_FD_WRITE ||
+                      op==GTA_WASI_FD_CLOSE || op==GTA_WASI_FD_READ ||
+                      op==GTA_WASI_FD_SEEK || op==GTA_WASI_FD_PREAD)) ||
+             (op==GTA_WASI_FD_SEEK && i==2)
             ? WASM_I32 : WASM_I64);
         if (!params[i]) {
             for(int j=0;j<i;++j) wasm_valtype_delete(params[j]);
@@ -340,6 +370,10 @@ static int gta_define_wasi_callbacks(wasmtime_linker_t *linker) {
     if(gta_define_wasi_callback(linker,"environ_sizes_get",GTA_WASI_ENV_SIZES)) return -2;
     if(gta_define_wasi_callback(linker,"environ_get",GTA_WASI_ENV_GET)) return -3;
     if(gta_define_wasi_callback(linker,"fd_write",GTA_WASI_FD_WRITE)) return -4;
+    if(gta_define_wasi_callback(linker,"fd_close",GTA_WASI_FD_CLOSE)) return -5;
+    if(gta_define_wasi_callback(linker,"fd_read",GTA_WASI_FD_READ)) return -6;
+    if(gta_define_wasi_callback(linker,"fd_seek",GTA_WASI_FD_SEEK)) return -7;
+    if(gta_define_wasi_callback(linker,"fd_pread",GTA_WASI_FD_PREAD)) return -8;
     return 0;
 }
 
@@ -460,11 +494,11 @@ int gta_ios_wasmtime_register_host_basics(
         gta_host_message(message, capacity, "Actual memory64 WASI clock/environment registration failed");
         return rc;
     }
-    if (installed) *installed += 4;
+    if (installed) *installed += 8;
     return 0;
 }
 
-/* Returns 0 only when nineteen ABI-matched host functions are registered
+/* Returns 0 only when 23 ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,

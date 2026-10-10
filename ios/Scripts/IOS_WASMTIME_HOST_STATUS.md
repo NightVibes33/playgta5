@@ -419,3 +419,28 @@ This is not GTA gameplay, game audio, original loading, shaders or an actual
 Metal world renderer. The true GTA 3 GiB shared memory import is still
 unallocated and the Wasmtime engine is not instantiated; full GameController
 signals cannot be passed to gameplay until that exists.
+
+
+## Build 27 — four more verified WASI file-descriptor imports (23/85)
+
+Using the exact uploaded real `game.wasm` type section, this adds:
+- `fd_close(i32)->i32` (WASI preview1 standard stream lifecycle)
+- `fd_read(i32,i64,i64,i64)->i32` (64-bit guest iovecs; stdin EOF)
+- `fd_seek(i32,i64,i32,i64)->i32` (ESPIPE for nonseekable standard streams)
+- `fd_pread(i32,i64,i64,i64,i64)->i32` (ESPIPE for standard input)
+
+The native Wasmtime linker registers these four signatures exactly; total
+coverage is **23 of 85 function imports**, with 62 function imports and the
+3 GiB shared memory still unimplemented. Actual native C regression tests
+check guest memory64 iovec validity, overflows, zero-byte EOF, non-mutating
+seek errors, EBADF handling, closure/repeat closure, and rejection of arbitrary
+host process file descriptors.
+
+These callbacks currently implement only standard streams (0, 1, 2).
+**No USB-backed virtual file descriptor table has been implemented**;
+`openat`, archive paging, ordinary `fd_read` of game files, and startup
+filesystem restoration remain blockers. Standard FD functionality is not
+equivalent to functioning GTA archive I/O. The original engine is still
+not instantiated; there are no real in-game frames, textures, shaders, input,
+audio playback or completed loading sequence. Signed-device testing remains
+necessary for the native Wasmtime runtime.
