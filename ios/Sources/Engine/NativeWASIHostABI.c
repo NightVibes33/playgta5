@@ -5,6 +5,7 @@
 #include <time.h>
 #include <limits.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "NativeTextHostABI.h"
@@ -80,6 +81,8 @@ void gta_wasi_reset_files(void) {
     pthread_mutex_unlock(&wasi_mutex);
 }
 
+
+static int span_valid(uint64_t at, uint64_t length);
 
 /* Imported Emscripten __syscall_openat(i32, i64, i32, i64) -> i32.
  * No arbitrary host filesystem access: guest paths resolve under the
