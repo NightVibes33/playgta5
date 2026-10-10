@@ -121,7 +121,7 @@ assert "GTAReference.settingsRow" in reference
 # Xcode builds do not need to make any web requests.
 for scene in ("gtav-story-trio", "gtav-vinewood-view", "gtav-car-gameplay",
               "gtav-city-helicopter", "gtav-franklin-race"):
-    assert (ROOT / "ios/Sources/Resources" / (scene + ".jpg")).is_file()
+    assert (root / "ios/Sources/Resources" / (scene + ".jpg")).is_file()
 assert "GTAReferenceGraphicsController" in reference
 assert "NativeEngineStatus.inspect" in reference
 assert "USBStorageManager.shared.chooseAsync" in reference
