@@ -340,11 +340,11 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         browse.addTarget(self, action: #selector(browsePressed), for: .touchUpInside)
         let validate = GTAReference.control("Validate", symbol: "checkmark.shield.fill")
         validate.addTarget(self, action: #selector(validatePressed), for: .touchUpInside)
-        let logs = GTAReference.control("Export Logs", symbol: "square.and.arrow.up")
-        logs.addTarget(self, action: #selector(exportPressed), for: .touchUpInside)
+        let disconnect = GTAReference.control("Disconnect", symbol: "externaldrive.badge.xmark")
+        disconnect.addTarget(self, action: #selector(disconnectPressed), for: .touchUpInside)
         actions.addArrangedSubview(browse)
         actions.addArrangedSubview(validate)
-        actions.addArrangedSubview(logs)
+        actions.addArrangedSubview(disconnect)
         stack.addArrangedSubview(actions)
         let banner = GTAReference.image("gtav-official-header", height: 180)
         stack.addArrangedSubview(banner)
@@ -423,6 +423,23 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
                 GTAReference.present("File validation failed", message: error.localizedDescription, from: self)
             }
         }
+    }
+    @objc private func disconnectPressed() {
+        guard USBStorageManager.shared.root != nil else {
+            GTAReference.present("No connected library", message:
+                "Select a GTA V folder from your external drive first.", from: self)
+            return
+        }
+        let alert = UIAlertController(title: "Disconnect GTA V Library?",
+            message: "Remove the bookmark and release USB access. No game files will be deleted.",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Disconnect", style: .destructive) { [weak self] _ in
+            USBStorageManager.shared.disconnect {
+                self?.refresh()
+            }
+        })
+        present(alert, animated: true)
     }
     @objc private func exportPressed() { GTAReference.exportLogs(from: self) }
 }

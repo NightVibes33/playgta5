@@ -61,6 +61,29 @@ final class USBStorageManager {
         try select(chosen, fromFile: false)
     }
 
+    /// Disconnect the selected USB library. This never deletes game files;
+    /// it revokes the bookmark and security-scoped access that the user granted.
+    func disconnect(completion: @escaping () -> Void) {
+        worker.async { [weak self] in
+            guard let self else { return }
+            if self.hasScope { self.accessURL?.stopAccessingSecurityScopedResource() }
+            self.hasScope = false
+            self.accessURL = nil
+            self.selectionMethod = "none"
+            UserDefaults.standard.removeObject(forKey: self.bookmarkKey)
+            UserDefaults.standard.removeObject(forKey: self.anchorKindKey)
+            self.stateLock.lock()
+            self.storedRoot = nil
+            self.startupMissing = ["USB game folder not selected"]
+            self.stateLock.unlock()
+            LogStore.shared.write("usb-storage", "User disconnected library; external files untouched")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Self.changedNotification, object: nil)
+                completion()
+            }
+        }
+    }
+
     /// USB-provider fallback when the Files folder picker doesn't complete.
     /// This is NOT a sandbox bypass: some providers only grant the picked file,
     /// in which case this function rejects the selection and explains why.
