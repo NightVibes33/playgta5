@@ -75,27 +75,58 @@ enum GTAReference {
     }
     // Compact native settings rows: the artwork is decoration; these
     // buttons retain their actual selection actions and persisted state.
-    static func settingsRow(_ title: String, symbol: String) -> UIButton {
+    // Reference-style compact settings control. Text at the right comes
+    // exclusively from the persisted engine option or user preferences.
+    private static let optionValueTag = 683491
+    static func settingsRow(_ title: String, symbol: String, value: String = "") -> UIButton {
         let button = UIButton(type: .system)
-        var config = UIButton.Configuration.plain()
-        config.title = title
-        config.image = UIImage(systemName: symbol)
-        config.imagePlacement = .leading
-        config.imagePadding = 13
-        config.baseForegroundColor = ink
-        config.contentInsets = .init(top: 8, leading: 7, bottom: 8, trailing: 6)
-        config.titleAlignment = .leading
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { original in
-            var attributes = original
-            attributes.font = .systemFont(ofSize: 13, weight: .semibold)
-            return attributes
-        }
-        button.configuration = config
-        button.contentHorizontalAlignment = .leading
-        button.tintColor = blue
-        button.titleLabel?.numberOfLines = 2
-        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 43).isActive = true
+        button.backgroundColor = UIColor.white.withAlphaComponent(0.018)
+        button.layer.cornerRadius = 10
+        button.accessibilityLabel = title
+        button.accessibilityValue = value
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 8
+        row.alignment = .center
+        row.isUserInteractionEnabled = false
+        row.translatesAutoresizingMaskIntoConstraints = false
+        let symbolView = UIImageView(image: UIImage(systemName: symbol,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)))
+        symbolView.tintColor = blue
+        symbolView.contentMode = .scaleAspectFit
+        symbolView.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        row.addArrangedSubview(symbolView)
+        let name = label(title, size: 13, weight: .semibold)
+        name.numberOfLines = 2
+        name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        row.addArrangedSubview(name)
+        row.addArrangedSubview(UIView())
+        let valueLabel = label(value, size: 11, weight: .semibold, color: ink)
+        valueLabel.tag = optionValueTag
+        valueLabel.textAlignment = .right
+        valueLabel.numberOfLines = 2
+        valueLabel.lineBreakMode = .byTruncatingMiddle
+        valueLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        row.addArrangedSubview(valueLabel)
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold)))
+        chevron.tintColor = secondary
+        chevron.widthAnchor.constraint(equalToConstant: 10).isActive = true
+        chevron.contentMode = .scaleAspectFit
+        row.addArrangedSubview(chevron)
+        button.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 8),
+            row.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -8),
+            row.topAnchor.constraint(equalTo: button.topAnchor, constant: 8),
+            row.bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -8),
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 50)
+        ])
         return button
+    }
+    static func updateSetting(_ button: UIButton, value: String) {
+        (button.viewWithTag(optionValueTag) as? UILabel)?.text = value
+        button.accessibilityValue = value
     }
     // Native console-launcher action tile with accessible, working targets.
     static func actionTile(_ title: String, detail: String, symbol: String,
@@ -680,7 +711,8 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
         let display = GTAReference.panelView(9)
         display.addArrangedSubview(GTAReference.label("Graphics", size: 19, weight: .bold))
-        let preset = GTAReference.settingsRow("Graphics Preset", symbol: "camera.filters")
+        let preset = GTAReference.settingsRow("Graphics Preset", symbol: "camera.filters",
+            value: GTALaunchPreferences.text("preset", fallback: "Custom"))
         preset.accessibilityIdentifier = "graphics-preset"
         preset.addTarget(self, action: #selector(showPresets), for: .touchUpInside)
         display.addArrangedSubview(preset)
@@ -692,7 +724,8 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         for id in ["textureQuality", "shadowQuality", "reflectionQuality", "particleQuality", "grassQuality"] {
             addEngineOption(id, to: display)
         }
-        let aa = GTAReference.settingsRow("Anti-Aliasing", symbol: "circle.hexagongrid")
+        let aa = GTAReference.settingsRow("Anti-Aliasing", symbol: "circle.hexagongrid",
+            value: GTALaunchPreferences.text("antiAliasing", fallback: "Off") + " · pending")
         aa.accessibilityIdentifier = "staged-anti-aliasing"
         aa.addAction(UIAction { [weak self, weak aa] _ in
             guard let self, let aa else { return }
@@ -702,7 +735,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             for quality in ["Off", "FXAA", "TAA"] {
                 sheet.addAction(UIAlertAction(title: quality, style: .default) { _ in
                     GTALaunchPreferences.setText("antiAliasing", value: quality)
-                    aa.configuration?.title = "Anti-Aliasing · " + quality + " (staged)"
+                    GTAReference.updateSetting(aa, value: quality + " · pending")
                 })
             }
             sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -715,8 +748,8 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
         let controls = GTAReference.panelView(9)
         controls.addArrangedSubview(GTAReference.label("Controls", size: 19, weight: .bold))
-        let scheme = GTAReference.control("Control Scheme · " +
-            GTALaunchPreferences.text("controlScheme", fallback: "Automatic"), symbol: "gamecontroller.fill")
+        let scheme = GTAReference.settingsRow("Control Scheme", symbol: "gamecontroller.fill",
+            value: GTALaunchPreferences.text("controlScheme", fallback: "Automatic"))
         scheme.addAction(UIAction { [weak self, weak scheme] _ in
             guard let self, let scheme else { return }
             let sheet = UIAlertController(title: "Control Scheme",
@@ -725,7 +758,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             for value in ["Automatic", "Touch", "Controller"] {
                 sheet.addAction(UIAlertAction(title: value, style: .default) { _ in
                     GTALaunchPreferences.setText("controlScheme", value: value)
-                    scheme.configuration?.title = "Control Scheme · " + value
+                    GTAReference.updateSetting(scheme, value: value)
                 })
             }
             sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -815,11 +848,13 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             "Hardware detected: none"
         outputRoute.text = "Current audio route: " +
             (AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "Unavailable")
-        presetButton?.configuration?.title = "Graphics Preset · " +
-            GTALaunchPreferences.text("preset", fallback: "Custom")
+        if let presetButton {
+            GTAReference.updateSetting(presetButton, value:
+                GTALaunchPreferences.text("preset", fallback: "Custom"))
+        }
         for (button, id) in engineButtons {
             if let spec = EngineOptions.option(id) {
-                button.configuration?.title = spec.title + " · " + EngineOptions.display(id)
+                GTAReference.updateSetting(button, value: EngineOptions.display(id))
             }
         }
         for (label, id) in valueLabels where id == "scale" {
@@ -854,7 +889,8 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
         case "grassQuality": symbol = "leaf"
         default: symbol = "slider.horizontal.3"
         }
-        let button = GTAReference.settingsRow(spec.title, symbol: symbol)
+        let button = GTAReference.settingsRow(spec.title, symbol: symbol,
+            value: EngineOptions.display(id))
         button.accessibilityIdentifier = "engine-option-" + id
         button.addAction(UIAction { [weak self, weak button] _ in
             guard let self, let button else { return }
@@ -865,7 +901,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
                 sheet.addAction(UIAlertAction(title: label, style: .default) { [weak self] _ in
                     EngineOptions.set(id, value: value)
                     GTALaunchPreferences.setText("preset", value: "Custom")
-                    button.configuration?.title = spec.title + " · " + EngineOptions.display(id)
+                    GTAReference.updateSetting(button, value: EngineOptions.display(id))
                     self?.refresh()
                 })
             }
