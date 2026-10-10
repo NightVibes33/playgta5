@@ -559,9 +559,11 @@ final class GTAReferenceMoreController: GTAReferencePage {
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        let name = ControllerManager.shared.currentName
-        controllerStatus.text = name == "No controller" ? "Controller: not connected" :
-            "Controller: " + name
+        // Query the actual iOS hardware inventory, not a manager that may
+        // have been stopped when the Controls tab disappeared.
+        let name = GCController.controllers().first?.vendorName
+        controllerStatus.text = name.map { "Controller: " + $0 } ??
+            "Controller: not connected"
     }
     @objc private func library() { switchTab(1) }
     @objc private func graphics() { switchTab(2) }

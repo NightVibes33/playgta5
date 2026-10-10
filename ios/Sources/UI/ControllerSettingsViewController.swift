@@ -32,7 +32,7 @@ final class ControllerSettingsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Controller"
+        title = "Controls"
         view.backgroundColor = GTATheme.night
         scroll.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -55,7 +55,7 @@ final class ControllerSettingsViewController: UIViewController {
         top.alignment = .center
         top.spacing = 12
         let controllerIcon = UIImageView(image: UIImage(systemName: "gamecontroller.fill"))
-        controllerIcon.tintColor = GTATheme.coral
+        controllerIcon.tintColor = GTAReference.green
         controllerIcon.contentMode = .scaleAspectFit
         controllerIcon.translatesAutoresizingMaskIntoConstraints = false
         controllerIcon.widthAnchor.constraint(equalToConstant: 48).isActive = true
@@ -72,7 +72,7 @@ final class ControllerSettingsViewController: UIViewController {
         hardware.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
             for: .systemFont(ofSize: 17, weight: .bold))
         hardware.adjustsFontForContentSizeCategory = true
-        hardware.textColor = GTATheme.coral
+        hardware.textColor = GTAReference.green
         hardware.numberOfLines = 0
         hardware.text = "Searching for controllers…"
         live.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
@@ -116,7 +116,7 @@ final class ControllerSettingsViewController: UIViewController {
         invert.isOn = store.bool(forKey: ControllerManager.invertYKey)
         invert.addTarget(self, action: #selector(save), for: .valueChanged)
         stack.addArrangedSubview(row)
-        invert.onTintColor = GTATheme.coral
+        invert.onTintColor = GTAReference.green
         stack.addArrangedSubview(GTATheme.section("Button mapping"))
         stack.addArrangedSubview(GTATheme.caption("Customize your on-foot bindings"))
         for index in inputs.indices {
@@ -136,7 +136,7 @@ final class ControllerSettingsViewController: UIViewController {
         let rumble = UIButton(type: .system)
         rumble.setTitle("Test controller vibration", for: .normal)
         rumble.tintColor = GTATheme.night
-        rumble.backgroundColor = GTATheme.coral
+        rumble.backgroundColor = GTAReference.green
         rumble.layer.cornerRadius = 13
         rumble.layer.cornerCurve = .continuous
         rumble.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
@@ -163,7 +163,7 @@ final class ControllerSettingsViewController: UIViewController {
         return l
     }
     private func addSlider(_ name: String, slider: UISlider) {
-        slider.tintColor = GTATheme.coral
+        slider.tintColor = GTAReference.green
         slider.accessibilityLabel = name
         let group = UIStackView(arrangedSubviews: [label(name), slider])
         group.axis = .vertical
