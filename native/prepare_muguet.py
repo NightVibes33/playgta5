@@ -101,6 +101,20 @@ launcher = launcher.replace('". Shader index found. This does not establish play
                             '". Shaders located. The engine is embedded in the app."')
 launcher = launcher.replace('"Native Runtime Checks"', '"Start Native Engine"')
 launcher = launcher.replace('"Live native PCM mixer gain"', '"Applied to real native CoreAudio output at launch"')
+launcher = launcher.replace(
+    '        stack.addArrangedSubview(controls)\n\n        let advanced = GTAReference.panelView(9)',
+    '''        stack.addArrangedSubview(controls)
+        let multiplayer = GTAReference.control("Multiplayer · Host / Join",
+                                               symbol: "person.2.fill")
+        multiplayer.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            self.navigationController?.setNavigationBarHidden(false, animated: true)
+            self.navigationController?.pushViewController(
+                GTANativeMultiplayerViewController(), animated: true)
+        }, for: .touchUpInside)
+        stack.addArrangedSubview(multiplayer)
+
+        let advanced = GTAReference.panelView(9)''')
 launcher = launcher.replace('        addScale(to: display)',
                             '        addEngineOption("mode", to: display)\n        addEngineOption("newgame", to: display)\n        addScale(to: display)')
 # Only Muguet's actually-supported game modes are offered.
