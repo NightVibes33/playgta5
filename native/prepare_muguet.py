@@ -89,6 +89,10 @@ launcher = (project / "ios/Sources/UI/GTAFiveTabLauncher.swift").read_text(encod
 launcher = launcher.replace("GameNavigationController(rootViewController: entry.0)",
                             "UINavigationController(rootViewController: entry.0)")
 launcher = launcher.replace("ControllerSettingsViewController()", "GTANativeControlsViewController()")
+launcher = launcher.replace("final class GTAFiveTabController: UITabBarController {",
+    "final class GTAFiveTabController: UITabBarController {\n"
+    "    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }\n"
+    "    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }\n")
 old_navigation = """        navigationController?.setNavigationBarHidden(false, animated: true)
         let gameplay = GameViewController()
         gameplay.hidesBottomBarWhenPushed = true
@@ -201,7 +205,13 @@ replace("src/config.rs",
 
 replace("ios/Info.plist",
         '<key>CFBundleDisplayName</key><string>GTAiOS Native</string>',
-        '<key>CFBundleDisplayName</key><string>GTA V iOS</string>\n'
-        '  <key>UIFileSharingEnabled</key><true/>\n'
-        '  <key>LSSupportsOpeningDocumentsInPlace</key><true/>')
+        '<key>CFBundleDisplayName</key><string>GTA V iOS</string>')
+replace("ios/Info.plist",
+        '<key>UISupportedInterfaceOrientations</key>\n'
+        '  <array><string>UIInterfaceOrientationLandscapeRight</string>'
+        '<string>UIInterfaceOrientationLandscapeLeft</string></array>',
+        '<key>UISupportedInterfaceOrientations</key>\n'
+        '  <array><string>UIInterfaceOrientationPortrait</string>'
+        '<string>UIInterfaceOrientationLandscapeRight</string>'
+        '<string>UIInterfaceOrientationLandscapeLeft</string></array>')
 print("Native engine uses original GTAiOS five-tab UIKit UI and engine-backed settings")
