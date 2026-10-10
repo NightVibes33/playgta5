@@ -18,6 +18,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fetch distinct official GTA V art
         run: bash ios/Scripts/fetch_distinct_gtav_art.sh
+      - name: Save official GTA V artwork for visual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAiOS-Genuine-GTAV-Scenes-${{ github.job }}
+          path: ios/Sources/Resources/gtav-*.jpg
+          if-no-files-found: error
       - name: Resolve pinned Wasmtime iOS static runtime (rebuild on artifact expiry)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -186,6 +192,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fetch distinct official GTA V art
         run: bash ios/Scripts/fetch_distinct_gtav_art.sh
+      - name: Save official GTA V artwork for visual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAiOS-Genuine-GTAV-Scenes-${{ github.job }}
+          path: ios/Sources/Resources/gtav-*.jpg
+          if-no-files-found: error
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Prepare runtime and project
