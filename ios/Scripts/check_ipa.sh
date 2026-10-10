@@ -23,6 +23,14 @@ if [ "$icon_name" != "AppIcon" ] || [ ! -s "$app/Assets.car" ]; then
   exit 1
 fi
 echo 'GTA V iOS icon metadata and compiled Assets.car: PASS'
+# All four screenshot-derived scenic images must be present and locally bundled.
+for name in gtaios-reference-home.jpg gtaios-library-skyline.jpg gtaios-library-thumb.jpg gtaios-settings-hero.jpg; do
+  if ! find "$app" -type f -name "$name" | grep -q .; then
+    echo "ERROR: bundled GTA V reference artwork missing: $name" >&2
+    exit 1
+  fi
+done
+echo 'Five-tab GTA V reference assets: PASS'
 echo 'Modern full-screen iPhone launch manifest: PASS'
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" | while read -r exe; do test -x "$app/$exe"; done

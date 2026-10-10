@@ -102,6 +102,22 @@ assert "GTATheme.neonPink" in launcher and "LosSantosHeroView()" in launcher
 assert 'usbStatusLabel.text = !hasUSB ? "Not connected"' in launcher
 assert "documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls:" in launcher
 assert "hardwareStatusLabel.text = name ==" in launcher
+reference = read("ios/Sources/UI/GTAFiveTabLauncher.swift")
+assert "GTAFiveTabController()" in scene
+assert "viewControllers = pages.map" in reference
+for title in ['"Home"', '"Library"', '"Graphics"', '"Controls"', '"More"']:
+    assert title in reference
+assert "ControllerSettingsViewController()" in reference
+assert "GTAReferenceLibraryController" in reference
+assert "GTAReferenceGraphicsController" in reference
+assert "NativeEngineStatus.inspect" in reference
+assert "USBStorageManager.shared.chooseAsync" in reference
+assert "EngineOptions.set" in reference and "EngineOptions.value" in reference
+assert "LogStore.shared.exportURL()" in reference
+assert "NativeEngineStatus.nativeEngineLinked" in reference
+assert '"gtaios-reference-home"' in reference
+assert '"gtaios-library-skyline"' in reference
+assert '"gtaios-settings-hero"' in reference
 assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
 assert "GTATheme.section" in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert "import GameController" in input_source
@@ -227,7 +243,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>33</string>" in plist
+assert "<key>CFBundleVersion</key><string>34</string>" in plist
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa
