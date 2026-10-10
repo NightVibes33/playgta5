@@ -363,3 +363,59 @@ This does **not** yet restore saved userdata into the GTA engine's in-memory
 filesystem on startup. Nor does it instantiate the 3 GiB shared memory or
 finish the other 70 function imports and true Metal graphics/loading/audio
 interfaces. A successful IPA build is only host-ABI coverage, not gameplay.
+
+
+## Build 25 — three ABI-accurate WASI memory64 host services (18/85 imports)
+
+The actual uploaded engine imports the following WASI preview1 signatures:
+- wasi_snapshot_preview1.clock_time_get(i32 id, i64 precisionNs, i64 timestampPtr)->i32
+- wasi_snapshot_preview1.environ_sizes_get(i64 countPtr,i64 byteCountPtr)->i32
+- wasi_snapshot_preview1.environ_get(i64 entriesPtr,i64 storagePtr)->i32
+
+NativeWASIHostABI.c implements the actual WASI return-code semantics:
+CLOCK_REALTIME / CLOCK_MONOTONIC nanoseconds are written as LE u64 to the
+guest's *externally bound* memory64 region; optional CPU/thread clock IDs
+are supported only if the iOS SDK exposes them. The precision parameter
+is an advisory hint, not a delay or an allocation. Invalid guest pointers
+return WASI EFAULT (21); invalid clock IDs return EINVAL (28). The
+sandbox exposes an empty environment to the guest, deliberately NOT any
+host process variables or credentials. environ_sizes_get writes two u64
+zeros; environ_get validates the zero-length destinations.
+
+The exact 3 signatures are now registered in the real Wasmtime C API linker
+alongside the earlier 15 GTA host callbacks, for **18 of 85 functions**.
+A C regression test covers clock output, empty environment, unbound guest
+memory, overflow, out-of-bounds addresses and nonclobbering behavior.
+A Wasmtime linker smoke calls clock_time_get without a bound heap and expects
+EFAULT rather than fake success.
+
+This does not allocate the GTA engine's required 3 GiB shared memory.
+Until the Wasmtime embedding binds and maintains that memory while the
+real engine executes, these callbacks correctly refuse memory writes.
+The other 67 function imports, GTA Metal rendering and shader conversion,
+actual original loading, in-world input, audio and end-to-end saves remain
+unfinished. The app is still a native runtime test, not a playable game.
+
+
+## Build 26: verified WASI fd_write and native diagnostics (19/85 imports)
+
+The real uploaded engine imports
+`wasi_snapshot_preview1.fd_write(i32 fd,i64 iovs,i64 count,i64 nwritten)->i32`,
+using 16-byte memory64 iovecs. The C host now validates every source span and
+destination pointer, supports stdout/stderr, writes the exact completed byte
+count, rejects unsupported FDs, and passes bounded printable output into the
+existing Files-exportable native log queue. The source output is capped to a
+200-byte preview, while total write size is limited to 1 MiB, so a malicious
+guest cannot force uncontrolled allocations or log output.
+
+Build 25's three WASI calls (clock_time_get, environ_sizes_get, environ_get)
+are retained. A native C regression test exercises real guest iovec layouts,
+the stdout and stderr callbacks, bad FDs, malformed pointers, overflow,
+unbinding and diagnostic log delivery. The Wasmtime linker now registers
+**19 of 85** actual typed function imports. The remaining **66** functions
+and env.memory are not implemented.
+
+This is not GTA gameplay, game audio, original loading, shaders or an actual
+Metal world renderer. The true GTA 3 GiB shared memory import is still
+unallocated and the Wasmtime engine is not instantiated; full GameController
+signals cannot be passed to gameplay until that exists.

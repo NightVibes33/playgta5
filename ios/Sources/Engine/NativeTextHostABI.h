@@ -23,6 +23,8 @@ void gta_text_host_hang_line_js(uint64_t text);
  * Writes NUL-terminated data; returns 1 when a message was dequeued.
  */
 int gta_text_host_next_log(char *destination, size_t capacity);
+/* Queue a bounded, printable WASI stdout/stderr byte preview. */
+void gta_text_host_enqueue_bytes(const char *tag, const void *data, size_t size);
 #ifdef __cplusplus
 }
 #endif
