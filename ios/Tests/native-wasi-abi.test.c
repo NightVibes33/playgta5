@@ -121,7 +121,7 @@ int main(void) {
     gta_wasi_bind_memory(large,sizeof large);
     assert(gta_wasi_syscall_fstat64(gamefd,80)==0);
     assert(le64(large+112)==16);
-    assert(le64(large+88)>=1);
+    assert((large[84] & 0xF0) == 0x80); /* regular-file mode; unlinked temp file has nlink=0 */
     assert(gta_wasi_syscall_fstat64(-1,80)==-8);
     assert(gta_wasi_syscall_fstat64(gamefd,150)==-21);
     assert(gta_wasi_gmtime_js(0,0)==0);
