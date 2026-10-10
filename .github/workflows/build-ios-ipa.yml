@@ -175,7 +175,7 @@ jobs:
     name: iPhone simulator UI snapshot
     runs-on: macos-15
     timeout-minutes: 25
-    continue-on-error: true
+    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
@@ -189,8 +189,8 @@ jobs:
         run: |
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; r=json.load(sys.stdin)["devices"]; v=[d for group in r.values() for d in group if "iPhone" in d["name"] and d["state"] != "unavailable"]; v.sort(key=lambda x: (x["name"] != "iPhone 16", x["name"])); print(v[0]["udid"] if v else "")')
           if [ -z "$DEVICE" ]; then
-            echo "No iPhone simulator installed on this runner"
-            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "ERROR: no iPhone simulator installed on runner" >&2
+            exit 1
           else
             echo "available=true" >> "$GITHUB_OUTPUT"
             echo "udid=$DEVICE" >> "$GITHUB_OUTPUT"
