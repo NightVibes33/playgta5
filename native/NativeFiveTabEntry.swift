@@ -264,3 +264,82 @@ final class GTANativeControlsViewController: GTAReferencePage {
         panel.addArrangedSubview(slider)
     }
 }
+
+
+// Engine-supported local multiplayer settings from upstream Muguet.
+// The stored host/join parameters are written to config.json at Play.
+final class GTANativeMultiplayerViewController: GTAReferencePage {
+    private let enabledSwitch = UISwitch()
+    private let role = UISegmentedControl(items: ["Join", "Host"])
+    private let nameField = UITextField()
+    private let serverField = UITextField()
+    private let form = UIStackView()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        let back = GTAReference.control("Back to Graphics", symbol: "chevron.left")
+        back.addAction(UIAction { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        }, for: .touchUpInside)
+        stack.addArrangedSubview(back)
+        stack.addArrangedSubview(GTAReference.section("Multiplayer"))
+        installHero("gtav-city-helicopter", height: 145)
+        let panel = GTAReference.panelView()
+        let enableRow = UIStackView()
+        enableRow.axis = .horizontal
+        enableRow.alignment = .center
+        enableRow.addArrangedSubview(GTAReference.label("Play with friends", size: 14, weight: .semibold))
+        enableRow.addArrangedSubview(UIView())
+        enabledSwitch.isOn = UserDefaults.standard.bool(forKey: "gtaios.native.multiplayer")
+        enabledSwitch.addAction(UIAction { [weak self] _ in
+            UserDefaults.standard.set(self?.enabledSwitch.isOn ?? false, forKey: "gtaios.native.multiplayer")
+            self?.updateVisibility()
+        }, for: .valueChanged)
+        enableRow.addArrangedSubview(enabledSwitch)
+        panel.addArrangedSubview(enableRow)
+
+        form.axis = .vertical
+        form.spacing = 14
+        role.selectedSegmentIndex = UserDefaults.standard.bool(forKey: "gtaios.native.host") ? 1 : 0
+        role.addAction(UIAction { [weak self] _ in
+            UserDefaults.standard.set(self?.role.selectedSegmentIndex == 1, forKey: "gtaios.native.host")
+            self?.updateVisibility()
+        }, for: .valueChanged)
+        form.addArrangedSubview(GTAReference.label("Session", size: 13, weight: .semibold))
+        form.addArrangedSubview(role)
+        nameField.text = UserDefaults.standard.string(forKey: "gtaios.native.name") ?? UIDevice.current.name
+        nameField.placeholder = "Player name"
+        nameField.textColor = GTAReference.ink
+        nameField.autocorrectionType = .no
+        nameField.borderStyle = .roundedRect
+        nameField.addAction(UIAction { [weak self] _ in
+            UserDefaults.standard.set(self?.nameField.text ?? "", forKey: "gtaios.native.name")
+        }, for: .editingChanged)
+        form.addArrangedSubview(GTAReference.label("Your name", size: 13, weight: .semibold))
+        form.addArrangedSubview(nameField)
+
+        serverField.text = UserDefaults.standard.string(forKey: "gtaios.native.server")
+        serverField.placeholder = "Host IP address"
+        serverField.textColor = GTAReference.ink
+        serverField.borderStyle = .roundedRect
+        serverField.keyboardType = .numbersAndPunctuation
+        serverField.autocorrectionType = .no
+        serverField.autocapitalizationType = .none
+        serverField.addAction(UIAction { [weak self] _ in
+            UserDefaults.standard.set(self?.serverField.text ?? "", forKey: "gtaios.native.server")
+        }, for: .editingChanged)
+        form.addArrangedSubview(GTAReference.label("Server address (joining only)", size: 13, weight: .semibold))
+        form.addArrangedSubview(serverField)
+        panel.addArrangedSubview(form)
+        stack.addArrangedSubview(panel)
+        stack.addArrangedSubview(GTAReference.label(
+            "Muguet host/join mode uses your local network. These parameters are passed directly to the native game runtime when Play is pressed.",
+            size: 12, color: GTAReference.secondary))
+        updateVisibility()
+    }
+    private func updateVisibility() {
+        form.isHidden = !enabledSwitch.isOn
+        serverField.isEnabled = role.selectedSegmentIndex == 0
+        serverField.alpha = serverField.isEnabled ? 1 : 0.35
+    }
+}
