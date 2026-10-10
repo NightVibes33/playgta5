@@ -31,7 +31,16 @@ enum GTALaunchPreferences {
         UserDefaults.standard.set(max(0, min(1, value)), forKey: keyPrefix + key)
     }
     static func reset() {
-        keys.forEach { UserDefaults.standard.removeObject(forKey: keyPrefix + $0) }
+        let defaults = UserDefaults.standard
+        keys.forEach { defaults.removeObject(forKey: keyPrefix + $0) }
+        // The Reset All Settings button includes native controller mappings,
+        // touch-overlay visibility and analog tuning, not only renderer choices.
+        for key in [ControllerManager.deadzoneKey, ControllerManager.sensitivityKey,
+                    ControllerManager.invertYKey, ControllerSettingsViewController.bindingKey,
+                    "gtaios.touch.visible"] {
+            defaults.removeObject(forKey: key)
+        }
+        LogStore.shared.write("preferences", "All graphics, audio, touch and controller preferences reset")
     }
     static func applyPreset(_ name: String) {
         // These choices are validated against EngineOptions, which is the

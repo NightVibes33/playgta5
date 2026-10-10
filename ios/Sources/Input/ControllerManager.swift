@@ -116,6 +116,8 @@ final class ControllerManager {
 
     @discardableResult
     func testRumble() -> Bool {
+        // Haptics can be tested directly from Graphics without first opening Controls.
+        refresh()
         guard GTALaunchPreferences.enabled("controllerVibration", fallback: true) else {
             LogStore.shared.write("controller", "Haptics disabled by user")
             return false
