@@ -1,7 +1,7 @@
 name: Build GTAiOS Unsigned IPA
 on:
   push:
-    branches: [ios-usb-port, native-aot-work, native-wasi-imports-work]
+    branches: [ios-usb-port, native-aot-work, native-wasi-imports-work, native-fd-write-work]
   workflow_dispatch:
 permissions:
   contents: read
@@ -74,6 +74,7 @@ jobs:
       - name: Verify real GTA memory64 WASI clock and environment ABI
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pthread \
+            ios/Sources/Engine/NativeTextHostABI.c \
             ios/Sources/Engine/NativeWASIHostABI.c \
             ios/Tests/native-wasi-abi.test.c \
             -o "$RUNNER_TEMP/native-wasi-abi"

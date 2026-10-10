@@ -17,6 +17,9 @@ int32_t gta_wasi_environ_sizes_get(uint64_t count_pointer,
                                    uint64_t byte_count_pointer);
 int32_t gta_wasi_environ_get(uint64_t environ_pointer,
                              uint64_t environ_buffer_pointer);
+/* Real game.wasm memory64 signature: i32,i64,i64,i64 -> i32 */
+int32_t gta_wasi_fd_write(uint32_t fd, uint64_t iovs, uint64_t count,
+                          uint64_t written_pointer);
 #ifdef __cplusplus
 }
 #endif

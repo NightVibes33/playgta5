@@ -117,3 +117,25 @@ int gta_text_host_next_log(char *destination, size_t capacity) {
     pthread_mutex_unlock(&guard);
     return 1;
 }
+
+/* Unlike C strings, fd_write buffers are not NUL-terminated. Keep the
+ * original guest output in a bounded, sanitized, Files-exportable queue.
+ */
+void gta_text_host_enqueue_bytes(const char *tag, const void *data, size_t size) {
+    if (!tag || !data || size == 0) return;
+    const unsigned char *p = (const unsigned char *)data;
+    char sanitized[GTA_TEXT_ENTRY - 32];
+    size_t n = size < sizeof(sanitized)-1 ? size : sizeof(sanitized)-1;
+    for (size_t i=0;i<n;i++) {
+        unsigned char c=p[i];
+        sanitized[i] = c>=0x20 && c!=0x7f ? (char)c
+                      : (c=='\n' || c=='\t' ? ' ' : '.');
+    }
+    sanitized[n]=0;
+    pthread_mutex_lock(&guard);
+    snprintf(queue[write_slot],GTA_TEXT_ENTRY,"%s %s",tag,sanitized);
+    write_slot=(write_slot+1)%GTA_TEXT_QUEUE;
+    if(queued==GTA_TEXT_QUEUE) read_slot=(read_slot+1)%GTA_TEXT_QUEUE;
+    else queued++;
+    pthread_mutex_unlock(&guard);
+}

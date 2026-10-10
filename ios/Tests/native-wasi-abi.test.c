@@ -1,4 +1,5 @@
 #include "../Sources/Engine/NativeWASIHostABI.h"
+#include "../Sources/Engine/NativeTextHostABI.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,6 +9,9 @@ static uint64_t le64(const unsigned char *p) {
     uint64_t n=0;
     for (unsigned i=0;i<8;i++) n|=(uint64_t)p[i]<<(8*i);
     return n;
+}
+static void write_le64(unsigned char *p, uint64_t x) {
+    for (unsigned k=0;k<8;k++) p[k]=(unsigned char)(x>>(k*8));
 }
 int main(void) {
     unsigned char memory[80];
@@ -33,9 +37,28 @@ int main(void) {
     assert(gta_wasi_environ_get(80, 80)==0);
     assert(gta_wasi_environ_get(81, 80)==21);
     assert(gta_wasi_environ_get(80, UINT64_MAX)==21);
+    /* WASI fd_write uses two u64 values per iovec with 64-bit pointers. */
+    memory[4]='O'; memory[5]='K'; memory[6]='!';
+    write_le64(memory+40,4);
+    write_le64(memory+48,3);
+    assert(gta_wasi_fd_write(1,40,1,64)==0);
+    assert(le64(memory+64)==3);
+    char line[256]={0};
+    assert(gta_text_host_next_log(line,sizeof line)==1);
+    assert(strstr(line,"[wasi-stdout] OK!")!=NULL);
+    assert(gta_wasi_fd_write(2,40,1,64)==0);
+    assert(gta_text_host_next_log(line,sizeof line)==1);
+    assert(strstr(line,"[wasi-stderr] OK!")!=NULL);
+    assert(gta_wasi_fd_write(7,40,1,64)==8);
+    assert(gta_wasi_fd_write(1,40,257,64)==21);
+    write_le64(memory+40,UINT64_MAX);
+    assert(gta_wasi_fd_write(1,40,1,64)==28);
+    write_le64(memory+40,4);
+    assert(gta_wasi_fd_write(1,40,1,79)==21);
     gta_wasi_unbind_memory();
+    assert(gta_wasi_fd_write(1,40,1,64)==21);
     assert(gta_wasi_environ_sizes_get(0, 8)==21);
     assert(gta_wasi_clock_time_get(1, 0, 8)==21);
-    printf("PASS: actual memory64 WASI clock_time_get, environ_sizes_get, environ_get; bounds/unbind/secret-free env\n");
+    printf("PASS: actual memory64 WASI clock_time_get, environ_sizes_get, environ_get, fd_write; bounds/unbind/secret-free env\n");
     return 0;
 }
