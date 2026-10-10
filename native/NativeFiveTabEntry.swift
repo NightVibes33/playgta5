@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import GameController
+import CoreHaptics
 import Metal
 
 // Native Muguet build entry point. The visual interface is the project's
@@ -163,12 +164,23 @@ enum ControllerManager {
     static let shared = ControllerManagerImpl()
 }
 final class ControllerManagerImpl {
+    private var activeEngine: CHHapticEngine?
     func testRumble() -> Bool {
-        guard let haptics = GCController.controllers().first?.haptics else { return false }
+        guard let haptics = GCController.controllers().first?.haptics,
+              let engine = haptics.createEngine(withLocality: .default) else { return false }
         do {
-            let engine = haptics.createEngine(withLocality: .default)
+            let event = CHHapticEvent(eventType: .hapticContinuous,
+                parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.7),
+                             CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)],
+                relativeTime: 0, duration: 0.15)
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
             try engine.start()
-            engine.stop(completionHandler: nil)
+            try engine.makePlayer(with: pattern).start(atTime: CHHapticTimeImmediate)
+            activeEngine = engine
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                engine.stop(completionHandler: nil)
+                self?.activeEngine = nil
+            }
             return true
         } catch { return false }
     }
