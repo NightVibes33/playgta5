@@ -157,6 +157,23 @@ final class LosSantosHeroView: UIView {
             skyline.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
 
+        // Bundled, locally generated GTA V hero art. No network access, no
+        // external storage reads and no synthetic gameplay/UI data involved.
+        if let imageURL = Bundle.main.url(forResource: "gtaios-hero", withExtension: "jpg"),
+           let image = UIImage(contentsOfFile: imageURL.path) {
+            let artwork = UIImageView(image: image)
+            artwork.translatesAutoresizingMaskIntoConstraints = false
+            artwork.contentMode = .scaleAspectFill
+            artwork.clipsToBounds = true
+            addSubview(artwork)
+            NSLayoutConstraint.activate([
+                artwork.topAnchor.constraint(equalTo: topAnchor),
+                artwork.bottomAnchor.constraint(equalTo: bottomAnchor),
+                artwork.leadingAnchor.constraint(equalTo: leadingAnchor),
+                artwork.trailingAnchor.constraint(equalTo: trailingAnchor)
+            ])
+        }
+
         let eyebrow = UILabel()
         eyebrow.text = "LOS SANTOS  /  GTA V"
         eyebrow.textColor = GTATheme.cream.withAlphaComponent(0.90)
