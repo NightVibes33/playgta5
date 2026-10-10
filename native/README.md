@@ -36,9 +36,11 @@ On a Mac, after initializing the submodule:
 ```sh
 python3 native/prepare_muguet.py
 cd native/Muguet
-BUNDLE_ID=com.nightvibes33.gtaios.native ./make-ios.sh /authorized/game.wasm --ipa
+BUNDLE_ID=com.nightvibes33.gtaios ./make-ios.sh /authorized/game.wasm --ipa
 python3 ../verify_external_assets.py --ipa build/Muguet.ipa
 ```
+
+The GitHub workflow publishes only `GTAiOS.ipa` (bundle ID `com.nightvibes33.gtaios`) with the project's own five-tab UI, icon and NightVibes33-only developer credits. Upstream engine sources remain under `native/Muguet` with their separate required legal license. The old diagnostic-only IPA workflow is not triggered by `ios-usb-port` pushes.
 
 The output is an unsigned/ad-hoc IPA for re-signing. Upstream recommends
 AltStore and its increased-memory entitlement; other signing tools must preserve

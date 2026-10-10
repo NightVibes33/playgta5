@@ -217,6 +217,14 @@ replace("ios/Info.plist",
         '<key>CFBundleDisplayName</key><string>GTAiOS Native</string>',
         '<key>CFBundleDisplayName</key><string>GTA V iOS</string>')
 replace("ios/Info.plist",
+        '<key>CFBundleName</key><string>Muguet</string>',
+        '<key>CFBundleName</key><string>GTAiOS</string>')
+# Preserve the upstream license within the signed IPA; it is not a
+# visible developer-credits entry in the user's GTAiOS interface.
+replace("ios/project.yml",
+        '- path: ../../../ios/Sources/Resources/Assets.xcassets',
+        '- path: ../LICENSE\n      - path: ../../../ios/Sources/Resources/Assets.xcassets')
+replace("ios/Info.plist",
         '<key>UISupportedInterfaceOrientations</key>\n'
         '  <array><string>UIInterfaceOrientationLandscapeRight</string>'
         '<string>UIInterfaceOrientationLandscapeLeft</string></array>',
