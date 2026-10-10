@@ -8,6 +8,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+static int archive_test_fd = -1;
+static int32_t archive_test_open(const char *relative) {
+    if (strcmp(relative, "data/test.bin") != 0) return -2;
+    return gta_wasi_register_readonly_fd(archive_test_fd);
+}
 static uint64_t le64(const unsigned char *p) {
     uint64_t n=0;
     for (unsigned i=0;i<8;i++) n|=(uint64_t)p[i]<<(8*i);
@@ -91,6 +96,25 @@ int main(void) {
     assert(write(actual,bytes,16)==16);
     int32_t gamefd=gta_wasi_register_readonly_fd(actual);
     assert(gamefd>=3);
+    /* Exercise the real memory64 openat guest path -> authorized provider
+     * -> virtual guest FD; deny write flags and suspicious path traversal. */
+    archive_test_fd=actual;
+    gta_wasi_set_openat_provider(archive_test_open);
+    strcpy((char*)memory, "data/test.bin");
+    assert(gta_wasi_syscall_openat(-100,0,O_WRONLY,0)==-13);
+    assert(gta_wasi_syscall_openat(7,0,O_RDONLY,0)==-9);
+    assert(gta_wasi_syscall_openat(-100,UINT64_MAX,O_RDONLY,0)==-14);
+    int32_t opened=gta_wasi_syscall_openat(-100,0,O_RDONLY,0);
+    assert(opened>=3 && opened!=gamefd);
+    assert(gta_wasi_fd_close((uint32_t)opened)==0);
+    strcpy((char*)memory,"data/../b/secret");
+    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
+    strcpy((char*)memory,"data//broken");
+    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
+    strcpy((char*)memory,"data/./broken");
+    assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
+    gta_wasi_set_openat_provider(NULL);
+    archive_test_fd=-1;
     close(actual); /* guest owns a duplicate, not the source */
     write_le64(memory+40,4);
     write_le64(memory+48,5);

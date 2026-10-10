@@ -128,6 +128,20 @@ int32_t gta_wasi_syscall_openat(int32_t dirfd, uint64_t path_pointer,
     while (*relative == '/') relative++;
     if (strncmp(relative, "data/", 5) != 0 &&
         strncmp(relative, "b/", 2) != 0) return -2; /* ENOENT */
+    /* Do not trust the embedding provider alone to reject path escape,
+     * doubled separators or dot segments. Never normalize a malicious
+     * path into an unintended file outside the authorized archive root. */
+    for (const char *part = relative; *part;) {
+        size_t len = strcspn(part, "/");
+        if (!len || (len == 1 && part[0] == '.') ||
+            (len == 2 && part[0] == '.' && part[1] == '.'))
+            return -13; /* EACCES */
+        part += len;
+        if (*part == '/') {
+            ++part;
+            if (!*part) return -13;
+        }
+    }
     if (!provider) return -2;
     return provider(relative);
 }

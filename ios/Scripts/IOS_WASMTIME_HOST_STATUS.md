@@ -507,3 +507,12 @@ The native engine cannot yet be instantiated: other imports, true
 3 GiB guest memory, pthread scheduling, WebGPU/Metal shaders and
 audio remain outstanding. On-device execution of the actual game
 is still unverified.
+
+## Build 31 — Emscripten openat source-path regression
+
+The memory64 host test now drives the real `__syscall_openat` C ABI through
+an explicitly registered read-only descriptor provider. It verifies normal
+authorized open and close, denial of write flags, invalid guest pointers and
+dirfds, and native rejection of dot-segment traversal and doubled separators
+before calling the Swift security-scoped file provider. This test does not
+contain or synthesize actual GTA assets.
