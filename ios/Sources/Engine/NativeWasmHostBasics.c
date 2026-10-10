@@ -1,5 +1,6 @@
 #include "NativeWasmtimeHost.h"
 #include "NativeTextHostABI.h"
+#include "NativeUserdataHostABI.h"
 #include <TargetConditionals.h>
 #include <stdio.h>
 #include <string.h>
@@ -200,6 +201,71 @@ static int gta_define_text_callbacks(wasmtime_linker_t *linker) {
     return 0;
 }
 
+/* Exact signatures from the uploaded GTA WebAssembly binary:
+ * env.wasm_userdata_put_js(i64 path,i64 bytes,i64 size,f64 mtimeMs)->void
+ * env.wasm_userdata_delete_js(i64 path)->void.
+ * Original game.js hands writes/deletes asynchronously to IndexedDB.
+ * Native implementation persists them atomically in the app's save sandbox.
+ * Failure is retained for Files-exportable diagnostics; void guest ABI cannot
+ * report write failures synchronously back to game.wasm.
+ */
+static wasm_trap_t *gta_userdata_put_callback(
+    void *env, wasmtime_caller_t *caller, const wasmtime_val_t *args,
+    size_t nargs, wasmtime_val_t *results, size_t nresults
+) {
+    (void)env; (void)caller; (void)results;
+    if (nargs == 4 && nresults == 0 &&
+        args[0].kind == WASMTIME_I64 && args[1].kind == WASMTIME_I64 &&
+        args[2].kind == WASMTIME_I64 && args[3].kind == WASMTIME_F64) {
+        (void)gta_userdata_put_js((uint64_t)args[0].of.i64,
+            (uint64_t)args[1].of.i64, (uint64_t)args[2].of.i64,
+            args[3].of.f64);
+    }
+    return NULL;
+}
+static wasm_trap_t *gta_userdata_delete_callback(
+    void *env, wasmtime_caller_t *caller, const wasmtime_val_t *args,
+    size_t nargs, wasmtime_val_t *results, size_t nresults
+) {
+    (void)env; (void)caller; (void)results;
+    if (nargs == 1 && nresults == 0 && args[0].kind == WASMTIME_I64)
+        (void)gta_userdata_delete_js((uint64_t)args[0].of.i64);
+    return NULL;
+}
+static int gta_define_userdata_callbacks(wasmtime_linker_t *linker) {
+    wasm_valtype_t *params[4] = {
+        wasm_valtype_new(WASM_I64), wasm_valtype_new(WASM_I64),
+        wasm_valtype_new(WASM_I64), wasm_valtype_new(WASM_F64)
+    };
+    if (!params[0] || !params[1] || !params[2] || !params[3]) {
+        for (int i=0; i<4; ++i) if (params[i]) wasm_valtype_delete(params[i]);
+        return -1;
+    }
+    wasm_valtype_vec_t inputs, outputs;
+    wasm_valtype_vec_new(&inputs, 4, params);
+    wasm_valtype_vec_new_empty(&outputs);
+    wasm_functype_t *put_type = wasm_functype_new(&inputs, &outputs);
+    if (!put_type) return -2;
+    const char *put_name = "wasm_userdata_put_js";
+    wasmtime_error_t *error = wasmtime_linker_define_func(
+        linker, "env", 3, put_name, strlen(put_name), put_type,
+        gta_userdata_put_callback, NULL, NULL);
+    wasm_functype_delete(put_type);
+    if (error) { wasmtime_error_delete(error); return -3; }
+
+    wasm_valtype_t *path = wasm_valtype_new(WASM_I64);
+    if (!path) return -4;
+    wasm_functype_t *delete_type = wasm_functype_new_1_0(path);
+    if (!delete_type) return -5;
+    const char *delete_name = "wasm_userdata_delete_js";
+    error = wasmtime_linker_define_func(
+        linker, "env", 3, delete_name, strlen(delete_name), delete_type,
+        gta_userdata_delete_callback, NULL, NULL);
+    wasm_functype_delete(delete_type);
+    if (error) { wasmtime_error_delete(error); return -6; }
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -306,10 +372,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if (installed) *installed += 3;
+    rc = gta_define_userdata_callbacks(linker);
+    if (rc != 0) {
+        gta_host_message(message, capacity, "Native GTA userdata put/delete callback registration failed");
+        return rc;
+    }
+    if (installed) *installed += 2;
     return 0;
 }
 
-/* Returns 0 only when thirteen ABI-matched host functions are registered
+/* Returns 0 only when fifteen ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -354,7 +426,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
             gta_host_message(message, capacity, "Monotonic clock callback failed");
         } else {
             gta_host_message(message, capacity,
-                "Thirteen native GTA host callbacks registered; monotonic function invoked correctly");
+                "Fifteen native GTA host callbacks registered; monotonic function invoked correctly");
         }
         if (error) wasmtime_error_delete(error);
         if (trap) wasm_trap_delete(trap);
@@ -381,7 +453,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "WASM memory64 logical maximum host callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Thirteen native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
+                    "Fifteen native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
@@ -412,7 +484,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                     "Actual WASM input block publish callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Thirteen verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
+                    "Fifteen verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
@@ -448,7 +520,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "GTA module-int native fallback smoke failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Thirteen real GTA ABI imports linked, module-int fallback and input-block callbacks executed; game not instantiated");
+                    "Fifteen real GTA ABI imports linked, module-int fallback and input-block callbacks executed; game not instantiated");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
