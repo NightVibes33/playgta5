@@ -143,6 +143,9 @@ final class GTAFiveTabController: UITabBarController {
         tabBar.tintColor = GTAReference.green
         tabBar.unselectedItemTintColor = GTAReference.secondary
         tabBar.isTranslucent = false
+        #if targetEnvironment(simulator)
+        chooseSnapshotTab()
+        #endif
     }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
         if let nav = selectedViewController as? UINavigationController,
@@ -155,6 +158,16 @@ final class GTAFiveTabController: UITabBarController {
         return .portrait
     }
     func select(_ index: Int) { selectedIndex = index }
+    #if targetEnvironment(simulator)
+    private func chooseSnapshotTab() {
+        // Only used by GitHub simulator screenshots. No status values are mocked.
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--snapshot-library") { selectedIndex = 1 }
+        if arguments.contains("--snapshot-graphics") { selectedIndex = 2 }
+        if arguments.contains("--snapshot-controls") { selectedIndex = 3 }
+        if arguments.contains("--snapshot-more") { selectedIndex = 4 }
+    }
+    #endif
 }
 extension GTAFiveTabController: UITabBarControllerDelegate {}
 
@@ -208,13 +221,35 @@ final class GTAReferenceHomeController: GTAReferencePage {
     private let readiness = GTAReference.label("", size: 11, weight: .medium, color: GTAReference.secondary)
     override func viewDidLoad() {
         super.viewDidLoad()
-        installHero("gtaios-reference-home", height: 370)
+        // Reference-matched full-bleed GTA V artwork with a real, state-driven action.
+        let hero = UIView()
+        hero.clipsToBounds = true
+        hero.layer.cornerRadius = 17
+        hero.layer.cornerCurve = .continuous
+        hero.translatesAutoresizingMaskIntoConstraints = false
+        hero.heightAnchor.constraint(equalToConstant: 370).isActive = true
+        let art = GTAReference.image("gtaios-reference-home", height: 370, radius: 0)
+        hero.addSubview(art)
+        NSLayoutConstraint.activate([
+            art.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
+            art.trailingAnchor.constraint(equalTo: hero.trailingAnchor),
+            art.topAnchor.constraint(equalTo: hero.topAnchor),
+            art.bottomAnchor.constraint(equalTo: hero.bottomAnchor)
+        ])
         play.titleLabel?.font = .systemFont(ofSize: 19, weight: .bold)
-        play.heightAnchor.constraint(equalToConstant: 63).isActive = true
         play.layer.borderWidth = 1
-        play.layer.borderColor = GTAReference.green.withAlphaComponent(0.8).cgColor
+        play.layer.borderColor = GTAReference.green.withAlphaComponent(0.9).cgColor
+        play.layer.cornerRadius = 19
         play.addTarget(self, action: #selector(playPressed), for: .touchUpInside)
-        stack.addArrangedSubview(play)
+        play.translatesAutoresizingMaskIntoConstraints = false
+        hero.addSubview(play)
+        NSLayoutConstraint.activate([
+            play.leadingAnchor.constraint(equalTo: hero.leadingAnchor, constant: 19),
+            play.trailingAnchor.constraint(equalTo: hero.trailingAnchor, constant: -19),
+            play.bottomAnchor.constraint(equalTo: hero.bottomAnchor, constant: -14),
+            play.heightAnchor.constraint(equalToConstant: 63)
+        ])
+        stack.addArrangedSubview(hero)
         readiness.textAlignment = .center
         stack.addArrangedSubview(readiness)
         let actions = UIStackView()

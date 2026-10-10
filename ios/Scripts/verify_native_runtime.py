@@ -117,6 +117,10 @@ assert "EngineOptions.set" in reference and "EngineOptions.value" in reference
 assert "LogStore.shared.exportURL()" in reference
 assert "NativeEngineStatus.nativeEngineLinked" in reference
 assert '"gtaios-reference-home"' in reference
+assert 'hero.addSubview(play)' in reference and 'play.bottomAnchor.constraint(equalTo: hero.bottomAnchor' in reference
+assert all(("\"" + name + "\"") in reference for name in ("Home", "Library", "Graphics", "Controls", "More"))
+assert '"--snapshot-library"' in reference and '"--snapshot-graphics"' in reference
+assert 'iphone-library.png' in workflow and 'iphone-graphics.png' in workflow
 assert '"gtaios-library-skyline"' in reference
 assert '"gtaios-settings-hero"' in reference
 assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
@@ -244,7 +248,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>35</string>" in plist
+assert "<key>CFBundleVersion</key><string>36</string>" in plist
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa

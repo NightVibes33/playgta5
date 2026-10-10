@@ -228,6 +228,14 @@ jobs:
             exit 1
           fi
           echo "GTAiOS remained alive and visible after simulator launch"
+          for destination in library graphics controls more; do
+            xcrun simctl terminate "$UDID" com.nightvibes33.gtaios
+            xcrun simctl launch "$UDID" com.nightvibes33.gtaios "--snapshot-$destination"
+            sleep 3
+            xcrun simctl io "$UDID" screenshot "iphone-$destination.png"
+            test -s "iphone-$destination.png"
+          done
+          shasum iphone-launcher.png iphone-library.png iphone-graphics.png iphone-controls.png iphone-more.png
       - name: Upload visual smoke artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -235,6 +243,10 @@ jobs:
           name: GTAiOS-iphone-simulator-screenshot
           path: |
             iphone-launcher.png
+            iphone-library.png
+            iphone-graphics.png
+            iphone-controls.png
+            iphone-more.png
             ${{ runner.temp }}/simulator-build.log
             ${{ runner.temp }}/simulator-runtime.log
             ${{ runner.temp }}/*GTAiOS*.ips
