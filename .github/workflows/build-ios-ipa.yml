@@ -57,6 +57,13 @@ jobs:
             ios/Tests/native-input-abi.test.c -lm -lpthread \
             -o "$RUNNER_TEMP/native-input-abi-test"
           "$RUNNER_TEMP/native-input-abi-test"
+      - name: Verify real GTA engine text/config host import semantics
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pthread \
+            ios/Sources/Engine/NativeTextHostABI.c \
+            ios/Tests/native-text-abi.test.c \
+            -o "$RUNNER_TEMP/native-text-abi"
+          "$RUNNER_TEMP/native-text-abi"
       - name: Verify native HTTPFS manifest import semantics
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pthread \
