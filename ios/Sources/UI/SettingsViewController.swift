@@ -6,36 +6,48 @@ import UIKit
 final class SettingsViewController: UITableViewController {
     private let ink = GTATheme.night
     private let panel = GTATheme.raised
-    private let accent = GTATheme.coral
+    private let accent = GTATheme.neonPink
 
     init() { super.init(style: .insetGrouped) }
     required init?(coder: NSCoder) { super.init(coder: coder) }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Graphics"
+        title = "Graphics & Controls"
         view.backgroundColor = ink
         tableView.backgroundColor = ink
-        tableView.separatorColor = UIColor.white.withAlphaComponent(0.075)
+        tableView.separatorColor = UIColor.white.withAlphaComponent(0.11)
         tableView.sectionHeaderTopPadding = 13
         tableView.estimatedRowHeight = 78
         tableView.rowHeight = UITableView.automaticDimension
 
-        let header = UIView(frame: CGRect(x: 0, y: 0, width: 393, height: 95))
-        let heading = GTATheme.section("Graphics")
-        heading.font = .systemFont(ofSize: 25, weight: .bold)
+        // The graphics page shares the same cinematic GTA V identity as Home,
+        // but leaves the choices wired directly to EngineOptions.
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: 393, height: 368))
+        header.backgroundColor = GTATheme.night
+        let art = LosSantosHeroView()
+        art.translatesAutoresizingMaskIntoConstraints = false
+        header.addSubview(art)
+        let heading = GTATheme.section("Graphics & Controls")
+        heading.font = .systemFont(ofSize: 27, weight: .heavy)
         heading.translatesAutoresizingMaskIntoConstraints = false
-        let description = GTATheme.caption("Resolution, performance and visual presets")
+        heading.adjustsFontSizeToFitWidth = true
+        heading.minimumScaleFactor = 0.8
+        let description = GTATheme.caption("GTA V · native Metal frame target and saved engine presets")
+        description.numberOfLines = 2
         description.translatesAutoresizingMaskIntoConstraints = false
         header.addSubview(heading)
         header.addSubview(description)
         NSLayoutConstraint.activate([
-            heading.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
-            heading.topAnchor.constraint(equalTo: header.topAnchor, constant: 16),
-            heading.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -20),
+            art.topAnchor.constraint(equalTo: header.topAnchor, constant: 10),
+            art.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 18),
+            art.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -18),
+            heading.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 21),
+            heading.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -18),
+            heading.topAnchor.constraint(equalTo: art.bottomAnchor, constant: 13),
             description.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
-            description.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 5),
-            description.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -20)
+            description.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -21),
+            description.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 3)
         ])
         tableView.tableHeaderView = header
 
@@ -87,6 +99,7 @@ final class SettingsViewController: UITableViewController {
         let spec = EngineOptions.sections[indexPath.section].options[indexPath.row]
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
         cell.backgroundColor = panel
+        cell.layer.borderColor = UIColor.white.withAlphaComponent(0.07).cgColor
         cell.selectionStyle = .default
         cell.tintColor = accent
         cell.accessibilityHint = "Double-tap to change the preset"
