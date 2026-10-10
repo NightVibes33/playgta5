@@ -310,3 +310,9 @@ assert 'live.isHidden = true' in controls_source
 assert 'native-control-scheme' in controls_source
 assert 'GTALaunchPreferences.setText("controlScheme"' in controls_source
 assert controls_source.index('stack.addArrangedSubview(scheme)') < controls_source.index('stack.addArrangedSubview(GTATheme.section("Advanced"))')
+
+# Real recent diagnostics, no fabricated launch/shader/history events.
+assert 'func recentEvents(limit: Int = 5' in read("ios/Sources/Support/LogStore.swift")
+assert 'LogStore.shared.recentEvents(limit: 5)' in reference
+assert '"Recent Diagnostic Events"' in reference
+assert '"No diagnostic events recorded"' in reference

@@ -1100,6 +1100,8 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
 
 final class GTAReferenceMoreController: GTAReferencePage {
     private let controllerStatus = GTAReference.label("", size: 12, color: GTAReference.secondary)
+    private let recentRows = UIStackView()
+    private var recentGeneration = 0
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("More"))
@@ -1130,6 +1132,25 @@ final class GTAReferenceMoreController: GTAReferencePage {
             button.addTarget(self, action: handler, for: .touchUpInside)
             stack.addArrangedSubview(button)
         }
+        // Actual on-device events, not a scripted list of successful launches.
+        let eventsPanel = GTAReference.panelView(12)
+        let eventHeader = UIStackView()
+        eventHeader.axis = .horizontal
+        eventHeader.alignment = .center
+        eventHeader.addArrangedSubview(GTAReference.label("Recent Diagnostic Events",
+                                                           size: 17, weight: .bold))
+        eventHeader.addArrangedSubview(UIView())
+        let refreshButton = UIButton(type: .system)
+        refreshButton.setImage(UIImage(systemName: "arrow.clockwise"), for: .normal)
+        refreshButton.tintColor = GTAReference.green
+        refreshButton.accessibilityLabel = "Refresh actual diagnostic events"
+        refreshButton.addTarget(self, action: #selector(reloadEvents), for: .touchUpInside)
+        eventHeader.addArrangedSubview(refreshButton)
+        eventsPanel.addArrangedSubview(eventHeader)
+        recentRows.axis = .vertical
+        recentRows.spacing = 7
+        eventsPanel.addArrangedSubview(recentRows)
+        stack.addArrangedSubview(eventsPanel)
         stack.addArrangedSubview(GTAReference.label(
             "All operations are local. No storefront, cloud sync, updates, save progress or gameplay " +
             "statistics are claimed without corresponding implementations.",
@@ -1142,6 +1163,36 @@ final class GTAReferenceMoreController: GTAReferencePage {
         let name = GCController.controllers().first?.vendorName
         controllerStatus.text = name.map { "Controller: " + $0 } ??
             "Controller: not connected"
+        reloadEvents()
+    }
+    @objc private func reloadEvents() {
+        recentGeneration += 1
+        let generation = recentGeneration
+        LogStore.shared.recentEvents(limit: 5) { [weak self] events in
+            guard let self, self.recentGeneration == generation else { return }
+            self.recentRows.arrangedSubviews.forEach { row in
+                self.recentRows.removeArrangedSubview(row)
+                row.removeFromSuperview()
+            }
+            if events.isEmpty {
+                self.recentRows.addArrangedSubview(GTAReference.label(
+                    "No diagnostic events recorded", size: 12, color: GTAReference.secondary))
+                return
+            }
+            for (timestamp, detail) in events {
+                let item = UIStackView()
+                item.axis = .vertical
+                item.spacing = 3
+                item.addArrangedSubview(GTAReference.label(
+                    timestamp.replacingOccurrences(of: "T", with: " "),
+                    size: 10, color: GTAReference.green))
+                let message = GTAReference.label(detail, size: 11, color: GTAReference.secondary)
+                message.numberOfLines = 2
+                item.addArrangedSubview(message)
+                self.recentRows.addArrangedSubview(item)
+                self.recentRows.addArrangedSubview(GTAReference.hairline())
+            }
+        }
     }
     @objc private func library() { switchTab(1) }
     @objc private func graphics() { switchTab(2) }

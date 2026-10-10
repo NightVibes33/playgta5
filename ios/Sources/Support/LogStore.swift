@@ -44,5 +44,37 @@ final class LogStore {
         return output
     }
 
+    /// Real log history, read from bounded file tails off the main thread.
+    func recentEvents(limit: Int = 5, completion: @escaping ([(String, String)]) -> Void) {
+        queue.async {
+            let files = (try? FileManager.default.contentsOfDirectory(
+                at: self.directory, includingPropertiesForKeys: nil)) ?? []
+            var events: [(stamp: String, detail: String)] = []
+            for file in files where file.pathExtension == "txt" {
+                guard let handle = try? FileHandle(forReadingFrom: file) else { continue }
+                defer { try? handle.close() }
+                let size = (try? handle.seekToEnd()) ?? 0
+                try? handle.seek(toOffset: size > 32768 ? size - 32768 : 0)
+                guard let data = try? handle.readToEnd(),
+                      let content = String(data: data, encoding: .utf8) else { continue }
+                let channel = file.deletingPathExtension().lastPathComponent
+                for line in content.split(separator: "\n").suffix(20) {
+                    guard line.hasPrefix("["),
+                          let close = line.firstIndex(of: "]") else { continue }
+                    let stamp = String(line[line.index(after: line.startIndex)..<close])
+                    let detail = String(line[line.index(after: close)...])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !detail.isEmpty {
+                        events.append((stamp, channel + " · " + detail))
+                    }
+                }
+            }
+            let rows = events.sorted { $0.stamp > $1.stamp }
+                .prefix(max(0, min(20, limit)))
+                .map { ($0.stamp, $0.detail) }
+            DispatchQueue.main.async { completion(Array(rows)) }
+        }
+    }
+
     func diagnosticsDirectory() -> URL { directory }
 }
