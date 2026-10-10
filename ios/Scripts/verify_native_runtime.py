@@ -119,9 +119,9 @@ assert "GTAReferenceLibraryController" in reference
 assert "GTAReference.settingsRow" in reference
 # Authentic scene assets are committed to the source tree so offline
 # Xcode builds do not need to make any web requests.
-for scene in ("gtav-story-trio", "gtav-vinewood-view", "gtav-car-gameplay",
-              "gtav-city-helicopter", "gtav-franklin-race"):
-    assert (root / "ios/Sources/Resources" / (scene + ".jpg")).is_file()
+for artwork_name in ("gtav-story-trio", "gtav-vinewood-view", "gtav-car-gameplay",
+                     "gtav-city-helicopter", "gtav-franklin-race"):
+    assert (root / "ios/Sources/Resources" / (artwork_name + ".jpg")).is_file()
 assert "GTAReferenceGraphicsController" in reference
 assert "NativeEngineStatus.inspect" in reference
 assert "USBStorageManager.shared.chooseAsync" in reference
