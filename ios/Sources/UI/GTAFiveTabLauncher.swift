@@ -155,12 +155,6 @@ final class GTAFiveTabController: UITabBarController {
         return .portrait
     }
     func select(_ index: Int) { selectedIndex = index }
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        (selectedViewController as? UINavigationController)?.supportedInterfaceOrientations ?? .portrait
-    }
-    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        (selectedViewController as? UINavigationController)?.preferredInterfaceOrientationForPresentation ?? .portrait
-    }
 }
 extension GTAFiveTabController: UITabBarControllerDelegate {}
 
