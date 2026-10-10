@@ -23,14 +23,18 @@ if [ "$icon_name" != "AppIcon" ] || [ ! -s "$app/Assets.car" ]; then
   exit 1
 fi
 echo 'GTA V iOS icon metadata and compiled Assets.car: PASS'
-# All four screenshot-derived scenic images must be present and locally bundled.
-for name in gtaios-reference-home.jpg gtaios-library-skyline.jpg gtaios-library-thumb.jpg gtaios-settings-hero.jpg; do
+# Only authentic GTA V promotional artwork is allowed in the IPA.
+for name in gtav-official-hero.jpg gtav-official-cover.jpg gtav-official-header.jpg; do
   if ! find "$app" -type f -name "$name" | grep -q .; then
-    echo "ERROR: bundled GTA V reference artwork missing: $name" >&2
+    echo "ERROR: missing authentic GTA V artwork: $name" >&2
     exit 1
   fi
 done
-echo 'Five-tab GTA V reference assets: PASS'
+if find "$app" -type f \( -name 'gtaios-reference-*.jpg' -o -name 'gtaios-library-*.jpg' -o -name 'gtaios-settings-hero.jpg' \) | grep -q .; then
+  echo 'ERROR: synthetic reference imagery is not permitted in the IPA' >&2
+  exit 1
+fi
+echo 'Authentic GTA V promotional artwork bundled: PASS'
 echo 'Modern full-screen iPhone launch manifest: PASS'
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" | while read -r exe; do test -x "$app/$exe"; done
@@ -40,16 +44,6 @@ if [ -e "$app/WebRuntime/index.html" ] || [ -e "$app/WebRuntime/game.js" ]; then
   exit 1
 fi
 echo 'Native runtime package: no WebKit gameplay or browser assets'
-# Keep the GTA V launcher cinematic and fully offline.
-if ! find "$app" -type f -name 'gtaios-hero.jpg' | grep -q .; then
-  echo 'ERROR: locally bundled GTA V launcher hero artwork missing' >&2
-  exit 1
-fi
-echo 'Offline GTA V launcher artwork: PASS'
-if ! find "$app" -type f -name 'gtaios-reference-hero.jpg' | grep -q .; then
-  echo 'ERROR: GTA V screenshot-matched cinematic header is missing' >&2
-  exit 1
-fi
 if find "$app" \( -name '*.rpf' -o -name 'game.wasm' \) | grep -q .; then
   echo "ERROR: proprietary game data must not be bundled in the IPA" >&2
   exit 1

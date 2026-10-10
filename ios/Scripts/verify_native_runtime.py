@@ -116,7 +116,7 @@ assert "USBStorageManager.shared.chooseAsync" in reference
 assert "EngineOptions.set" in reference and "EngineOptions.value" in reference
 assert "LogStore.shared.exportURL()" in reference
 assert "NativeEngineStatus.nativeEngineLinked" in reference
-assert '"gtaios-reference-home"' in reference
+assert '"gtav-official-cover"' in reference
 assert 'hero.addSubview(play)' in reference and 'play.bottomAnchor.constraint(equalTo: hero.bottomAnchor' in reference
 assert all(("\"" + name + "\"") in reference for name in ("Home", "Library", "Graphics", "Controls", "More"))
 assert '"--snapshot-library"' in reference and '"--snapshot-graphics"' in reference
@@ -124,8 +124,8 @@ assert "GCController.controllers().first?.vendorName" in reference
 controls = read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert 'title = "Controls"' in controls and "GTAReference.green" in controls
 assert 'iphone-library.png' in workflow and 'iphone-graphics.png' in workflow
-assert '"gtaios-library-skyline"' in reference
-assert '"gtaios-settings-hero"' in reference
+assert '"gtav-official-header"' in reference
+assert '"gtav-official-hero"' in reference
 assert "GTATheme.section" in read("ios/Sources/UI/SettingsViewController.swift")
 assert "GTATheme.section" in read("ios/Sources/UI/ControllerSettingsViewController.swift")
 assert "import GameController" in input_source

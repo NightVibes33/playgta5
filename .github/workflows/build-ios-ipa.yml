@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Bundle authentic GTA V artwork
+        run: bash ios/Scripts/fetch_official_gtav_art.sh
       - name: Resolve pinned Wasmtime iOS static runtime (rebuild on artifact expiry)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -178,6 +180,8 @@ jobs:
     continue-on-error: false
     steps:
       - uses: actions/checkout@v4
+      - name: Bundle authentic GTA V artwork
+        run: bash ios/Scripts/fetch_official_gtav_art.sh
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Prepare runtime and project

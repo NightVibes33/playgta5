@@ -228,7 +228,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         hero.layer.cornerCurve = .continuous
         hero.translatesAutoresizingMaskIntoConstraints = false
         hero.heightAnchor.constraint(equalToConstant: 370).isActive = true
-        let art = GTAReference.image("gtaios-reference-home", height: 370, radius: 0)
+        let art = GTAReference.image("gtav-official-cover", height: 370, radius: 0)
         hero.addSubview(art)
         NSLayoutConstraint.activate([
             art.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
@@ -264,7 +264,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         actions.addArrangedSubview(files)
         stack.addArrangedSubview(actions)
         let city = GTAReference.panelView(0)
-        city.addArrangedSubview(GTAReference.image("gtaios-library-skyline", height: 132))
+        city.addArrangedSubview(GTAReference.image("gtav-official-header", height: 132))
         let cityText = GTAReference.label("Los Santos", size: 16, weight: .bold)
         cityText.textAlignment = .center
         city.addArrangedSubview(cityText)
@@ -312,7 +312,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         cardRow.axis = .horizontal
         cardRow.spacing = 13
         cardRow.alignment = .center
-        let cover = GTAReference.image("gtaios-library-thumb", height: 165, radius: 12)
+        let cover = GTAReference.image("gtav-official-cover", height: 165, radius: 12)
         cover.widthAnchor.constraint(equalToConstant: 130).isActive = true
         cardRow.addArrangedSubview(cover)
         let detail = UIStackView()
@@ -344,7 +344,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         actions.addArrangedSubview(validate)
         actions.addArrangedSubview(logs)
         stack.addArrangedSubview(actions)
-        let banner = GTAReference.image("gtaios-library-skyline", height: 180)
+        let banner = GTAReference.image("gtav-official-header", height: 180)
         stack.addArrangedSubview(banner)
         let infoCard = GTAReference.panelView()
         infoCard.addArrangedSubview(GTAReference.label("Game Information", size: 19, weight: .bold))
@@ -432,7 +432,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Settings"))
-        installHero("gtaios-settings-hero", height: 205)
+        installHero("gtav-official-hero", height: 205)
         let info = GTAReference.panelView()
         info.addArrangedSubview(GTAReference.label("Graphics", size: 19, weight: .bold))
         info.addArrangedSubview(GTAReference.label("Current device capability and stored renderer preferences",
