@@ -225,7 +225,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>29</string>" in plist
+assert "<key>CFBundleVersion</key><string>30</string>" in plist
 
 print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")
