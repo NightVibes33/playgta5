@@ -82,10 +82,27 @@ jobs:
           unzip -q native/Muguet/build/Muguet.ipa -d "$STAGE"
           test -d "$STAGE/Payload/Muguet.app"
           mv "$STAGE/Payload/Muguet.app" "$STAGE/Payload/GTAiOS.app"
-          codesign --verify "$STAGE/Payload/GTAiOS.app"
-          test -s "$STAGE/Payload/GTAiOS.app/LICENSE"
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$STAGE/Payload/GTAiOS.app/Info.plist" | grep -Fxq com.nightvibes33.gtaios
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$STAGE/Payload/GTAiOS.app/Info.plist" | grep -Fxq GTAiOS
+          APP="$STAGE/Payload/GTAiOS.app"
+          echo "::group::Inspect built native GTAiOS app"
+          ls -lah "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist"
+          echo "::endgroup::"
+          # Source license is shipped with the IPA but never added to developer credits.
+          # XcodeGen may skip extensionless LICENSE when it is listed as a source.
+          if [ ! -s "$APP/LICENSE" ]; then
+            cp native/Muguet/LICENSE "$APP/LICENSE"
+            codesign --force --sign - \
+              --entitlements native/Muguet/ios/Muguet-sideload.entitlements \
+              --generate-entitlement-der "$APP"
+          fi
+          codesign --verify --verbose=2 "$APP"
+          test -s "$APP/LICENSE" || { echo "ERROR: upstream license missing from packaged IPA"; exit 1; }
+          test -s "$APP/muguet" || { echo "ERROR: compiled executable missing"; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist" | grep -Fxq com.nightvibes33.gtaios
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$APP/Info.plist" | grep -Fxq GTAiOS
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist" | grep -Fxq 'GTA V iOS'
           (cd "$STAGE" && zip -qry "$GITHUB_WORKSPACE/GTAiOS.ipa" Payload)
           python3 native/verify_external_assets.py --ipa GTAiOS.ipa
           xcrun otool -l "$STAGE/Payload/GTAiOS.app/muguet" > "$RUNNER_TEMP/native-engine-mach-o.txt"
