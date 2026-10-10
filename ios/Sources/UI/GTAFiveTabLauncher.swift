@@ -332,10 +332,10 @@ final class GTAReferenceHomeController: GTAReferencePage {
         identity.spacing = 0
         identity.translatesAutoresizingMaskIntoConstraints = false
         let name = GTAReference.label("GTAiOS", size: 23, weight: .black)
-        let subtitle = GTAReference.label("GRAND THEFT AUTO V  ·  iPHONE", size: 9,
+        let brandSubtitle = GTAReference.label("GRAND THEFT AUTO V  ·  iPHONE", size: 9,
                                           weight: .semibold, color: GTAReference.secondary)
         identity.addArrangedSubview(name)
-        identity.addArrangedSubview(subtitle)
+        identity.addArrangedSubview(brandSubtitle)
         hero.addSubview(identity)
         let localBadge = GTAReference.label("LOCAL", size: 11,
                                            weight: .heavy, color: GTAReference.green)
