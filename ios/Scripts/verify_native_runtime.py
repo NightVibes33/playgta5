@@ -107,7 +107,7 @@ assert 'wasm_httpfs_manifest_js' in host
 assert 'stageHTTPFSManifest()' in native
 assert 'data/manifest.json' in native
 assert 'native-httpfs-manifest.test.c' in workflow
-assert 'registered != 10' in game
+assert 'registered != 15' in game
 assert 'native-input-abi.test.c' in workflow
 
 assert 'wasmtime_linker_define_func' in host
@@ -117,7 +117,7 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 10' in game
+assert 'registered != 15' in game
 assert 'native-aot-smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
@@ -132,6 +132,12 @@ assert 'gta_define_text_callbacks' in host
 assert 'gta_text_host_next_log' in game
 assert 'NativeTextHostABI.h' in read("ios/Sources/Engine/NativeWasmtimeHost.h")
 assert 'NativeTextHostABI.c' in workflow
+assert 'native-userdata-abi.test.c' in workflow
+assert 'gta_define_userdata_callbacks' in host
+assert 'wasm_userdata_put_js' in host and 'wasm_userdata_delete_js' in host
+assert 'NativeUserdataHostABI.h' in read('ios/Sources/Engine/NativeWasmtimeHost.h')
+assert 'gta_userdata_set_root' in game
+assert 'gta_userdata_take_error()' in game
 assert 'native-text-abi.test.c' in workflow
 assert 'GTA_TEXT_SOURCE_MAX 4096' in read("ios/Sources/Engine/NativeTextHostABI.c")
 assert 'GTA_TEXT_QUEUE 32' in read("ios/Sources/Engine/NativeTextHostABI.c")
@@ -183,7 +189,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>23</string>" in plist
+assert "<key>CFBundleVersion</key><string>24</string>" in plist
 
 print("PASS: native Metal/Wasmtime, shared memory64 AOT fixture with native controller press/release guest readback")
 print("PASS: native USB module-header and imported memory inspection; 4MiB ranged I/O")

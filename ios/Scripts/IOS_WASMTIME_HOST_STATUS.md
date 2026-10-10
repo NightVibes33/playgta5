@@ -332,3 +332,34 @@ GTA engine until its 3 GiB shared memory is safely instantiated and bound,
 and the remaining host imports, renderer/shaders, actual game audio,
 save lifecycle, and in-world input all exist. The real AOT module currently
 undergoes deserialization and ABI coverage inspection only.
+
+
+## Build 24 — actual GTA save/setting writes and deletes (15/85 imports)
+
+The original `game.js` and the uploaded WebAssembly ABI agree on:
+- `env.wasm_userdata_put_js(i64 path, i64 data, i64 size, f64 mtimeMs)->void`
+- `env.wasm_userdata_delete_js(i64 path)->void`
+
+These two callbacks previously went to the browser's IndexedDB
+`gta5-userdata` store. They now call the native `NativeUserdataHostABI.c`
+implementation through real Wasmtime linker registrations. Native code
+resolves bounded string/data offsets from the externally owned guest shared
+memory64 region and stores per-user files in the **app-private**
+`Documents/GTAiOS-Userdata/` directory; the USB game archives are untouched.
+Writes use restrictive permissions, per-directory `openat` with
+`O_NOFOLLOW`, atomic rename, fsync and original mtime preservation.
+Invalid guest pointers, traversal components, oversized files (>32 MiB),
+symlinks and unbound memory fail safely, with errors exposed in Files logs.
+Deleting a non-existent save is idempotent.
+
+A separate pure-C regression test checks write, readback, timestamp,
+directory traversal rejection, size/bounds enforcement, deletion and
+unbinding. The native launcher also corrects a critical BUILD 23 logic
+regression: it compared **13 registered host imports** to **10**, preventing
+the rest of runtime verification from running even on a correct host.
+Build 24 now expects exactly **15**.
+
+This does **not** yet restore saved userdata into the GTA engine's in-memory
+filesystem on startup. Nor does it instantiate the 3 GiB shared memory or
+finish the other 70 function imports and true Metal graphics/loading/audio
+interfaces. A successful IPA build is only host-ABI coverage, not gameplay.

@@ -1,7 +1,7 @@
 name: Build GTAiOS Unsigned IPA
 on:
   push:
-    branches: [ios-usb-port, native-aot-work]
+    branches: [ios-usb-port, native-aot-work, native-userdata-work]
   workflow_dispatch:
 permissions:
   contents: read
@@ -64,6 +64,13 @@ jobs:
             ios/Tests/native-text-abi.test.c \
             -o "$RUNNER_TEMP/native-text-abi"
           "$RUNNER_TEMP/native-text-abi"
+      - name: Verify real GTA userdata save and deletion ABI
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pthread \
+            ios/Sources/Engine/NativeUserdataHostABI.c \
+            ios/Tests/native-userdata-abi.test.c -lm \
+            -o "$RUNNER_TEMP/native-userdata-abi"
+          "$RUNNER_TEMP/native-userdata-abi"
       - name: Verify native HTTPFS manifest import semantics
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pthread \

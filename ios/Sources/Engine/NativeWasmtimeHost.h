@@ -4,6 +4,7 @@
 #include "../Input/NativeGameInputABI.h"
 #include "NativeHTTPFSManifestABI.h"
 #include "NativeTextHostABI.h"
+#include "NativeUserdataHostABI.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,7 +12,7 @@ extern "C" {
    This does not instantiate the GTA game engine. */
 int gta_ios_wasmtime_engine_probe(void);
 
-/* Registers thirteen verified GTA host imports (timing, capabilities and heap limit)
+/* Registers fifteen verified GTA host imports (timing, capabilities and heap limit)
    and invokes the native Wasmtime monotonic-clock callback as a smoke test.
    The remaining imports are intentionally NOT stubbed or instantiated. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,

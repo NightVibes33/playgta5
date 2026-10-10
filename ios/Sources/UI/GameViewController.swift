@@ -28,6 +28,17 @@ final class GameViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Map /userdata/* to app-private Documents, never to the USB game assets.
+        let saveDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("GTAiOS-Userdata", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: saveDirectory,
+                withIntermediateDirectories: true)
+            let setup = saveDirectory.path.withCString { gta_userdata_set_root($0) }
+            LogStore.shared.write("native", "GTA native userdata persistence sandbox configured: rc=\(setup)")
+        } catch {
+            LogStore.shared.write("native", "GTA native userdata sandbox unavailable: \(error.localizedDescription)")
+        }
         view.backgroundColor = .black
 
         surface = NativeMetalSurface(frame: .zero)
@@ -202,7 +213,7 @@ final class GameViewController: UIViewController {
         let hostDetail = String(cString: hostMessage)
         LogStore.shared.write("native",
             "Real GTA native host callbacks: result=\(basicProbe), registered=\(registered)/85, message=\(hostDetail)")
-        if basicProbe != 0 || registered != 10 {
+        if basicProbe != 0 || registered != 15 {
             status.text = "Native Wasmtime host callback test failed (\(basicProbe)). \(hostDetail)"
             return
         }
@@ -332,6 +343,10 @@ final class GameViewController: UIViewController {
             for _ in 0..<8 {
                 guard gta_text_host_next_log(&guestLine, guestLine.count) == 1 else { break }
                 LogStore.shared.write("engine", String(cString: guestLine))
+            }
+            let userdataFailure = gta_userdata_take_error()
+            if userdataFailure < 0 {
+                LogStore.shared.write("engine", "GTA native userdata save/delete failed: code=\(userdataFailure)")
             }
             let fps = Double(frameCounter) / elapsed
             updateStats(seconds: fps)
