@@ -182,7 +182,7 @@ assert 'wasm_httpfs_manifest_js' in host
 assert 'stageHTTPFSManifest()' in native
 assert 'data/manifest.json' in native
 assert 'native-httpfs-manifest.test.c' in workflow
-assert 'registered != 32' in game
+assert 'registered != 33' in game
 assert 'native-input-abi.test.c' in workflow
 
 assert 'wasmtime_linker_define_func' in host
@@ -214,6 +214,9 @@ assert 'gta_define_wasi_callbacks' in host
 assert 'gta_define_openat_callback' in host and '__syscall_openat' in host
 assert 'gta_define_platform_callbacks' in host
 assert 'gta_define_more_callbacks' in host
+assert 'gta_define_game_audio' in host and 'wasm_audio_publish_js' in host
+assert 'gta_game_audio_drain' in game
+assert 'gta_game_audio_bind' in read('ios/Sources/Engine/NativeGameAudioABI.h')
 for new_import in ('__syscall_getcwd','_emscripten_system','__syscall_fcntl64'):
     assert new_import in host
 for platform_import in ('__syscall_fstat64','__syscall_stat64','__syscall_lstat64','_gmtime_js','_localtime_js'):

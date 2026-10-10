@@ -543,3 +543,24 @@ unit tests check guest pointers and independent descriptor lifetimes.
 The source still requires the other 53 imported functions, 3 GiB shared
 memory, thread lifecycle, native WebGPU-to-Metal rendering and physical
 iPhone world-play testing. Do not describe the IPA as playable.
+
+
+## Build 33 — real guest PCM stereo ring -> native AVAudioEngine (33/85)
+
+The exact original \`env.wasm_audio_publish_js(i64 ring,i32 capacity)->void\`
+is registered in the Wasmtime linker. A separately compiled C bridge
+implements the original browser \`audio-worklet.js\` header and interleaved
+float32 stereo ring, atomically reading published PCM and advancing the guest
+read cursor. Native output only schedules actual guest frames through
+AVAudioEngine; it does not emit test tones or fake gameplay audio.
+
+Safety: bounds-check the entire ring against an externally bound live
+Wasmtime memory64 mapping; require a power-of-two capacity; handle uint32
+sequence wrap and producer overrun; unbind before the guest memory is
+released/replaced; remain silent when no real guest audio exists. An
+independent native unit test covers stereo, cursor increments, wraparound
+and no-bound-memory behavior.
+
+No real GTA audio can occur until the **actual game** is instantiated with
+its required 3 GiB shared memory and invokes this callback. Native Metal
+world rendering, threading, and engine startup remain missing.

@@ -6,6 +6,7 @@
 #include "NativeTextHostABI.h"
 #include "NativeUserdataHostABI.h"
 #include "NativeWASIHostABI.h"
+#include "NativeGameAudioABI.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

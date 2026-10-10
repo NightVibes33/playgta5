@@ -2,6 +2,7 @@
 #include "NativeTextHostABI.h"
 #include "NativeUserdataHostABI.h"
 #include "NativeWASIHostABI.h"
+#include "NativeGameAudioABI.h"
 #include <TargetConditionals.h>
 #include <stdio.h>
 #include <string.h>
@@ -542,6 +543,39 @@ static int gta_define_more_callbacks(wasmtime_linker_t *linker) {
     return 0;
 }
 
+
+/* The source engine's real env.wasm_audio_publish_js(i64,i32)->void
+ * publishes its shared stereo PCM ring. Audio remains silent unless a
+ * live Wasmtime guest allocation is actually bound to the audio ABI. */
+static wasm_trap_t *gta_native_audio_callback(void *env,wasmtime_caller_t *caller,
+    const wasmtime_val_t *args,size_t count,
+    wasmtime_val_t *results,size_t out_count) {
+    (void)env;(void)caller;(void)results;
+    if(count==2 && out_count==0 && args[0].kind==WASMTIME_I64 &&
+       args[1].kind==WASMTIME_I32){
+        (void)gta_game_audio_publish((uint64_t)args[0].of.i64,args[1].of.i32);
+    }
+    return NULL;
+}
+static int gta_define_game_audio(wasmtime_linker_t *linker) {
+    wasm_valtype_t *ptr=wasm_valtype_new(WASM_I64);
+    wasm_valtype_t *size=wasm_valtype_new(WASM_I32);
+    if(!ptr || !size){
+        if(ptr)wasm_valtype_delete(ptr);
+        if(size)wasm_valtype_delete(size);
+        return -1;
+    }
+    wasm_functype_t *type=wasm_functype_new_2_0(ptr,size);
+    if(!type)return -2;
+    const char *name="wasm_audio_publish_js";
+    wasmtime_error_t *error=wasmtime_linker_define_func(
+        linker,"env",3,name,strlen(name),type,
+        gta_native_audio_callback,NULL,NULL);
+    wasm_functype_delete(type);
+    if(error){wasmtime_error_delete(error);return -3;}
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -678,10 +712,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if(installed)*installed+=3;
+    rc=gta_define_game_audio(linker);
+    if(rc!=0){
+        gta_host_message(message,capacity,"Native game audio PCM publish import registration failed");
+        return rc;
+    }
+    if(installed)++*installed;
     return 0;
 }
 
-/* Returns 0 only when 32 ABI-matched host functions are registered
+/* Returns 0 only when 33 ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,

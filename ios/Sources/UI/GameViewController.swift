@@ -21,6 +21,9 @@ final class GameViewController: UIViewController {
     private var inspectStarted = false
     private var gamepadSnapshot: [String: Double] = [:]
     private var lastInputBridgeResult: Int32 = Int32.min
+    private var audioScratch = [Float](repeating: 0, count: 1600)
+    private var nativeAudioStarted = false
+    private var audioFailureLogged = false
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .landscapeRight }
@@ -219,7 +222,7 @@ final class GameViewController: UIViewController {
         let hostDetail = String(cString: hostMessage)
         LogStore.shared.write("native",
             "Real GTA native host callbacks: result=\(basicProbe), registered=\(registered)/85, message=\(hostDetail)")
-        if basicProbe != 0 || registered != 32 {
+        if basicProbe != 0 || registered != 33 {
             status.text = "Native Wasmtime host callback test failed (\(basicProbe)). \(hostDetail)"
             return
         }
@@ -291,6 +294,7 @@ final class GameViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        NativePCMOutput.shared.stop()
         ControllerManager.shared.stop()
         statsTicker?.invalidate()
         statsTicker = nil
@@ -338,8 +342,38 @@ final class GameViewController: UIViewController {
         }
     }
 
+    private func pumpNativeAudio() {
+        // The engine must first publish real guest-memory PCM. No sample
+        // generator or fake GTA soundtrack can enter this path.
+        let count = audioScratch.withUnsafeMutableBufferPointer { buffer in
+            gta_game_audio_drain(buffer.baseAddress, 800)
+        }
+        guard count > 0 else { return }
+        let payload = Array(audioScratch.prefix(Int(count) * 2))
+        if !nativeAudioStarted {
+            nativeAudioStarted = true
+            NativePCMOutput.shared.start { [weak self] result in
+                if case .failure(let error) = result {
+                    self?.reportAudioFailure(error)
+                }
+            }
+        }
+        NativePCMOutput.shared.scheduleStereoFloatPCM(payload) { [weak self] result in
+            if case .failure(let error) = result {
+                self?.reportAudioFailure(error)
+            }
+        }
+    }
+
+    private func reportAudioFailure(_ error: Error) {
+        guard !audioFailureLogged else { return }
+        audioFailureLogged = true
+        LogStore.shared.write("native-audio", "Real game PCM output failed: \(error.localizedDescription)")
+    }
+
     @objc private func tickStats(_ link: CADisplayLink) {
         syncNativeInput()
+        pumpNativeAudio()
         frameCounter += 1
         let now = CACurrentMediaTime()
         let elapsed = now - frameStart

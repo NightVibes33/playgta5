@@ -89,6 +89,13 @@ jobs:
             ios/Tests/native-wasi-abi.test.c \
             -o "$RUNNER_TEMP/native-wasi-abi"
           "$RUNNER_TEMP/native-wasi-abi"
+      - name: Verify real WebAudio stereo float PCM ring ABI
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pthread \
+            ios/Sources/Engine/NativeGameAudioABI.c \
+            ios/Tests/native-game-audio.test.c \
+            -o "$RUNNER_TEMP/native-game-audio"
+          "$RUNNER_TEMP/native-game-audio"
       - name: Verify native HTTPFS manifest import semantics
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pthread \
