@@ -489,3 +489,21 @@ actual serialized module, not the broader `game.js` JS shim (which contains
 functions not necessarily imported by the 63 MiB binary). The compact UI
 shows only the summary; the native log retains the complete ABI report.
 No fake host callbacks, engine instantiation, or playable-game claim.
+
+## Build 30 — game archive path-open ABI (24/85 native imports)
+
+This registers `env.__syscall_openat(i32,i64,i32,i64)->i32` from the
+original Emscripten `game.js` with a **real read-only iOS file-provider
+bridge**. Guest UTF-8 paths are bounded and read from bound memory64;
+absolute /data/* and /b/* or matching relative paths are routed through
+the user's approved USB game root. NSFileCoordinator opens the real file
+and the native 64-slot guest descriptor table duplicates its handle.
+The guest receives a virtual WASI fd supporting read, pread, seek and
+close. Write/create/truncate attempts are rejected, and traversal paths
+are rejected independently by USBStorageManager. No assets are fabricated.
+
+This increases real linker registrations from **23/85 to 24/85**.
+The native engine cannot yet be instantiated: other imports, true
+3 GiB guest memory, pthread scheduling, WebGPU/Metal shaders and
+audio remain outstanding. On-device execution of the actual game
+is still unverified.

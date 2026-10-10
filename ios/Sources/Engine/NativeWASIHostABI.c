@@ -37,6 +37,8 @@ typedef struct {
 } gta_wasi_file;
 static gta_wasi_file wasi_files[GTA_WASI_FILES];
 static pthread_once_t wasi_files_once = PTHREAD_ONCE_INIT;
+static gta_wasi_openat_provider wasi_openat_provider;
+
 static void gta_wasi_files_init(void) {
     for (size_t i = 0; i < GTA_WASI_FILES; ++i) wasi_files[i].owned_fd = -1;
 }
@@ -76,6 +78,55 @@ void gta_wasi_reset_files(void) {
     }
     stdio_open[0] = stdio_open[1] = stdio_open[2] = 1;
     pthread_mutex_unlock(&wasi_mutex);
+}
+
+
+/* Imported Emscripten __syscall_openat(i32, i64, i32, i64) -> i32.
+ * No arbitrary host filesystem access: guest paths resolve under the
+ * previously authorized USB game root through a Swift file coordinator.
+ * We explicitly deny writes, creation and truncation. The caller's mode
+ * varargs are unused because writing is not supported.
+ */
+void gta_wasi_set_openat_provider(gta_wasi_openat_provider provider) {
+    pthread_mutex_lock(&wasi_mutex);
+    wasi_openat_provider = provider;
+    pthread_mutex_unlock(&wasi_mutex);
+}
+int32_t gta_wasi_syscall_openat(int32_t dirfd, uint64_t path_pointer,
+                                int32_t flags, uint64_t varargs_pointer) {
+    (void)varargs_pointer;
+    if ((flags & O_ACCMODE) != O_RDONLY ||
+        (flags & (O_CREAT | O_TRUNC | O_APPEND | O_EXCL)) != 0)
+        return -13; /* EACCES, read-only game archives */
+    char name[1024];
+    gta_wasi_openat_provider provider = NULL;
+    pthread_mutex_lock(&wasi_mutex);
+    if (!span_valid(path_pointer, 1)) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return -14; /* EFAULT */
+    }
+    size_t i = 0;
+    for (; i < sizeof(name) - 1; ++i) {
+        if (!span_valid(path_pointer + i, 1)) {
+            pthread_mutex_unlock(&wasi_mutex);
+            return -14;
+        }
+        name[i] = (char)guest_memory[(size_t)(path_pointer + i)];
+        if (!name[i]) break;
+    }
+    if (i == sizeof(name) - 1) {
+        pthread_mutex_unlock(&wasi_mutex);
+        return -36; /* ENAMETOOLONG */
+    }
+    provider = wasi_openat_provider;
+    pthread_mutex_unlock(&wasi_mutex);
+    if (dirfd != -100 && name[0] != '/') return -9; /* EBADF */
+    const char *relative = name;
+    while (*relative == '/') relative++;
+    if (strncmp(relative, "data/", 5) != 0 &&
+        strncmp(relative, "b/", 2) != 0) return -2; /* ENOENT */
+    if (!provider) return -2;
+    return provider(relative);
 }
 
 static int wasi_std_is_open(uint32_t fd) {

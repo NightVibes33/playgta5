@@ -50,8 +50,33 @@ enum NativeEngineStatus {
         }
     }
 
+    /* Native Emscripten openat guest paths become coordinated reads of the
+     * user's selected data/ or b/ files. C already rejects writes and paths
+     * outside these prefixes; USBStorageManager independently blocks escapes. */
+    private static let nativeArchiveOpen: @convention(c) (UnsafePointer<CChar>?) -> Int32 = { rawPath in
+        guard let rawPath, let relative = String(validatingCString: rawPath),
+              relative.hasPrefix("data/") || relative.hasPrefix("b/"),
+              let file = USBStorageManager.shared.file(relative) else { return -2 }
+        var coordinationError: NSError?
+        var result: Int32 = -5
+        NSFileCoordinator(filePresenter: nil).coordinate(
+            readingItemAt: file, options: [], error: &coordinationError
+        ) { coordinated in
+            do {
+                let handle = try FileHandle(forReadingFrom: coordinated)
+                result = gta_wasi_register_readonly_fd(handle.fileDescriptor)
+                try handle.close()
+                if result < 3 { result = -24 } // EMFILE: guest fd table exhausted
+            } catch {
+                LogStore.shared.write("native", "Archive open denied: \(relative): \(error.localizedDescription)")
+            }
+        }
+        return coordinationError == nil ? result : -5
+    }
+
     private static func inspectSync() throws -> Inspection {
         guard USBStorageManager.shared.root != nil else { throw Failure.notConnected }
+        gta_wasi_set_openat_provider(nativeArchiveOpen)
         guard let wasm = USBStorageManager.shared.file("b/8b0b5899ed/game.wasm") else {
             throw Failure.missing("b/8b0b5899ed/game.wasm")
         }

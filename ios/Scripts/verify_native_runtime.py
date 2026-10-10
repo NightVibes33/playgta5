@@ -182,7 +182,7 @@ assert 'wasm_httpfs_manifest_js' in host
 assert 'stageHTTPFSManifest()' in native
 assert 'data/manifest.json' in native
 assert 'native-httpfs-manifest.test.c' in workflow
-assert 'registered != 23' in game
+assert 'registered != 24' in game
 assert 'native-input-abi.test.c' in workflow
 
 assert 'wasmtime_linker_define_func' in host
@@ -192,7 +192,7 @@ assert 'CLOCK_MONOTONIC' in host and 'CLOCK_REALTIME' in host
 assert 'emscripten_num_logical_cores' in host
 assert 'wasm_now_ms' in host
 assert 'gta_ios_wasmtime_basic_host_probe' in game
-assert 'registered != 23' in game
+assert 'registered != 24' in game
 assert 'native-aot-smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in game
 assert 'gta_ios_wasmtime_execute_smoke' in read("ios/Sources/Engine/NativeAOTExecutionProbe.c")
@@ -211,6 +211,8 @@ assert 'native-userdata-abi.test.c' in workflow
 assert 'native-wasi-abi.test.c' in workflow
 assert 'gta_define_userdata_callbacks' in host
 assert 'gta_define_wasi_callbacks' in host
+assert 'gta_define_openat_callback' in host and '__syscall_openat' in host
+assert 'gta_wasi_set_openat_provider' in read('ios/Sources/Engine/NativeEngineSupport.swift')
 wasi=read('ios/Sources/Engine/NativeWASIHostABI.c')
 for callback in ['gta_wasi_clock_time_get','gta_wasi_environ_sizes_get','gta_wasi_environ_get']:
     assert callback in wasi
