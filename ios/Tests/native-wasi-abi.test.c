@@ -115,6 +115,21 @@ int main(void) {
     assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
     gta_wasi_set_openat_provider(NULL);
     archive_test_fd=-1;
+    /* Real Emscripten stat64 memory64 struct and native calendar fields. */
+    unsigned char large[192];
+    memset(large,0xA5,sizeof large);
+    gta_wasi_bind_memory(large,sizeof large);
+    assert(gta_wasi_syscall_fstat64(gamefd,80)==0);
+    assert(le64(large+112)==16);
+    assert(le64(large+88)>=1);
+    assert(gta_wasi_syscall_fstat64(-1,80)==-8);
+    assert(gta_wasi_syscall_fstat64(gamefd,150)==-21);
+    assert(gta_wasi_gmtime_js(0,0)==0);
+    assert(large[20]==70 && large[16]==0);
+    assert(gta_wasi_localtime_js(0,8)==0);
+    assert(gta_wasi_localtime_js(0,150)==1);
+    assert(gta_wasi_gmtime_js(0,170)==1);
+    gta_wasi_bind_memory(memory,sizeof memory);
     close(actual); /* guest owns a duplicate, not the source */
     write_le64(memory+40,4);
     write_le64(memory+48,5);

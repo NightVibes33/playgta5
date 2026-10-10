@@ -15,6 +15,11 @@ void gta_wasi_unbind_memory(void);
  * or -1; closes all owned duplicates on reset, never the original FD. */
 int32_t gta_wasi_register_readonly_fd(int host_fd);
 void gta_wasi_reset_files(void);
+int32_t gta_wasi_syscall_fstat64(int32_t fd,uint64_t stat_pointer);
+int32_t gta_wasi_syscall_stat64(uint64_t path,uint64_t stat_pointer);
+int32_t gta_wasi_syscall_lstat64(uint64_t path,uint64_t stat_pointer);
+int32_t gta_wasi_gmtime_js(int64_t seconds,uint64_t tm_pointer);
+int32_t gta_wasi_localtime_js(int64_t seconds,uint64_t tm_pointer);
 /* Real Emscripten __syscall_openat import. The iOS provider must authorize
  * file access under the user-selected USB root and register a guest-only fd. */
 typedef int32_t (*gta_wasi_openat_provider)(const char *relative_path);

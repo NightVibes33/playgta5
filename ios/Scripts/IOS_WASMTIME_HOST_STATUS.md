@@ -516,3 +516,8 @@ authorized open and close, denial of write flags, invalid guest pointers and
 dirfds, and native rejection of dot-segment traversal and doubled separators
 before calling the Swift security-scoped file provider. This test does not
 contain or synthesize actual GTA assets.
+
+
+## Build 31 — batch platform imports (29 of 85 registered)
+
+The ARM64 linker now registers five additional original-game imports: `__syscall_fstat64`, `__syscall_stat64`, `__syscall_lstat64`, `_gmtime_js`, and `_localtime_js`. The stat ABI copies the real authorized archive descriptor metadata into the exact original 104-byte guest layout instead of casting Darwin struct stat. Native time services populate the game.js tm offsets and timezone seconds. Tests check real file sizes and bounds. Directory/symlink/pseudo-filesystem semantics remain incomplete; path stat only works for authorized archive files. The 3 GiB memory import and original gameplay are NOT operational, and these registered callbacks have not been verified against a real on-device GTA module instantiation.

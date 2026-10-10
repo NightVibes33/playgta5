@@ -424,6 +424,57 @@ static int gta_define_openat_callback(wasmtime_linker_t *linker) {
     return 0;
 }
 
+
+enum { GTA_P_FSTAT=1,GTA_P_STAT,GTA_P_LSTAT,GTA_P_GMTIME,GTA_P_LOCALTIME };
+static wasm_trap_t *gta_platform_callback(void *env,wasmtime_caller_t *caller,
+    const wasmtime_val_t *args,size_t nargs,wasmtime_val_t *results,size_t nresults) {
+    (void)caller;
+    if(nargs!=2 || nresults!=1 || args[1].kind!=WASMTIME_I64)return NULL;
+    int32_t v=0; uintptr_t op=(uintptr_t)env;
+    if(op==GTA_P_FSTAT && args[0].kind==WASMTIME_I32)
+        v=gta_wasi_syscall_fstat64(args[0].of.i32,(uint64_t)args[1].of.i64);
+    else if(args[0].kind==WASMTIME_I64) {
+        uint64_t p=(uint64_t)args[0].of.i64,q=(uint64_t)args[1].of.i64;
+        switch(op) {
+            case GTA_P_STAT:v=gta_wasi_syscall_stat64(p,q);break;
+            case GTA_P_LSTAT:v=gta_wasi_syscall_lstat64(p,q);break;
+            case GTA_P_GMTIME:v=gta_wasi_gmtime_js((int64_t)p,q);break;
+            case GTA_P_LOCALTIME:v=gta_wasi_localtime_js((int64_t)p,q);break;
+            default:return NULL;
+        }
+    } else return NULL;
+    results[0].kind=WASMTIME_I32;results[0].of.i32=v;
+    return NULL;
+}
+static int gta_define_platform_callbacks(wasmtime_linker_t *linker) {
+    const struct {const char *name;uintptr_t op;wasm_valkind_t first;} ops[]={
+        {"__syscall_fstat64",GTA_P_FSTAT,WASM_I32},
+        {"__syscall_stat64",GTA_P_STAT,WASM_I64},
+        {"__syscall_lstat64",GTA_P_LSTAT,WASM_I64},
+        {"_gmtime_js",GTA_P_GMTIME,WASM_I64},
+        {"_localtime_js",GTA_P_LOCALTIME,WASM_I64}
+    };
+    for(size_t i=0;i<sizeof(ops)/sizeof(ops[0]);++i) {
+        wasm_valtype_t *a=wasm_valtype_new(ops[i].first);
+        wasm_valtype_t *b=wasm_valtype_new(WASM_I64);
+        wasm_valtype_t *r=wasm_valtype_new(WASM_I32);
+        if(!a||!b||!r){
+            if(a)wasm_valtype_delete(a);
+            if(b)wasm_valtype_delete(b);
+            if(r)wasm_valtype_delete(r);
+            return -1;
+        }
+        wasm_functype_t *type=wasm_functype_new_2_1(a,b,r);
+        if(!type)return -2;
+        wasmtime_error_t *err=wasmtime_linker_define_func(linker,"env",3,
+            ops[i].name,strlen(ops[i].name),type,gta_platform_callback,
+            (void *)ops[i].op,NULL);
+        wasm_functype_delete(type);
+        if(err){wasmtime_error_delete(err);return -3;}
+    }
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -548,10 +599,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if (installed) ++*installed;
+    rc=gta_define_platform_callbacks(linker);
+    if(rc!=0){
+        gta_host_message(message,capacity,"POSIX stat64/calendar import registration failed");
+        return rc;
+    }
+    if(installed)*installed+=5;
     return 0;
 }
 
-/* Returns 0 only when 24 ABI-matched host functions are registered
+/* Returns 0 only when 29 ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,

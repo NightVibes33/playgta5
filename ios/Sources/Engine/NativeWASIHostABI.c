@@ -166,6 +166,97 @@ static void put_u64_le(uint64_t at, uint64_t v) {
     for (size_t i=0; i<8; ++i) guest_memory[(size_t)at+i]=(unsigned char)(v>>(i*8));
 }
 
+
+/* Original game.js SYSCALLS.writeStat: 104-byte memory64 little-endian layout. */
+static void gta_put_u32(uint64_t at,uint32_t x) {
+    for(unsigned i=0;i<4;i++)guest_memory[(size_t)at+i]=(unsigned char)(x>>(8*i));
+}
+static int32_t gta_stat_guest(uint64_t at,const struct stat *s) {
+    if(!span_valid(at,104))return -21;
+    memset(guest_memory+(size_t)at,0,104);
+    gta_put_u32(at,(uint32_t)s->st_dev);
+    gta_put_u32(at+4,(uint32_t)s->st_mode);
+    put_u64_le(at+8,(uint64_t)s->st_nlink);
+    gta_put_u32(at+16,(uint32_t)s->st_uid);
+    gta_put_u32(at+20,(uint32_t)s->st_gid);
+    gta_put_u32(at+24,(uint32_t)s->st_rdev);
+    put_u64_le(at+32,(uint64_t)s->st_size);
+    gta_put_u32(at+40,(uint32_t)s->st_blksize);
+    gta_put_u32(at+44,(uint32_t)s->st_blocks);
+#if defined(__APPLE__)
+    const struct timespec *a=&s->st_atimespec,*m=&s->st_mtimespec,*ct=&s->st_ctimespec;
+#else
+    const struct timespec *a=&s->st_atim,*m=&s->st_mtim,*ct=&s->st_ctim;
+#endif
+    put_u64_le(at+48,(uint64_t)a->tv_sec);
+    put_u64_le(at+56,(uint64_t)a->tv_nsec);
+    put_u64_le(at+64,(uint64_t)m->tv_sec);
+    put_u64_le(at+72,(uint64_t)m->tv_nsec);
+    put_u64_le(at+80,(uint64_t)ct->tv_sec);
+    put_u64_le(at+88,(uint64_t)ct->tv_nsec);
+    put_u64_le(at+96,(uint64_t)s->st_ino);
+    return 0;
+}
+int32_t gta_wasi_syscall_fstat64(int32_t fd,uint64_t at) {
+    pthread_once(&wasi_files_once,gta_wasi_files_init);
+    pthread_mutex_lock(&wasi_mutex);
+    gta_wasi_file *f=fd<0?NULL:gta_wasi_lookup((uint32_t)fd);
+    int32_t rc;
+    if(!f)rc=-8; /* Emscripten EBADF */
+    else if(!span_valid(at,104))rc=-21; /* EFAULT */
+    else {
+        struct stat st;
+        rc=fstat(f->owned_fd,&st)?-29:gta_stat_guest(at,&st);
+    }
+    pthread_mutex_unlock(&wasi_mutex);
+    return rc;
+}
+int32_t gta_wasi_syscall_stat64(uint64_t path,uint64_t at) {
+    int32_t fd=gta_wasi_syscall_openat(-100,path,O_RDONLY,0);
+    if(fd<0)return fd;
+    int32_t rc=gta_wasi_syscall_fstat64(fd,at);
+    (void)gta_wasi_fd_close((uint32_t)fd);
+    return rc;
+}
+int32_t gta_wasi_syscall_lstat64(uint64_t path,uint64_t at) {
+    /* Restricted archive root prohibits symlink traversal, so the only
+     * supported objects are regular files with the same stat/lstat data. */
+    return gta_wasi_syscall_stat64(path,at);
+}
+static void gta_put_tm(uint64_t at,const struct tm *t) {
+    const int values[]={t->tm_sec,t->tm_min,t->tm_hour,t->tm_mday,
+        t->tm_mon,t->tm_year,t->tm_wday,t->tm_yday};
+    for(unsigned i=0;i<8;i++)gta_put_u32(at+i*4,(uint32_t)values[i]);
+}
+int32_t gta_wasi_gmtime_js(int64_t seconds,uint64_t at) {
+    pthread_mutex_lock(&wasi_mutex);
+    time_t v=(time_t)seconds;
+    struct tm t;
+    int32_t rc=!span_valid(at,32) || (int64_t)v!=seconds ||
+        !gmtime_r(&v,&t);
+    if(!rc)gta_put_tm(at,&t);
+    pthread_mutex_unlock(&wasi_mutex);
+    return rc;
+}
+int32_t gta_wasi_localtime_js(int64_t seconds,uint64_t at) {
+    pthread_mutex_lock(&wasi_mutex);
+    time_t v=(time_t)seconds;
+    struct tm t;
+    int32_t rc=!span_valid(at,48) || (int64_t)v!=seconds ||
+        !localtime_r(&v,&t);
+    if(!rc) {
+        gta_put_tm(at,&t);
+        gta_put_u32(at+32,(uint32_t)t.tm_isdst);
+#if defined(__APPLE__) || defined(__linux__)
+        put_u64_le(at+40,(uint64_t)(int64_t)t.tm_gmtoff);
+#else
+        put_u64_le(at+40,0);
+#endif
+    }
+    pthread_mutex_unlock(&wasi_mutex);
+    return rc;
+}
+
 int32_t gta_wasi_clock_time_get(uint32_t clock_id, uint64_t precision_ns,
                                  uint64_t out_pointer) {
     (void)precision_ns; /* Hint only; never weaken timestamp precision. */
