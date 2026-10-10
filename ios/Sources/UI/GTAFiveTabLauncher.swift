@@ -746,10 +746,15 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
             GTALaunchPreferences.reset()
             NativePCMOutput.shared.setMasterVolume(1)
             guard let self else { return }
-            self.stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-            self.engineButtons.removeAll()
-            self.valueLabels.removeAll()
-            self.viewDidLoad()
+            // Recreate only the settings controller; calling viewDidLoad
+            // a second time caused stacked duplicate views and observers.
+            if let nav = self.navigationController {
+                var controllers = nav.viewControllers
+                if !controllers.isEmpty {
+                    controllers[controllers.count - 1] = GTAReferenceGraphicsController()
+                    nav.setViewControllers(controllers, animated: false)
+                }
+            }
         })
         present(sheet, animated: true)
     }
