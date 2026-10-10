@@ -3,6 +3,10 @@ on:
   push:
     branches: [ios-usb-port, native-aot-work]
   workflow_dispatch:
+# Cancel obsolete screenshot builds when new launcher revisions are pushed.
+concurrency:
+  group: gta-ios-build-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
   actions: read

@@ -68,6 +68,9 @@ final class ControllerSettingsViewController: UIViewController {
         top.addArrangedSubview(controllerIcon)
         top.addArrangedSubview(titles)
         stack.addArrangedSubview(top)
+        // Bundled Rockstar-published GTA V imagery, not generated wallpaper.
+        stack.addArrangedSubview(GTAReference.image("gtav-official-header", height: 154))
+        stack.addArrangedSubview(GTAReference.label("Controls", size: 19, weight: .bold))
 
         hardware.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
             for: .systemFont(ofSize: 17, weight: .bold))
@@ -117,6 +120,38 @@ final class ControllerSettingsViewController: UIViewController {
         invert.addTarget(self, action: #selector(save), for: .valueChanged)
         stack.addArrangedSubview(row)
         invert.onTintColor = GTAReference.green
+        // Native iOS controller vibration: setting is persisted and consumed
+        // by ControllerManager.testRumble() when a real controller supports it.
+        let vibrationRow = UIStackView()
+        vibrationRow.axis = .horizontal
+        vibrationRow.alignment = .center
+        vibrationRow.spacing = 12
+        vibrationRow.isLayoutMarginsRelativeArrangement = true
+        vibrationRow.directionalLayoutMargins = .init(top: 12, leading: 16,
+                                                       bottom: 12, trailing: 16)
+        GTATheme.card(vibrationRow)
+        let vibrationName = GTAReference.label("Vibration · hardware haptics", size: 13,
+                                               weight: .semibold)
+        vibrationRow.addArrangedSubview(vibrationName)
+        let vibration = UISwitch()
+        vibration.onTintColor = GTAReference.green
+        vibration.isOn = GTALaunchPreferences.enabled("controllerVibration", fallback: true)
+        vibration.addAction(UIAction { _ in
+            GTALaunchPreferences.setEnabled("controllerVibration", value: vibration.isOn)
+            if vibration.isOn { _ = ControllerManager.shared.testRumble() }
+        }, for: .valueChanged)
+        vibrationRow.addArrangedSubview(vibration)
+        stack.addArrangedSubview(vibrationRow)
+
+        let opacity = UISlider()
+        opacity.minimumValue = 0.2
+        opacity.maximumValue = 1
+        opacity.value = Float(GTALaunchPreferences.fraction("touchOpacity", fallback: 0.7))
+        opacity.addAction(UIAction { _ in
+            GTALaunchPreferences.setFraction("touchOpacity", value: Double(opacity.value))
+        }, for: .valueChanged)
+        addSlider("Touch overlay opacity", slider: opacity)
+
         stack.addArrangedSubview(GTATheme.section("Button mapping"))
         stack.addArrangedSubview(GTATheme.caption("Customize your on-foot bindings"))
         for index in inputs.indices {

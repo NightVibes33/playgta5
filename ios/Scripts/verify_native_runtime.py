@@ -104,6 +104,12 @@ assert "documentPicker(_ controller: UIDocumentPickerViewController, didPickDocu
 assert "hardwareStatusLabel.text = name ==" in launcher
 reference = read("ios/Sources/UI/GTAFiveTabLauncher.swift")
 assert "GTAFiveTabController()" in scene
+assert 'GTALaunchPreferences.fraction("touchOpacity"' in read("ios/Sources/UI/ControllerSettingsViewController.swift")
+assert '"gtav-official-header"' in read("ios/Sources/UI/ControllerSettingsViewController.swift")
+assert 'setMasterVolume' in read("ios/Sources/Engine/NativePCMOutput.swift")
+assert 'AVRoutePickerView' in read("ios/Sources/UI/GTAFiveTabLauncher.swift")
+assert 'library_hero.jpg' in read("ios/Scripts/fetch_official_gtav_art.sh")
+
 assert "extendsHeroUnderStatusBar" in reference
 assert "viewControllers = pages.map" in reference
 for title in ['"Home"', '"Library"', '"Graphics"', '"Controls"', '"More"']:
@@ -251,7 +257,7 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>37</string>" in plist
+assert "<key>CFBundleVersion</key><string>38</string>" in plist
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa
