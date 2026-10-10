@@ -13,49 +13,29 @@ final class SettingsViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Graphics & performance"
+        title = "Graphics"
         view.backgroundColor = ink
         tableView.backgroundColor = ink
         tableView.separatorColor = UIColor.white.withAlphaComponent(0.075)
-        tableView.sectionHeaderTopPadding = 22
+        tableView.sectionHeaderTopPadding = 13
         tableView.estimatedRowHeight = 78
         tableView.rowHeight = UITableView.automaticDimension
 
-        // A native editorial section header rather than a generic settings list.
-        let header = UIView(frame: CGRect(x: 0, y: 0, width: 393, height: 151))
-        let accentRule = UIView()
-        accentRule.backgroundColor = accent
-        accentRule.layer.cornerRadius = 2
-        accentRule.translatesAutoresizingMaskIntoConstraints = false
-        let heading = GTATheme.section("Make it yours.")
-        heading.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(
-            for: .systemFont(ofSize: 31, weight: .black))
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: 393, height: 95))
+        let heading = GTATheme.section("Graphics")
+        heading.font = .systemFont(ofSize: 25, weight: .bold)
         heading.translatesAutoresizingMaskIntoConstraints = false
-        let description = GTATheme.caption("Video • performance • engine profiles")
-        description.textColor = GTATheme.cream.withAlphaComponent(0.88)
+        let description = GTATheme.caption("Resolution, performance and visual presets")
         description.translatesAutoresizingMaskIntoConstraints = false
-        let state = GTATheme.caption("Native game engine integration is still in progress.")
-        state.textColor = accent
-        state.numberOfLines = 0
-        state.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(accentRule)
         header.addSubview(heading)
         header.addSubview(description)
-        header.addSubview(state)
         NSLayoutConstraint.activate([
-            accentRule.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
-            accentRule.topAnchor.constraint(equalTo: header.topAnchor, constant: 20),
-            accentRule.widthAnchor.constraint(equalToConstant: 4),
-            accentRule.heightAnchor.constraint(equalToConstant: 51),
-            heading.leadingAnchor.constraint(equalTo: accentRule.trailingAnchor, constant: 14),
-            heading.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -18),
-            heading.topAnchor.constraint(equalTo: header.topAnchor, constant: 15),
+            heading.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
+            heading.topAnchor.constraint(equalTo: header.topAnchor, constant: 16),
+            heading.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -20),
             description.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
-            description.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -18),
-            description.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 2),
-            state.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 22),
-            state.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -22),
-            state.topAnchor.constraint(equalTo: description.bottomAnchor, constant: 20)
+            description.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 5),
+            description.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -20)
         ])
         tableView.tableHeaderView = header
 

@@ -1,12 +1,14 @@
 import UIKit
 import UniformTypeIdentifiers
 
-/// Compact game-first dashboard. Intentionally no duplicate UIKit navigation title.
+/// Game-first dashboard: cinematic library cover, one meaningful action,
+/// two practical setup destinations and diagnostics tucked into overflow.
+/// This deliberately avoids test-world menus, fake playable modes and
+/// a home-screen-sized engineering status panel.
 final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let background = CAGradientLayer()
     private let scrollView = UIScrollView()
     private let content = UIStackView()
-    private let deviceLabel = UILabel()
     private let storageTitle = UILabel()
     private let storageDetails = UILabel()
     private let fileIndicator = UIView()
@@ -14,19 +16,15 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private let folderButton = UIButton(type: .system)
     private let settingsButton = UIButton(type: .system)
     private let controllerButton = UIButton(type: .system)
+    private let moreButton = UIButton(type: .system)
     private let logsButton = UIButton(type: .system)
-    private let filePickerTestButton = UIButton(type: .system)
-    private let indexFileButton = UIButton(type: .system)
-    private let advancedButton = UIButton(type: .system)
-    private let advancedPanel = UIStackView()
-    private let runtimeTitle = UILabel()
-    private let runtimeDetail = UILabel()
-    private var expandedDiagnostics = false
-    private let modeButtons = [UIButton(type: .system), UIButton(type: .system), UIButton(type: .system)]
+    private let statusLine = UILabel()
+    private let deviceLabel = UILabel()
     private var focusIndex = 0
     private var heldUp = false
     private var heldDown = false
     private var heldA = false
+
     private enum PickerIntent { case folder, diagnosticText, indexFile }
     private var pickerIntent: PickerIntent = .folder
     private var activePicker: UIDocumentPickerViewController?
@@ -34,10 +32,10 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     private var pickerCallbackReceived = false
     private var pendingUSBCheck: UUID?
 
-
-    private let mint = GTATheme.coral
     private let muted = GTATheme.subdued
-    private let panel = GTATheme.raised
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -45,244 +43,264 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         view.backgroundColor = GTATheme.night
         background.colors = [
             GTATheme.night.cgColor,
-            UIColor(red: 0.092, green: 0.104, blue: 0.135, alpha: 1).cgColor
+            UIColor(red: 0.075, green: 0.083, blue: 0.102, alpha: 1).cgColor
         ]
         background.startPoint = CGPoint(x: 0, y: 0)
-        background.endPoint = CGPoint(x: 1, y: 1)
+        background.endPoint = CGPoint(x: 0.9, y: 1)
         view.layer.insertSublayer(background, at: 0)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.alwaysBounceVertical = true
         scrollView.showsVerticalScrollIndicator = false
-        content.translatesAutoresizingMaskIntoConstraints = false
-        content.axis = .vertical
-        content.alignment = .fill
-        content.spacing = 13
-        content.isLayoutMarginsRelativeArrangement = false
+        scrollView.contentInsetAdjustmentBehavior = .never
         view.addSubview(scrollView)
+
+        content.axis = .vertical
+        content.spacing = 15
+        content.alignment = .fill
+        content.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(content)
+
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            content.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 19),
-            content.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -19),
-            content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 15),
-            content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -18),
-            content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -38)
+            scrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 12),
+            content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20),
+            content.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 20),
+            content.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -20),
+            content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -40)
         ])
 
-        // Compact native chrome followed by an illustrated Los Santos feature.
-        // The hero is deliberately static: no bitmap/network work or idle timer.
-        let top = UIStackView()
-        top.axis = .horizontal
-        top.alignment = .center
-        top.spacing = 10
-        let mark = UILabel()
-        mark.text = "V"
-        mark.textAlignment = .center
-        mark.textColor = GTATheme.night
-        mark.backgroundColor = GTATheme.coral
-        mark.clipsToBounds = true
-        mark.layer.cornerRadius = 9
-        mark.layer.cornerCurve = .continuous
-        mark.font = .systemFont(ofSize: 17, weight: .black)
-        mark.translatesAutoresizingMaskIntoConstraints = false
-        mark.widthAnchor.constraint(equalToConstant: 34).isActive = true
-        mark.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        let wordmark = GTATheme.section("GTAiOS")
-        let build = GTATheme.caption("BUILD " + (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))
-        build.textAlignment = .right
-        top.addArrangedSubview(mark)
-        top.addArrangedSubview(wordmark)
-        top.addArrangedSubview(UIView())
-        top.addArrangedSubview(build)
-        wordmark.setContentHuggingPriority(.required, for: .horizontal)
-        content.addArrangedSubview(top)
+        // Small identity bar; version and technical information stay in About.
+        let header = UIStackView()
+        header.axis = .horizontal
+        header.spacing = 11
+        header.alignment = .center
+        let monogram = UILabel()
+        monogram.text = "V"
+        monogram.textAlignment = .center
+        monogram.font = .systemFont(ofSize: 18, weight: .black)
+        monogram.textColor = GTATheme.night
+        monogram.backgroundColor = GTATheme.coral
+        monogram.layer.cornerRadius = 9
+        monogram.layer.cornerCurve = .continuous
+        monogram.clipsToBounds = true
+        monogram.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        monogram.heightAnchor.constraint(equalToConstant: 36).isActive = true
 
-        let hero = LosSantosHeroView()
-        content.addArrangedSubview(hero)
+        let brand = UILabel()
+        brand.text = "GTAiOS"
+        brand.font = .systemFont(ofSize: 21, weight: .bold)
+        brand.textColor = GTATheme.cream
+        brand.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        let storage = UIView()
-        GTATheme.card(storage)
-        storage.translatesAutoresizingMaskIntoConstraints = false
-        storage.heightAnchor.constraint(greaterThanOrEqualToConstant: 81).isActive = true
-        let srow = UIStackView()
-        srow.translatesAutoresizingMaskIntoConstraints = false
-        srow.axis = .horizontal
-        srow.spacing = 11
-        srow.alignment = .center
-        storage.addSubview(srow)
-        NSLayoutConstraint.activate([
-            srow.leadingAnchor.constraint(equalTo: storage.leadingAnchor, constant: 14),
-            srow.trailingAnchor.constraint(equalTo: storage.trailingAnchor, constant: -14),
-            srow.topAnchor.constraint(equalTo: storage.topAnchor, constant: 11),
-            srow.bottomAnchor.constraint(equalTo: storage.bottomAnchor, constant: -11)
-        ])
+        let spacer = UIView()
+        moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        moreButton.tintColor = GTATheme.cream
+        moreButton.backgroundColor = GTATheme.raised
+        moreButton.layer.cornerRadius = 18
+        moreButton.layer.cornerCurve = .continuous
+        moreButton.accessibilityLabel = "More options and diagnostics"
+        moreButton.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        moreButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        moreButton.addTarget(self, action: #selector(showMore), for: .touchUpInside)
+
+        header.addArrangedSubview(monogram)
+        header.addArrangedSubview(brand)
+        header.addArrangedSubview(spacer)
+        header.addArrangedSubview(moreButton)
+        content.addArrangedSubview(header)
+        content.setCustomSpacing(18, after: header)
+
+        content.addArrangedSubview(LosSantosHeroView())
+
+        let libraryHeading = UILabel()
+        libraryHeading.text = "MY GAME"
+        libraryHeading.textColor = GTATheme.cream.withAlphaComponent(0.87)
+        libraryHeading.font = .systemFont(ofSize: 11, weight: .heavy)
+        content.addArrangedSubview(libraryHeading)
+        content.setCustomSpacing(9, after: libraryHeading)
+
+        // The entire row is one clear library action—not a decorative card
+        // followed by an unrelated second "USB FILES" button.
+        let library = UIView()
+        GTATheme.card(library)
+        library.translatesAutoresizingMaskIntoConstraints = false
+        library.heightAnchor.constraint(equalToConstant: 83).isActive = true
+
         let disk = UIImageView(image: UIImage(systemName: "externaldrive.fill"))
         disk.tintColor = GTATheme.coral
         disk.contentMode = .scaleAspectFit
         disk.translatesAutoresizingMaskIntoConstraints = false
-        disk.widthAnchor.constraint(equalToConstant: 29).isActive = true
-        disk.heightAnchor.constraint(equalToConstant: 29).isActive = true
-        let stateText = UIStackView()
-        stateText.axis = .vertical; stateText.spacing = 4
-        storageTitle.textColor = .white
-        storageTitle.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
-            for: .systemFont(ofSize: 15, weight: .bold))
-        storageTitle.adjustsFontForContentSizeCategory = true
-        storageDetails.textColor = muted
-        storageDetails.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(
-            for: .systemFont(ofSize: 12))
-        storageDetails.adjustsFontForContentSizeCategory = true
-        storageDetails.numberOfLines = 2
-        stateText.addArrangedSubview(storageTitle)
-        stateText.addArrangedSubview(storageDetails)
-        fileIndicator.backgroundColor = .systemOrange
-        fileIndicator.layer.cornerRadius = 5
-        fileIndicator.translatesAutoresizingMaskIntoConstraints = false
-        fileIndicator.widthAnchor.constraint(equalToConstant: 10).isActive = true
-        fileIndicator.heightAnchor.constraint(equalToConstant: 10).isActive = true
-        srow.addArrangedSubview(disk)
-        srow.addArrangedSubview(stateText)
-        srow.addArrangedSubview(fileIndicator)
-        content.addArrangedSubview(storage)
+        library.addSubview(disk)
 
-        let runtime = UIView()
-        GTATheme.card(runtime)
-        runtime.translatesAutoresizingMaskIntoConstraints = false
-        let readiness = UIStackView()
-        readiness.axis = .vertical
-        readiness.spacing = 5
-        readiness.translatesAutoresizingMaskIntoConstraints = false
-        runtimeTitle.text = "ENGINE PORT • IN DEVELOPMENT"
-        runtimeTitle.textColor = GTATheme.coral
-        runtimeTitle.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .systemFont(ofSize: 12, weight: .bold))
-        runtimeDetail.text = "The native Metal and USB systems are being validated. GTA world rendering and engine integration are not playable yet."
-        runtimeDetail.textColor = muted
-        runtimeDetail.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(
-            for: .systemFont(ofSize: 13))
-        runtimeDetail.adjustsFontForContentSizeCategory = true
-        runtimeDetail.numberOfLines = 0
-        readiness.addArrangedSubview(runtimeTitle)
-        readiness.addArrangedSubview(runtimeDetail)
-        runtime.addSubview(readiness)
+        storageTitle.textColor = GTATheme.cream
+        storageTitle.font = .systemFont(ofSize: 16, weight: .bold)
+        storageTitle.lineBreakMode = .byTruncatingTail
+        storageTitle.translatesAutoresizingMaskIntoConstraints = false
+        library.addSubview(storageTitle)
+
+        storageDetails.textColor = muted
+        storageDetails.font = .systemFont(ofSize: 12, weight: .regular)
+        storageDetails.lineBreakMode = .byTruncatingMiddle
+        storageDetails.numberOfLines = 1
+        storageDetails.translatesAutoresizingMaskIntoConstraints = false
+        library.addSubview(storageDetails)
+
+        fileIndicator.backgroundColor = GTATheme.coral
+        fileIndicator.layer.cornerRadius = 4
+        fileIndicator.translatesAutoresizingMaskIntoConstraints = false
+        library.addSubview(fileIndicator)
+
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
+        chevron.tintColor = muted
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        library.addSubview(chevron)
         NSLayoutConstraint.activate([
-            readiness.leadingAnchor.constraint(equalTo: runtime.leadingAnchor, constant: 15),
-            readiness.trailingAnchor.constraint(equalTo: runtime.trailingAnchor, constant: -15),
-            readiness.topAnchor.constraint(equalTo: runtime.topAnchor, constant: 14),
-            readiness.bottomAnchor.constraint(equalTo: runtime.bottomAnchor, constant: -14)
+            disk.leadingAnchor.constraint(equalTo: library.leadingAnchor, constant: 17),
+            disk.centerYAnchor.constraint(equalTo: library.centerYAnchor),
+            disk.widthAnchor.constraint(equalToConstant: 27),
+            disk.heightAnchor.constraint(equalToConstant: 27),
+            storageTitle.leadingAnchor.constraint(equalTo: disk.trailingAnchor, constant: 14),
+            storageTitle.trailingAnchor.constraint(lessThanOrEqualTo: fileIndicator.leadingAnchor, constant: -9),
+            storageTitle.bottomAnchor.constraint(equalTo: library.centerYAnchor, constant: -1),
+            storageDetails.leadingAnchor.constraint(equalTo: storageTitle.leadingAnchor),
+            storageDetails.trailingAnchor.constraint(equalTo: fileIndicator.leadingAnchor, constant: -10),
+            storageDetails.topAnchor.constraint(equalTo: library.centerYAnchor, constant: 4),
+            fileIndicator.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -9),
+            fileIndicator.centerYAnchor.constraint(equalTo: library.centerYAnchor),
+            fileIndicator.heightAnchor.constraint(equalToConstant: 8),
+            fileIndicator.widthAnchor.constraint(equalToConstant: 8),
+            chevron.trailingAnchor.constraint(equalTo: library.trailingAnchor, constant: -17),
+            chevron.centerYAnchor.constraint(equalTo: library.centerYAnchor),
+            chevron.widthAnchor.constraint(equalToConstant: 8),
+            chevron.heightAnchor.constraint(equalToConstant: 14)
         ])
 
-        let tapStorage = UITapGestureRecognizer(target: self, action: #selector(chooseFolder))
-        storage.addGestureRecognizer(tapStorage)
-        storage.isUserInteractionEnabled = true
-        storage.accessibilityLabel = "Choose USB game files folder"
-        storage.accessibilityTraits = .button
-
-        let profileHeading = GTATheme.section("Session profile")
-        let modes = UIStackView()
-        modes.axis = .horizontal
-        modes.distribution = .fillEqually
-        modes.spacing = 8
-        for (i, name) in ["STORY", "FREE ROAM", "TEST WORLD"].enumerated() {
-            let button = modeButtons[i]
-            button.tag = i
-            button.setTitle(name, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
-            button.titleLabel?.adjustsFontSizeToFitWidth = true
-            button.titleLabel?.minimumScaleFactor = 0.78
-            button.layer.cornerRadius = 9
-            button.layer.borderWidth = 1
-            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 47).isActive = true
-            button.addTarget(self, action: #selector(selectMode(_:)), for: .touchUpInside)
-            modes.addArrangedSubview(button)
-        }
-        style(playButton, title: "RUN NATIVE CHECKS", symbol: "arrow.up.right", filled: true)
-        playButton.addTarget(self, action: #selector(launch), for: .touchUpInside)
-        playButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 58).isActive = true
-        content.addArrangedSubview(playButton)
-
-        let toolRow = UIStackView()
-        toolRow.axis = .horizontal
-        toolRow.distribution = .fillEqually
-        toolRow.spacing = 8
-        style(folderButton, title: "USB FILES", symbol: "externaldrive", filled: false)
-        style(settingsButton, title: "GRAPHICS", symbol: "slider.horizontal.3", filled: false)
-        style(controllerButton, title: "CONTROLS", symbol: "gamecontroller", filled: false)
+        folderButton.backgroundColor = .clear
+        folderButton.translatesAutoresizingMaskIntoConstraints = false
+        folderButton.accessibilityLabel = "Select or change your USB game library"
         folderButton.addTarget(self, action: #selector(chooseFolder), for: .touchUpInside)
-        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
-        controllerButton.addTarget(self, action: #selector(openControllerSetup), for: .touchUpInside)
-        toolRow.addArrangedSubview(folderButton)
-        toolRow.addArrangedSubview(settingsButton)
-        toolRow.addArrangedSubview(controllerButton)
-        content.addArrangedSubview(toolRow)
-        content.addArrangedSubview(runtime)
-        content.setCustomSpacing(20, after: runtime)
-        content.addArrangedSubview(profileHeading)
-        content.addArrangedSubview(modes)
+        library.addSubview(folderButton)
+        NSLayoutConstraint.activate([
+            folderButton.leadingAnchor.constraint(equalTo: library.leadingAnchor),
+            folderButton.trailingAnchor.constraint(equalTo: library.trailingAnchor),
+            folderButton.topAnchor.constraint(equalTo: library.topAnchor),
+            folderButton.bottomAnchor.constraint(equalTo: library.bottomAnchor)
+        ])
+        content.addArrangedSubview(library)
 
-        // Diagnostic-only file pickers stay behind the Advanced disclosure.
-        // Keep the main launcher focused on connection, input and native boot.
-        advancedPanel.axis = .vertical
-        advancedPanel.spacing = 9
-        advancedPanel.isHidden = true
-        var advancedConfig = UIButton.Configuration.plain()
-        advancedConfig.title = "File picker troubleshooting"
-        advancedConfig.image = UIImage(systemName: "chevron.down")
-        advancedConfig.imagePlacement = .leading
-        advancedConfig.baseForegroundColor = muted
-        advancedButton.configuration = advancedConfig
-        advancedButton.contentHorizontalAlignment = .leading
-        advancedButton.addTarget(self, action: #selector(toggleAdvanced), for: .touchUpInside)
-        advancedButton.accessibilityHint = "Show optional Files compatibility diagnostics"
-        content.addArrangedSubview(advancedButton)
-        content.addArrangedSubview(advancedPanel)
-        let pickerTip = label("FOLDER PICKER: TAP SELECT, CHOOSE playgta5.com, THEN OPEN", size: 10, weight: .medium, color: mint)
-        pickerTip.numberOfLines = 2
-        pickerTip.lineBreakMode = .byWordWrapping
-        pickerTip.accessibilityLabel = "Select the playgta5.com folder with the Files selection control, then confirm Open; this does not copy the game"
-        advancedPanel.addArrangedSubview(pickerTip)
+        configureMainAction()
+        playButton.addTarget(self, action: #selector(launch), for: .touchUpInside)
+        playButton.heightAnchor.constraint(equalToConstant: 56).isActive = true
+        content.addArrangedSubview(playButton)
+        content.setCustomSpacing(5, after: playButton)
 
-        let probeRow = UIStackView()
-        probeRow.axis = .horizontal
-        probeRow.distribution = .fillEqually
-        probeRow.spacing = 8
-        style(filePickerTestButton, title: "TEST .TXT", symbol: "doc.text", filled: false)
-        style(indexFileButton, title: "INDEX.HTML", symbol: "doc.text.magnifyingglass", filled: false)
-        filePickerTestButton.addTarget(self, action: #selector(testFilesPicker), for: .touchUpInside)
-        indexFileButton.addTarget(self, action: #selector(chooseIndexFile), for: .touchUpInside)
-        probeRow.addArrangedSubview(filePickerTestButton)
-        probeRow.addArrangedSubview(indexFileButton)
-        advancedPanel.addArrangedSubview(probeRow)
-        prepareDiagnosticTextFile()
+        statusLine.textColor = muted
+        statusLine.font = .systemFont(ofSize: 11, weight: .medium)
+        statusLine.textAlignment = .center
+        statusLine.numberOfLines = 2
+        statusLine.translatesAutoresizingMaskIntoConstraints = false
+        content.addArrangedSubview(statusLine)
+        content.setCustomSpacing(18, after: statusLine)
 
-        let bottom = UIStackView()
-        bottom.axis = .horizontal; bottom.spacing = 8; bottom.alignment = .center
-        deviceLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .systemFont(ofSize: 12, weight: .medium))
+        let secondary = UIStackView()
+        secondary.axis = .horizontal
+        secondary.spacing = 11
+        secondary.distribution = .fillEqually
+        setupSecondary(settingsButton, title: "Graphics", symbol: "slider.horizontal.3", action: #selector(openSettings))
+        setupSecondary(controllerButton, title: "Controller", symbol: "gamecontroller", action: #selector(openControllerSetup))
+        secondary.addArrangedSubview(settingsButton)
+        secondary.addArrangedSubview(controllerButton)
+        content.addArrangedSubview(secondary)
+
+        let footer = UIStackView()
+        footer.axis = .horizontal
+        footer.alignment = .center
         deviceLabel.textColor = muted
-        deviceLabel.numberOfLines = 2
-        let flexible = UIView()
-        flexible.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        style(logsButton, title: "LOGS", symbol: "doc.text", filled: false)
-        logsButton.addTarget(self, action: #selector(exportLogs), for: .touchUpInside)
-        logsButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 89).isActive = true
-        bottom.addArrangedSubview(deviceLabel)
-        bottom.addArrangedSubview(flexible)
-        bottom.addArrangedSubview(logsButton)
-        content.addArrangedSubview(bottom)
+        deviceLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        deviceLabel.lineBreakMode = .byTruncatingTail
+        let build = GTATheme.caption("BUILD " + (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))
+        build.font = .systemFont(ofSize: 10, weight: .medium)
+        build.setContentHuggingPriority(.required, for: .horizontal)
+        footer.addArrangedSubview(deviceLabel)
+        footer.addArrangedSubview(UIView())
+        footer.addArrangedSubview(build)
+        content.addArrangedSubview(footer)
+
         NotificationCenter.default.addObserver(self, selector: #selector(storageChanged),
             name: USBStorageManager.changedNotification, object: nil)
         refresh()
     }
 
+    private func configureMainAction() {
+        var c = UIButton.Configuration.filled()
+        c.title = "Choose Game Folder"
+        c.image = UIImage(systemName: "arrow.up.right")
+        c.imagePlacement = .trailing
+        c.imagePadding = 10
+        c.baseBackgroundColor = GTATheme.coral
+        c.baseForegroundColor = GTATheme.night
+        c.cornerStyle = .large
+        c.contentInsets = NSDirectionalEdgeInsets(top: 15, leading: 20, bottom: 15, trailing: 20)
+        playButton.configuration = c
+        playButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
+        playButton.accessibilityLabel = "Choose game folder"
+    }
+
+    private func setupSecondary(_ button: UIButton, title: String, symbol: String, action: Selector) {
+        var c = UIButton.Configuration.filled()
+        c.title = title
+        c.image = UIImage(systemName: symbol)
+        c.imagePlacement = .leading
+        c.imagePadding = 9
+        c.baseBackgroundColor = GTATheme.raised
+        c.baseForegroundColor = GTATheme.cream
+        c.cornerStyle = .large
+        c.contentInsets = NSDirectionalEdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
+        button.configuration = c
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        button.heightAnchor.constraint(equalToConstant: 52).isActive = true
+        button.addTarget(self, action: action, for: .touchUpInside)
+    }
+
+    private func refresh() {
+        if let root = USBStorageManager.shared.root {
+            storageTitle.text = "Grand Theft Auto V"
+            storageDetails.text = "Connected · " + root.lastPathComponent
+            fileIndicator.backgroundColor = GTATheme.success
+            playButton.configuration?.title = "Play GTA V"
+            playButton.configuration?.image = UIImage(systemName: "play.fill")
+            playButton.isEnabled = NativeEngineStatus.nativeEngineLinked
+            playButton.alpha = NativeEngineStatus.nativeEngineLinked ? 1 : 0.65
+            playButton.accessibilityLabel = NativeEngineStatus.nativeEngineLinked
+                ? "Play Grand Theft Auto V" : "Play unavailable until native engine is ready"
+            statusLine.text = NativeEngineStatus.nativeEngineLinked
+                ? "Ready to play from USB-C"
+                : "Native game engine integration is still in progress"
+        } else {
+            storageTitle.text = "Connect game files"
+            storageDetails.text = "Select your GTA V folder on USB-C"
+            fileIndicator.backgroundColor = GTATheme.coral
+            playButton.configuration?.title = "Choose Game Folder"
+            playButton.configuration?.image = UIImage(systemName: "arrow.up.right")
+            playButton.isEnabled = true
+            playButton.alpha = 1
+            playButton.accessibilityLabel = "Choose game folder"
+            statusLine.text = "Game data stays on your external drive"
+        }
+        updateDevice(ControllerManager.shared.currentName)
+        highlightFocus()
+    }
+
     @objc private func storageChanged() { refresh() }
 
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
-    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        background.frame = view.bounds
+    }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
@@ -291,14 +309,9 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
             LogStore.shared.write("usb-storage",
                 "PICKER_GONE_WITHOUT_CALLBACK: document picker disappeared; no URL or cancel delegate fired")
             activePicker = nil
-            storageDetails.text = "Files closed without returning a selection"
         }
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        background.frame = view.bounds
-    }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
@@ -307,104 +320,27 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         ControllerManager.shared.begin()
         refresh()
     }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         ControllerManager.shared.stop()
     }
 
-    private func label(_ title: String, size: CGFloat, weight: UIFont.Weight, color: UIColor) -> UILabel {
-        let l = UILabel()
-        l.text = title
-        l.font = .systemFont(ofSize: size, weight: weight)
-        l.textColor = color
-        return l
-    }
-    private func style(_ b: UIButton, title: String, symbol: String, filled: Bool) {
-        var config = UIButton.Configuration.plain()
-        config.title = title
-        config.image = UIImage(systemName: symbol)
-        config.imagePadding = filled ? 8 : 5
-        config.imagePlacement = filled ? .trailing : .top
-        config.titleLineBreakMode = .byTruncatingTail
-        config.baseForegroundColor = filled ? GTATheme.night : GTATheme.cream
-        config.background.backgroundColor = filled ? GTATheme.coral : GTATheme.inset
-        config.cornerStyle = .large
-        config.contentInsets = NSDirectionalEdgeInsets(top: 11, leading: 10, bottom: 11, trailing: 10)
-        b.configuration = config
-        b.titleLabel?.font = .systemFont(ofSize: filled ? 13 : 11, weight: .bold)
-        b.titleLabel?.numberOfLines = 1
-        b.titleLabel?.lineBreakMode = .byTruncatingTail
-        b.titleLabel?.adjustsFontSizeToFitWidth = true
-        b.titleLabel?.minimumScaleFactor = 0.75
-        b.heightAnchor.constraint(greaterThanOrEqualToConstant: filled ? 56 : 64).isActive = true
-    }
-    private func refresh() {
-        updateMode()
-        playButton.configuration?.title = "RUN NATIVE CHECKS"
-        if let root = USBStorageManager.shared.root {
-            let missing = USBStorageManager.shared.missingStartupAssets()
-            storageTitle.text = root.lastPathComponent
-            storageDetails.text = missing.isEmpty ? "USB connected · Startup assets verified"
-                : "Missing \(missing.count) required items · Change USB folder"
-            storageDetails.textColor = missing.isEmpty ? GTATheme.success : UIColor.systemOrange
-            fileIndicator.backgroundColor = missing.isEmpty ? GTATheme.success : UIColor.systemOrange
-            playButton.isEnabled = true
-            playButton.alpha = 1
-            // Do not decode external artwork synchronously on the main thread.
-            // USB can block for seconds in a Files provider.
-        } else {
-            storageTitle.text = "Connect your game library"
-            storageDetails.text = "Choose the GTA V folder on your USB-C drive"
-            storageDetails.textColor = muted
-            fileIndicator.backgroundColor = .systemOrange
-            playButton.isEnabled = true
-            playButton.alpha = 1
-            playButton.configuration?.title = "CHOOSE GAME FILES"
-        }
-        updateDevice(ControllerManager.shared.currentName)
-        highlightFocus()
-    }
-    @objc private func toggleAdvanced() {
-        expandedDiagnostics.toggle()
-        advancedPanel.isHidden = !expandedDiagnostics
-        advancedButton.configuration?.title = expandedDiagnostics
-            ? "Hide picker troubleshooting" : "File picker troubleshooting"
-        advancedButton.configuration?.image = UIImage(
-            systemName: expandedDiagnostics ? "chevron.up" : "chevron.down")
-        UISelectionFeedbackGenerator().selectionChanged()
-        UIAccessibility.post(notification: .layoutChanged, argument: advancedButton)
+    private func updateDevice(_ name: String) {
+        deviceLabel.text = name == "No controller" ? "Controller not connected" : name
     }
 
-    private func updateMode() {
-        let current = EngineOptions.value("mode")
-        for (i, b) in modeButtons.enumerated() {
-            let selected = ["story", "sandbox5", "sandbox6"][i] == current
-            b.backgroundColor = selected ? GTATheme.coral.withAlphaComponent(0.13) : GTATheme.inset
-            b.layer.borderColor = (selected ? GTATheme.coral : UIColor.white.withAlphaComponent(0.12)).cgColor
-            b.setTitleColor(selected ? GTATheme.coral : GTATheme.cream, for: .normal)
-        }
+    private var focusTargets: [UIButton] {
+        [playButton, folderButton, settingsButton, controllerButton, moreButton]
     }
-    private func updateDevice(_ name: String) {
-        deviceLabel.text = name == "No controller" ? "No controller · Pair in iOS Settings" : "Controller connected · " + name
-        highlightFocus()
-    }
-    @objc private func selectMode(_ sender: UIButton) {
-        EngineOptions.set("mode", value: ["story", "sandbox5", "sandbox6"][sender.tag])
-        updateMode()
-        UISelectionFeedbackGenerator().selectionChanged()
-    }
-    private var buttons: [UIButton] { [playButton, folderButton, settingsButton, controllerButton] + modeButtons + [logsButton] }
     private func highlightFocus() {
-        // Present the focus ring only when a game controller is connected.
-        let controllerConnected = ControllerManager.shared.currentName != "No controller"
-        for (i, b) in buttons.enumerated() {
-            let focused = controllerConnected && i == focusIndex
-            b.layer.cornerRadius = 14
-            b.layer.cornerCurve = .continuous
-            b.clipsToBounds = true
-            b.layer.borderColor = (focused ? GTATheme.coral : UIColor.clear).cgColor
-            b.layer.borderWidth = focused ? 2 : 0
-            b.accessibilityValue = focused ? "Controller focused" : nil
+        let connected = ControllerManager.shared.currentName != "No controller"
+        for (i, button) in focusTargets.enumerated() {
+            let focused = connected && focusIndex == i
+            button.layer.borderColor = focused ? GTATheme.coral.cgColor : UIColor.clear.cgColor
+            button.layer.borderWidth = focused ? 2 : 0
+            button.layer.cornerRadius = 15
+            button.accessibilityValue = focused ? "Controller focused" : nil
         }
     }
     private func handleController(_ state: [String: Double]) {
@@ -412,13 +348,66 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         let up = (state["up"] ?? 0) > 0.6 || (state["ly"] ?? 0) > 0.7
         let down = (state["down"] ?? 0) > 0.6 || (state["ly"] ?? 0) < -0.7
         let a = (state["a"] ?? 0) > 0.6
-        if up && !heldUp { focusIndex = max(0, focusIndex - 1); highlightFocus() }
-        if down && !heldDown { focusIndex = min(buttons.count - 1, focusIndex + 1); highlightFocus() }
-        if a && !heldA && buttons[focusIndex].isEnabled {
-            buttons[focusIndex].sendActions(for: .touchUpInside)
+        if up && !heldUp {
+            focusIndex = max(0, focusIndex - 1)
+            highlightFocus()
         }
-        heldUp = up; heldDown = down; heldA = a
+        if down && !heldDown {
+            focusIndex = min(focusTargets.count - 1, focusIndex + 1)
+            highlightFocus()
+        }
+        if a && !heldA, focusTargets[focusIndex].isEnabled {
+            focusTargets[focusIndex].sendActions(for: .touchUpInside)
+        }
+        heldUp = up
+        heldDown = down
+        heldA = a
     }
+
+    @objc private func showMore() {
+        let menu = UIAlertController(title: "GTAiOS",
+            message: "Library and device options · Build " +
+                (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"),
+            preferredStyle: .actionSheet)
+        menu.addAction(UIAlertAction(title: "Choose a different game folder", style: .default) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self?.chooseFolder() }
+        })
+        menu.addAction(UIAlertAction(title: "Native runtime details", style: .default) { [weak self] _ in
+            self?.openGame()
+        })
+        menu.addAction(UIAlertAction(title: "File picker troubleshooting", style: .default) { [weak self] _ in
+            self?.showFileDiagnostics()
+        })
+        menu.addAction(UIAlertAction(title: "Export diagnostics", style: .default) { [weak self] _ in
+            self?.exportLogs()
+        })
+        menu.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        if let popup = menu.popoverPresentationController {
+            popup.sourceView = moreButton
+            popup.sourceRect = moreButton.bounds
+        }
+        present(menu, animated: true)
+    }
+
+    private func showFileDiagnostics() {
+        let alert = UIAlertController(title: "Files diagnostics",
+            message: "Optional tests for system file-picker compatibility.",
+            preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Test .TXT picker", style: .default) { [weak self] _ in
+            self?.prepareDiagnosticTextFile()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self?.testFilesPicker() }
+        })
+        alert.addAction(UIAlertAction(title: "Select index.html", style: .default) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self?.chooseIndexFile() }
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        if let popup = alert.popoverPresentationController {
+            popup.sourceView = moreButton
+            popup.sourceRect = moreButton.bounds
+        }
+        present(alert, animated: true)
+    }
+
     // Direct, unwrapped directory picker following Apple's documented pattern.
     // We intentionally removed the action-sheet -> dismiss -> repesent chain;
     // it could race with Files' own presentation and delegate lifecycle.
@@ -599,6 +588,15 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
     }
     @objc private func launch() {
         guard USBStorageManager.shared.root != nil else { chooseFolder(); return }
+        if !NativeEngineStatus.nativeEngineLinked {
+            let alert = UIAlertController(title: "Game not ready",
+                message: "Your game library is connected, but native GTA V engine integration is not complete. The game cannot launch yet.",
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Runtime details", style: .default) { [weak self] _ in self?.openGame() })
+            present(alert, animated: true)
+            return
+        }
         let missing = USBStorageManager.shared.missingStartupAssets()
         if !missing.isEmpty {
             let alert = UIAlertController(title: "Missing game resources",
@@ -627,8 +625,8 @@ final class LauncherViewController: UIViewController, UIDocumentPickerDelegate {
         let file = LogStore.shared.exportURL()
         let activity = UIActivityViewController(activityItems: [file], applicationActivities: nil)
         if let p = activity.popoverPresentationController {
-            p.sourceView = logsButton
-            p.sourceRect = logsButton.bounds
+            p.sourceView = moreButton
+            p.sourceRect = moreButton.bounds
         }
         present(activity, animated: true)
     }
