@@ -89,10 +89,19 @@ launcher = (project / "ios/Sources/UI/GTAFiveTabLauncher.swift").read_text(encod
 launcher = launcher.replace("GameNavigationController(rootViewController: entry.0)",
                             "UINavigationController(rootViewController: entry.0)")
 launcher = launcher.replace("ControllerSettingsViewController()", "GTANativeControlsViewController()")
-launcher = launcher.replace("final class GTAFiveTabController: UITabBarController {",
-    "final class GTAFiveTabController: UITabBarController {\n"
-    "    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }\n"
-    "    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }\n")
+launcher = launcher.replace(
+    '''    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        if let nav = selectedViewController as? UINavigationController,
+           nav.topViewController is GameViewController { return .allButUpsideDown }
+        return .portrait
+    }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        if let nav = selectedViewController as? UINavigationController,
+           nav.topViewController is GameViewController { return .landscapeRight }
+        return .portrait
+    }''',
+    '''    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }''')
 old_navigation = """        navigationController?.setNavigationBarHidden(false, animated: true)
         let gameplay = GameViewController()
         gameplay.hidesBottomBarWhenPushed = true
