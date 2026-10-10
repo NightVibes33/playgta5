@@ -230,7 +230,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         hero.layer.cornerCurve = .continuous
         hero.translatesAutoresizingMaskIntoConstraints = false
         hero.heightAnchor.constraint(equalToConstant: 370).isActive = true
-        let art = GTAReference.image("gtav-official-cover", height: 370, radius: 0)
+        let art = GTAReference.image("gtav-story-trio", height: 370, radius: 0)
         hero.addSubview(art)
         NSLayoutConstraint.activate([
             art.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
@@ -266,7 +266,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         actions.addArrangedSubview(files)
         stack.addArrangedSubview(actions)
         let city = GTAReference.panelView(0)
-        city.addArrangedSubview(GTAReference.image("gtav-official-header", height: 132))
+        city.addArrangedSubview(GTAReference.image("gtav-vinewood-view", height: 132))
         let cityText = GTAReference.label("Los Santos", size: 16, weight: .bold)
         cityText.textAlignment = .center
         city.addArrangedSubview(cityText)
@@ -347,7 +347,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         actions.addArrangedSubview(validate)
         actions.addArrangedSubview(disconnect)
         stack.addArrangedSubview(actions)
-        let banner = GTAReference.image("gtav-official-header", height: 180)
+        let banner = GTAReference.image("gtav-city-helicopter", height: 180)
         stack.addArrangedSubview(banner)
         let infoCard = GTAReference.panelView()
         infoCard.addArrangedSubview(GTAReference.label("Game Information", size: 19, weight: .bold))
@@ -465,7 +465,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Settings"))
-        installHero("gtav-official-hero", height: 195)
+        installHero("gtav-car-gameplay", height: 174)
 
         let performance = GTAReference.panelView(11)
         performance.addArrangedSubview(GTAReference.label("Performance Monitor", size: 18, weight: .bold))

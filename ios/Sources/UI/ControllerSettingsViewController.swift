@@ -69,7 +69,7 @@ final class ControllerSettingsViewController: UIViewController {
         top.addArrangedSubview(titles)
         stack.addArrangedSubview(top)
         // Bundled Rockstar-published GTA V imagery, not generated wallpaper.
-        stack.addArrangedSubview(GTAReference.image("gtav-official-header", height: 154))
+        stack.addArrangedSubview(GTAReference.image("gtav-franklin-race", height: 154))
         stack.addArrangedSubview(GTAReference.label("Controls", size: 19, weight: .bold))
 
         hardware.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
