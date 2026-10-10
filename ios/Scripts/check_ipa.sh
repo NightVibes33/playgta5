@@ -34,6 +34,18 @@ if find "$app" -type f \( -name 'gtaios-reference-*.jpg' -o -name 'gtaios-librar
   echo 'ERROR: synthetic reference imagery is not permitted in the IPA' >&2
   exit 1
 fi
+# Reject substitutions for the verified publisher promotional images.
+check_art_hash() {
+  local name="$1" expected="$2" observed
+  observed="$(shasum -a 256 "$app/$name" | awk '{print $1}')"
+  if [[ "$observed" != "$expected" ]]; then
+    echo "ERROR: changed GTA V artwork: $name" >&2
+    exit 1
+  fi
+}
+check_art_hash gtav-official-hero.jpg 9911eacd492474f3f8bd99852458c7b04abc4c9990dfc72219e7bdc80ea6d5b4
+check_art_hash gtav-official-cover.jpg 301cbc71c0265978a6b62ede653a298559e63c8d96ca88be20a1885d6189a2d2
+check_art_hash gtav-official-header.jpg e1ee8ed03ef2926d224e331a1bc61711822bbe7261cf847624089c1e95207a9a
 echo 'Authentic GTA V promotional artwork bundled: PASS'
 echo 'Modern full-screen iPhone launch manifest: PASS'
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
