@@ -316,3 +316,9 @@ assert 'func recentEvents(limit: Int = 5' in read("ios/Sources/Support/LogStore.
 assert 'LogStore.shared.recentEvents(limit: 5)' in reference
 assert '"Recent Diagnostic Events"' in reference
 assert '"No diagnostic events recorded"' in reference
+
+# Verified startup path count comes from the same scan contract.
+assert "var startupPathCount: Int { Self.startupPaths.count }" in usb
+assert "let required = Self.startupPaths" in usb
+assert "USBStorageManager.shared.startupPathCount" in reference
+assert 'assetCoverage.text = "No startup paths inspected"' in reference

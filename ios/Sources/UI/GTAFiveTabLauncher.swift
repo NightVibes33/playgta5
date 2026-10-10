@@ -393,7 +393,7 @@ final class GTAReferenceHomeController: GTAReferencePage {
         // The original widescreen trio contains all three protagonists and
         // the GTA V title. Preserve the WHOLE image instead of center-cropping
         // Franklin and Trevor off the sides on a narrow iPhone screen.
-        let art = GTAReference.image("gtav-story-trio", height: 218, radius: 0)
+        let art = GTAReference.image("gtav-story-trio", height: 207, radius: 0)
         art.contentMode = .scaleAspectFit
         // One real Rockstar key-art image, displayed uncropped. The lower
         // color treatment is a native control surface, not repeated wallpaper.
@@ -581,6 +581,8 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
     private var selectedAsFile = false
     private var verifiedRoot: URL?
     private var lastInspectedBytes: Int64?
+    private let assetCoverage = GTAReference.label("", size: 11, weight: .semibold,
+                                                    color: GTAReference.secondary)
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Library"))
@@ -607,6 +609,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
         cardRow.addArrangedSubview(detail)
         card.addArrangedSubview(cardRow)
         card.addArrangedSubview(diskInfo)
+        card.addArrangedSubview(assetCoverage)
         stack.addArrangedSubview(card)
         stack.addArrangedSubview(GTAReference.section("Quick Actions"))
         let actions = UIStackView()
@@ -649,6 +652,10 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
             connection.textColor = verifiedRoot == root.standardizedFileURL && missing.isEmpty ?
                 GTAReference.green : GTAReference.blue
             diskInfo.text = "Selected folder: " + root.lastPathComponent
+            let total = USBStorageManager.shared.startupPathCount
+            let detected = max(0, total - missing.count)
+            assetCoverage.text = "Startup paths detected: \(detected) / \(total)"
+            assetCoverage.textColor = missing.isEmpty ? GTAReference.green : GTAReference.secondary
             if confirmed, let bytes = lastInspectedBytes {
                 engineInfo.text = "Inspected game.wasm: " +
                     ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
@@ -661,6 +668,8 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
             connection.text = "Not selected"
             connection.textColor = GTAReference.blue
             diskInfo.text = "Select your own local game mirror from the Files app"
+            assetCoverage.text = "No startup paths inspected"
+            assetCoverage.textColor = GTAReference.secondary
             engineInfo.text = "Game engine archive: not connected"
         }
     }

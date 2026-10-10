@@ -6,6 +6,14 @@ import Foundation
 final class USBStorageManager {
     static let shared = USBStorageManager()
     static let changedNotification = Notification.Name("gtaios.usb-storage.changed")
+    private static let startupPaths: [(String, String)] = [
+        ("data", "data/ game archives"),
+        ("b/8b0b5899ed/game.wasm", "b/8b0b5899ed/game.wasm"),
+        ("b/8b0b5899ed/shaders/index.json", "b/8b0b5899ed/shaders/index.json"),
+        ("b/8b0b5899ed/title", "b/8b0b5899ed/title/ artwork"),
+        ("b/8b0b5899ed/audio-worklet.js", "b/8b0b5899ed/audio-worklet.js")
+    ]
+    var startupPathCount: Int { Self.startupPaths.count }
     private let bookmarkKey = "gtaios.usb.bookmark"
     private let anchorKindKey = "gtaios.usb.bookmark-kind"
 
@@ -275,13 +283,7 @@ final class USBStorageManager {
     }
 
     private func scanStartupAssets(in gameRoot: URL) -> [String] {
-        let required: [(String, String)] = [
-            ("data", "data/ game archives"),
-            ("b/8b0b5899ed/game.wasm", "b/8b0b5899ed/game.wasm"),
-            ("b/8b0b5899ed/shaders/index.json", "b/8b0b5899ed/shaders/index.json"),
-            ("b/8b0b5899ed/title", "b/8b0b5899ed/title/ artwork"),
-            ("b/8b0b5899ed/audio-worklet.js", "b/8b0b5899ed/audio-worklet.js")
-        ]
+        let required = Self.startupPaths
         let missing = required.compactMap { item -> String? in
             let path = gameRoot.appendingPathComponent(item.0)
             return FileManager.default.fileExists(atPath: path.path) ? nil : item.1
