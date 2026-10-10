@@ -156,7 +156,8 @@ replace("ios/project.yml",
             "gtav-story-trio.jpg", "gtav-official-cover.jpg",
             "gtav-official-hero.jpg", "gtav-car-gameplay.jpg",
             "gtav-vinewood-view.jpg", "gtav-city-helicopter.jpg",
-            "gtav-franklin-race.jpg", "gtav-official-header.jpg"
+            "gtav-franklin-race.jpg", "gtav-official-header.jpg",
+            "gtaios-developer-avatar.png"
         ]))
 
 # Detaching the Files provider must also unmount the native Rust game root.

@@ -219,7 +219,8 @@ final class GTAContributorAvatarView: UIImageView {
     }
     override init(frame: CGRect) {
         super.init(frame: frame)
-        image = UIImage(systemName: "person.crop.circle.fill")
+        image = UIImage(named: "gtaios-developer-avatar")
+            ?? UIImage(systemName: "person.crop.circle.fill")
         tintColor = GTAReference.blue
         contentMode = .scaleAspectFill
         clipsToBounds = true

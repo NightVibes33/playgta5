@@ -17,6 +17,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Bundle GTAiOS developer GitHub profile image
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 35 \
+            'https://avatars.githubusercontent.com/u/214680657?s=256&v=4' \
+            -o "$RUNNER_TEMP/gtaios-github-avatar"
+          sips -s format png "$RUNNER_TEMP/gtaios-github-avatar" \
+            --out ios/Sources/Resources/gtaios-developer-avatar.png >/dev/null
+          test -s ios/Sources/Resources/gtaios-developer-avatar.png
       - name: Fetch exact private engine input with read-only deploy key
         uses: actions/checkout@v4
         with:
