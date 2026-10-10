@@ -235,7 +235,7 @@ jobs:
           for destination in library graphics controls more; do
             xcrun simctl terminate "$UDID" com.nightvibes33.gtaios
             TAB_OUTPUT=$(xcrun simctl launch "$UDID" com.nightvibes33.gtaios "--snapshot-$destination")
-            TAB_PID=$(echo "$TAB_OUTPUT" | awk -F\x27: \x27 \x27/com.nightvibes33.gtaios:/ {print $2}\x27 | tr -dc \x270-9\x27)
+            TAB_PID=$(echo "$TAB_OUTPUT" | awk -F': ' '/com.nightvibes33.gtaios:/ {print $2}' | tr -dc '0-9')
             test -n "$TAB_PID"
             sleep 3
             if ! kill -0 "$TAB_PID" 2>/dev/null; then
