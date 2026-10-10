@@ -139,7 +139,7 @@ replace("build.rs", '.arg("ios/Launcher.swift")',
 # Copy across the original Rockstar artwork, without image generation/reuse.
 replace("ios/project.yml",
         '- path: ../../../ios/Sources/Resources/gtav-story-trio.jpg',
-        '\n'.join('- path: ../../../ios/Sources/Resources/' + f for f in [
+        '\n      '.join('- path: ../../../ios/Sources/Resources/' + f for f in [
             "gtav-story-trio.jpg", "gtav-official-cover.jpg",
             "gtav-official-hero.jpg", "gtav-car-gameplay.jpg",
             "gtav-vinewood-view.jpg", "gtav-city-helicopter.jpg",
