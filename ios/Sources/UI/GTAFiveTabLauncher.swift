@@ -304,6 +304,7 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
     private let engineInfo = GTAReference.label("", size: 11, weight: .medium,
                                                 color: GTAReference.secondary)
     private var selectedAsFile = false
+    private var verifiedRoot: URL?
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Library"))
@@ -364,11 +365,16 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
     private func refresh() {
         if let root = USBStorageManager.shared.root {
             let missing = USBStorageManager.shared.missingStartupAssets()
-            connection.text = missing.isEmpty ? "Game data readable ✓" : "Game folder selected · missing assets"
-            connection.textColor = missing.isEmpty ? GTAReference.green : GTAReference.blue
+            let confirmed = verifiedRoot == root.standardizedFileURL
+            connection.text = !missing.isEmpty ? "Missing startup paths" :
+                (confirmed ? "Engine file inspected · startup paths present" :
+                    "Startup paths detected · validation pending")
+            connection.textColor = verifiedRoot == root.standardizedFileURL && missing.isEmpty ?
+                GTAReference.green : GTAReference.blue
             diskInfo.text = "Selected folder: " + root.lastPathComponent
             engineInfo.text = "Run Validate to inspect real engine file bytes"
         } else {
+            verifiedRoot = nil
             connection.text = "Not selected"
             connection.textColor = GTAReference.blue
             diskInfo.text = "Select your own local game mirror from the Files app"
@@ -415,7 +421,9 @@ final class GTAReferenceLibraryController: GTAReferencePage, UIDocumentPickerDel
             switch result {
             case .success(let value):
                 let bytes = ByteCountFormatter.string(fromByteCount: value.byteCount, countStyle: .file)
+                self.verifiedRoot = USBStorageManager.shared.root?.standardizedFileURL
                 self.engineInfo.text = "Inspected game.wasm: " + bytes
+                self.refresh()
                 GTAReference.present("Game files inspected", message:
                     "WebAssembly engine readable: " + bytes +
                     ". Shader index found. This does not establish playable GTA V runtime.", from: self)
