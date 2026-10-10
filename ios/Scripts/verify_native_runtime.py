@@ -262,7 +262,12 @@ assert 'generate_wasmtime_conf.py' in workflow
 assert 'conf.h.in' in workflow
 assert 'xcrun nm "' in ipa
 assert '_gta_ios_wasmtime_aot_probe' in ipa
-assert "<key>CFBundleVersion</key><string>38</string>" in plist
+# Version is sourced from the real plist, not hardcoded into the test.
+import re
+build_match = re.search(r'<key>CFBundleVersion</key><string>([1-9][0-9]*)</string>', plist)
+assert build_match is not None, "CFBundleVersion must be a positive integer"
+version_match = re.search(r'<key>CFBundleShortVersionString</key><string>([0-9]+\.[0-9]+\.[0-9]+)</string>', plist)
+assert version_match is not None, "semantic CFBundleShortVersionString required"
 assert '<key>CFBundleIconName</key><string>AppIcon</string>' in plist
 assert "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon" in project
 assert "GTA V iOS icon metadata and compiled Assets.car: PASS" in ipa
