@@ -1,4 +1,5 @@
 #include "NativeWASIHostABI.h"
+#include "NativeArchivePathABI.h"
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
@@ -107,8 +108,7 @@ void gta_wasi_set_openat_provider(gta_wasi_openat_provider provider) {
 int32_t gta_wasi_syscall_openat(int32_t dirfd, uint64_t path_pointer,
                                 int32_t flags, uint64_t varargs_pointer) {
     (void)varargs_pointer;
-    if ((flags & O_ACCMODE) != O_RDONLY ||
-        (flags & (O_CREAT | O_TRUNC | O_APPEND | O_EXCL)) != 0)
+    if (!gta_archive_flags_readonly(flags))
         return -13; /* EACCES, read-only game archives */
     char name[1024];
     gta_wasi_openat_provider provider = NULL;
@@ -133,24 +133,11 @@ int32_t gta_wasi_syscall_openat(int32_t dirfd, uint64_t path_pointer,
     provider = wasi_openat_provider;
     pthread_mutex_unlock(&wasi_mutex);
     if (dirfd != -100 && name[0] != '/') return -9; /* EBADF */
-    const char *relative = name;
-    while (*relative == '/') relative++;
-    if (strncmp(relative, "data/", 5) != 0 &&
-        strncmp(relative, "b/", 2) != 0) return -2; /* ENOENT */
     /* Do not trust the embedding provider alone to reject path escape,
      * doubled separators or dot segments. Never normalize a malicious
      * path into an unintended file outside the authorized archive root. */
-    for (const char *part = relative; *part;) {
-        size_t len = strcspn(part, "/");
-        if (!len || (len == 1 && part[0] == '.') ||
-            (len == 2 && part[0] == '.' && part[1] == '.'))
-            return -13; /* EACCES */
-        part += len;
-        if (*part == '/') {
-            ++part;
-            if (!*part) return -13;
-        }
-    }
+    char relative[1024];
+    if (!gta_archive_relative_path(name, relative, sizeof(relative))) return -13;
     if (!provider) return -2;
     return provider(relative);
 }

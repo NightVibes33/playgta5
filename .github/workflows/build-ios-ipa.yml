@@ -85,10 +85,18 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pthread \
             ios/Sources/Engine/NativeTextHostABI.c \
+            ios/Sources/Engine/NativeArchivePathABI.c \
             ios/Sources/Engine/NativeWASIHostABI.c \
             ios/Tests/native-wasi-abi.test.c \
             -o "$RUNNER_TEMP/native-wasi-abi"
           "$RUNNER_TEMP/native-wasi-abi"
+      - name: Verify external game mount and guest archive flags
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror \
+            ios/Sources/Engine/NativeArchivePathABI.c \
+            ios/Tests/native-archive-path.test.c \
+            -o "$RUNNER_TEMP/native-archive-path"
+          "$RUNNER_TEMP/native-archive-path"
       - name: Verify real WebAudio stereo float PCM ring ABI
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pthread \

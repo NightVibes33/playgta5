@@ -107,6 +107,14 @@ int main(void) {
     int32_t opened=gta_wasi_syscall_openat(-100,0,O_RDONLY,0);
     assert(opened>=3 && opened!=gamefd);
     assert(gta_wasi_fd_close((uint32_t)opened)==0);
+    strcpy((char*)memory,"/game/test.bin");
+    opened=gta_wasi_syscall_openat(-100,0,32768,0);
+    assert(opened>=3);
+    assert(gta_wasi_fd_close((uint32_t)opened)==0);
+    /* Linux/Emscripten creation bits, independent of Darwin O_CREAT. */
+    assert(gta_wasi_syscall_openat(-100,0,64,0)==-13);
+    assert(gta_wasi_syscall_openat(-100,0,512,0)==-13);
+    assert(gta_wasi_syscall_openat(-100,0,1024,0)==-13);
     strcpy((char*)memory,"data/../b/secret");
     assert(gta_wasi_syscall_openat(-100,0,O_RDONLY,0)==-13);
     strcpy((char*)memory,"data//broken");
