@@ -117,7 +117,6 @@ for title in ['"Home"', '"Library"', '"Graphics"', '"Controls"', '"More"']:
 assert "ControllerSettingsViewController()" in reference
 assert "GTAReferenceLibraryController" in reference
 assert "GTAReference.settingsRow" in reference
-assert 'gtav-franklin-race' in controls
 assert "fetch_distinct_gtav_art.sh" in workflow
 assert "GTAReferenceGraphicsController" in reference
 assert "NativeEngineStatus.inspect" in reference
@@ -131,6 +130,7 @@ assert all(("\"" + name + "\"") in reference for name in ("Home", "Library", "Gr
 assert '"--snapshot-library"' in reference and '"--snapshot-graphics"' in reference
 assert "GCController.controllers().first?.vendorName" in reference
 controls = read("ios/Sources/UI/ControllerSettingsViewController.swift")
+assert 'gtav-franklin-race' in controls
 assert 'title = "Controls"' in controls and "GTAReference.green" in controls
 assert 'iphone-library.png' in workflow and 'iphone-graphics.png' in workflow
 assert '"gtav-vinewood-view"' in reference
