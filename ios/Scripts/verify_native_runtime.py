@@ -295,3 +295,10 @@ print("PASS: native Bluetooth and touch control capture, runtime controls, therm
 print("PASS: atomic native saves and PCM audio output service present, not yet engine-bound")
 print("PASS: no WebKit gameplay or embedded browser runtime; unlinked engine truthfully blocked")
 print("NOT PLAYABLE: compiled ARM64 GTA engine, real Metal renderer/import ABI and on-device gameplay remain outstanding")
+
+# Home shows real USB and GameController state in dedicated status cards.
+assert 'let chips = UIStackView()' in reference
+assert 'USBStorageManager.shared.missingStartupAssets()' in reference
+assert 'GCController.controllers().first(where:' in reference
+assert 'installHero("gtav-official-hero", height: 174)' in reference
+assert 'GTAReference.image("gtav-car-gameplay", height: 131)' in reference

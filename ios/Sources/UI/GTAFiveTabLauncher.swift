@@ -378,6 +378,8 @@ final class GTAReferenceHomeController: GTAReferencePage {
     override var extendsHeroUnderStatusBar: Bool { true }
     private let play = GTAVNeonLaunchButton(frame: .zero)
     private let readiness = GTAReference.label("", size: 11, weight: .medium, color: GTAReference.secondary)
+    private let usbState = GTAReference.label("", size: 12, weight: .bold)
+    private let controllerState = GTAReference.label("", size: 12, weight: .bold)
     override func viewDidLoad() {
         super.viewDidLoad()
         // Reference-matched full-bleed GTA V artwork with a real, state-driven action.
@@ -386,12 +388,12 @@ final class GTAReferenceHomeController: GTAReferencePage {
         hero.layer.cornerRadius = 17
         hero.layer.cornerCurve = .continuous
         hero.translatesAutoresizingMaskIntoConstraints = false
-        hero.heightAnchor.constraint(equalToConstant: 398).isActive = true
+        hero.heightAnchor.constraint(equalToConstant: 350).isActive = true
         hero.backgroundColor = UIColor(red: 0.055, green: 0.073, blue: 0.10, alpha: 1)
         // The original widescreen trio contains all three protagonists and
         // the GTA V title. Preserve the WHOLE image instead of center-cropping
         // Franklin and Trevor off the sides on a narrow iPhone screen.
-        let art = GTAReference.image("gtav-story-trio", height: 214, radius: 0)
+        let art = GTAReference.image("gtav-story-trio", height: 218, radius: 0)
         art.contentMode = .scaleAspectFit
         // One real Rockstar key-art image, displayed uncropped. The lower
         // color treatment is a native control surface, not repeated wallpaper.
@@ -454,6 +456,36 @@ final class GTAReferenceHomeController: GTAReferencePage {
         stack.addArrangedSubview(hero)
         readiness.textAlignment = .center
         stack.addArrangedSubview(readiness)
+        stack.setCustomSpacing(8, after: readiness)
+        // Live local game-library and controller status, never mocked game progress.
+        let chips = UIStackView()
+        chips.axis = .horizontal
+        chips.distribution = .fillEqually
+        chips.spacing = 9
+        for (title, symbol, value) in [
+            ("GAME FILES", "externaldrive.fill", usbState),
+            ("CONTROLLER", "gamecontroller.fill", controllerState)
+        ] {
+            let card = GTAReference.panelView(10)
+            card.spacing = 5
+            let header = UIStackView()
+            header.axis = .horizontal
+            header.spacing = 6
+            let glyph = UIImageView(image: UIImage(systemName: symbol))
+            glyph.tintColor = GTAReference.green
+            glyph.contentMode = .scaleAspectFit
+            glyph.widthAnchor.constraint(equalToConstant: 15).isActive = true
+            header.addArrangedSubview(glyph)
+            header.addArrangedSubview(GTAReference.label(title, size: 9, weight: .bold,
+                                                       color: GTAReference.secondary))
+            card.addArrangedSubview(header)
+            value.numberOfLines = 1
+            value.lineBreakMode = .byTruncatingTail
+            card.addArrangedSubview(value)
+            chips.addArrangedSubview(card)
+        }
+        stack.addArrangedSubview(chips)
+        stack.setCustomSpacing(10, after: chips)
         let actions = UIStackView()
         actions.axis = .horizontal
         actions.distribution = .fillEqually
@@ -470,8 +502,8 @@ final class GTAReferenceHomeController: GTAReferencePage {
         city.layer.cornerCurve = .continuous
         city.clipsToBounds = true
         city.backgroundColor = GTAReference.panel
-        city.heightAnchor.constraint(equalToConstant: 154).isActive = true
-        let panorama = GTAReference.image("gtav-vinewood-view", height: 154, radius: 0)
+        city.heightAnchor.constraint(equalToConstant: 136).isActive = true
+        let panorama = GTAReference.image("gtav-vinewood-view", height: 136, radius: 0)
         panorama.contentMode = .scaleAspectFill
         city.addSubview(panorama)
         NSLayoutConstraint.activate([
@@ -499,17 +531,36 @@ final class GTAReferenceHomeController: GTAReferencePage {
             cityTitle.bottomAnchor.constraint(equalTo: titlePlate.contentView.bottomAnchor, constant: -10)
         ])
         stack.addArrangedSubview(city)
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshLiveStatus),
+            name: USBStorageManager.changedNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshLiveStatus),
+            name: .GCControllerDidConnect, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshLiveStatus),
+            name: .GCControllerDidDisconnect, object: nil)
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        refreshLiveStatus()
+    }
+    @objc private func refreshLiveStatus() {
         let hasFiles = USBStorageManager.shared.root != nil
         let engine = NativeEngineStatus.nativeEngineLinked
-        // A real unavailable engine never yields a fictitious working Play action.
+        let missing = hasFiles ? USBStorageManager.shared.missingStartupAssets() : []
+        usbState.text = !hasFiles ? "Not connected" : (missing.isEmpty ? "Startup files found" : "Files missing")
+        usbState.textColor = hasFiles && missing.isEmpty ? GTAReference.green : GTAReference.secondary
+        if let gamepad = GCController.controllers().first(where: { $0.extendedGamepad != nil }) {
+            controllerState.text = gamepad.vendorName ?? "Gamepad connected"
+            controllerState.textColor = GTAReference.green
+        } else {
+            controllerState.text = "Not connected"
+            controllerState.textColor = GTAReference.secondary
+        }
+        // Real app status; gameplay data is never invented.
         let title = !hasFiles ? "Select GTA V Files" : (engine ? "Play GTA V" : "Check Engine")
         play.configuration?.title = title
         play.configuration?.image = UIImage(systemName: engine && hasFiles ? "play.fill" : "folder.fill")
-        readiness.text = !hasFiles ? "No accessible GTA V folder selected" :
-            (engine ? "GTA V runtime linked" : "GTA V engine not linked · gameplay unavailable")
+        readiness.text = !hasFiles ? "Attach your GTA V game folder to continue" :
+            (engine ? "GTA V native runtime linked" : "GTA V native gameplay not yet available")
     }
     @objc private func playPressed() {
         guard USBStorageManager.shared.root != nil else { switchTab(1); return }
@@ -697,7 +748,7 @@ final class GTAReferenceGraphicsController: GTAReferencePage {
     override func viewDidLoad() {
         super.viewDidLoad()
         stack.addArrangedSubview(GTAReference.section("Game Settings"))
-        installHero("gtav-car-gameplay", height: 174)
+        installHero("gtav-official-hero", height: 174)
 
         let performance = GTAReference.panelView(11)
         performance.addArrangedSubview(GTAReference.label("Performance Monitor", size: 18, weight: .bold))
@@ -1054,7 +1105,7 @@ final class GTAReferenceMoreController: GTAReferencePage {
         stack.addArrangedSubview(GTAReference.section("More"))
         // Distinct, bundled Rockstar artwork for the fifth tab.
         // This image is not shared with Home, Library, Graphics, or Controls.
-        let visual = GTAReference.image("gtav-official-hero", height: 131)
+        let visual = GTAReference.image("gtav-car-gameplay", height: 131)
         visual.accessibilityLabel = "Official Grand Theft Auto V promotional artwork"
         stack.addArrangedSubview(visual)
 
