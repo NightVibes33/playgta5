@@ -1,6 +1,7 @@
 #include "NativeWasmtimeHost.h"
 #include "NativeTextHostABI.h"
 #include "NativeUserdataHostABI.h"
+#include "NativeWASIHostABI.h"
 #include <TargetConditionals.h>
 #include <stdio.h>
 #include <string.h>
@@ -266,6 +267,73 @@ static int gta_define_userdata_callbacks(wasmtime_linker_t *linker) {
     return 0;
 }
 
+/* Native WASI preview1 host functions. The verified uploaded 63MiB engine
+ * imports i32,i64,i64 -> i32 clock and i64,i64 -> i32 environment functions.
+ * Unlike no-op linker placeholders, these validate guest memory64 offsets
+ * and write the actual expected WASI output cells. The embedding runtime
+ * must bind the live shared memory before GTA can call these callbacks.
+ */
+enum { GTA_WASI_CLOCK=1, GTA_WASI_ENV_SIZES=2, GTA_WASI_ENV_GET=3 };
+static wasm_trap_t *gta_wasi_callback(
+    void *env, wasmtime_caller_t *caller, const wasmtime_val_t *args,
+    size_t nargs, wasmtime_val_t *results, size_t nresults
+) {
+    (void)caller;
+    if (nresults != 1 || !results) return NULL;
+    const uintptr_t op=(uintptr_t)env;
+    int32_t rc=21; /* WASI EFAULT for unavailable guest memory. */
+    if (op==GTA_WASI_CLOCK && nargs==3 &&
+        args[0].kind==WASMTIME_I32 && args[1].kind==WASMTIME_I64 &&
+        args[2].kind==WASMTIME_I64) {
+        rc=gta_wasi_clock_time_get((uint32_t)args[0].of.i32,
+            (uint64_t)args[1].of.i64, (uint64_t)args[2].of.i64);
+    } else if (op==GTA_WASI_ENV_SIZES && nargs==2 &&
+        args[0].kind==WASMTIME_I64 && args[1].kind==WASMTIME_I64) {
+        rc=gta_wasi_environ_sizes_get((uint64_t)args[0].of.i64,
+            (uint64_t)args[1].of.i64);
+    } else if (op==GTA_WASI_ENV_GET && nargs==2 &&
+        args[0].kind==WASMTIME_I64 && args[1].kind==WASMTIME_I64) {
+        rc=gta_wasi_environ_get((uint64_t)args[0].of.i64,
+            (uint64_t)args[1].of.i64);
+    }
+    results[0].kind=WASMTIME_I32;
+    results[0].of.i32=rc;
+    return NULL;
+}
+static int gta_define_wasi_callback(wasmtime_linker_t *linker,
+                                     const char *name, uintptr_t op) {
+    const int number=(op==GTA_WASI_CLOCK) ? 3 : 2;
+    wasm_valtype_t *params[3]={0};
+    for(int i=0;i<number;++i) {
+        params[i]=wasm_valtype_new(op==GTA_WASI_CLOCK && i==0
+                                      ? WASM_I32 : WASM_I64);
+        if (!params[i]) {
+            for(int j=0;j<i;++j) wasm_valtype_delete(params[j]);
+            return -1;
+        }
+    }
+    wasm_valtype_t *result=wasm_valtype_new(WASM_I32);
+    if(!result) {for(int i=0;i<number;++i)wasm_valtype_delete(params[i]);return -2;}
+    wasm_valtype_vec_t input, output;
+    wasm_valtype_vec_new(&input, number, params);
+    wasm_valtype_vec_new(&output, 1, &result);
+    wasm_functype_t *type=wasm_functype_new(&input,&output);
+    if(!type) return -3;
+    const char *module="wasi_snapshot_preview1";
+    wasmtime_error_t *error=wasmtime_linker_define_func(
+        linker, module, strlen(module), name, strlen(name), type,
+        gta_wasi_callback, (void *)op, NULL);
+    wasm_functype_delete(type);
+    if(error) {wasmtime_error_delete(error);return -4;}
+    return 0;
+}
+static int gta_define_wasi_callbacks(wasmtime_linker_t *linker) {
+    if(gta_define_wasi_callback(linker,"clock_time_get",GTA_WASI_CLOCK)) return -1;
+    if(gta_define_wasi_callback(linker,"environ_sizes_get",GTA_WASI_ENV_SIZES)) return -2;
+    if(gta_define_wasi_callback(linker,"environ_get",GTA_WASI_ENV_GET)) return -3;
+    return 0;
+}
+
 static void gta_host_message(char *dst, size_t capacity, const char *msg) {
     if (dst && capacity) {
         snprintf(dst, capacity, "%s", msg ? msg : "Unknown host error");
@@ -378,10 +446,16 @@ int gta_ios_wasmtime_register_host_basics(
         return rc;
     }
     if (installed) *installed += 2;
+    rc = gta_define_wasi_callbacks(linker);
+    if (rc != 0) {
+        gta_host_message(message, capacity, "Actual memory64 WASI clock/environment registration failed");
+        return rc;
+    }
+    if (installed) *installed += 3;
     return 0;
 }
 
-/* Returns 0 only when fifteen ABI-matched host functions are registered
+/* Returns 0 only when eighteen ABI-matched host functions are registered
  * and the linker successfully calls the native monotonic callback. This is
  * hardware runtime integration, NOT game engine instantiation. */
 int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
@@ -426,7 +500,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
             gta_host_message(message, capacity, "Monotonic clock callback failed");
         } else {
             gta_host_message(message, capacity,
-                "Fifteen native GTA host callbacks registered; monotonic function invoked correctly");
+                "Eighteen native GTA host callbacks registered; monotonic function invoked correctly");
         }
         if (error) wasmtime_error_delete(error);
         if (trap) wasm_trap_delete(trap);
@@ -453,7 +527,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "WASM memory64 logical maximum host callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Fifteen native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
+                    "Eighteen native GTA imports registered; monotonic clock and i64 heap maximum callbacks executed");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
@@ -484,7 +558,7 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                     "Actual WASM input block publish callback failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Fifteen verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
+                    "Eighteen verified native GTA host imports; real i64 input block callback invoked; game still not instantiated");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
@@ -520,13 +594,48 @@ int gta_ios_wasmtime_basic_host_probe(unsigned int *installed,
                 gta_host_message(message, capacity, "GTA module-int native fallback smoke failed");
             } else {
                 gta_host_message(message, capacity,
-                    "Fifteen real GTA ABI imports linked, module-int fallback and input-block callbacks executed; game not instantiated");
+                    "Eighteen real GTA ABI imports linked, module-int fallback and input-block callbacks executed; game not instantiated");
             }
             if (error) wasmtime_error_delete(error);
             if (trap) wasm_trap_delete(trap);
         }
         if (setting.kind == WASMTIME_EXTERN_FUNC)
             wasmtime_extern_delete(&setting);
+    }
+    /* Call an actual newly registered WASI memory64 function through the
+     * Wasmtime C API. Because the real GTA heap is intentionally unbound,
+     * the correct result is WASI EFAULT (21), not a fake success value.
+     */
+    if (result == 0) {
+        const char *module="wasi_snapshot_preview1";
+        const char *name="clock_time_get";
+        wasmtime_extern_t clock_func={0};
+        if (!wasmtime_linker_get(linker, context, module, strlen(module),
+                                 name, strlen(name), &clock_func) ||
+                clock_func.kind != WASMTIME_EXTERN_FUNC) {
+            result=-29;
+            gta_host_message(message, capacity, "WASI clock_time_get linker lookup failed");
+        } else {
+            wasmtime_val_t args[3]={0}, answer={0};
+            args[0].kind=WASMTIME_I32; args[0].of.i32=1; /* monotonic */
+            args[1].kind=WASMTIME_I64; args[1].of.i64=1;
+            args[2].kind=WASMTIME_I64; args[2].of.i64=0;
+            wasm_trap_t *trap=NULL;
+            wasmtime_error_t *error=wasmtime_func_call(context,
+                &clock_func.of.func, args, 3, &answer, 1, &trap);
+            if(error || trap || answer.kind!=WASMTIME_I32 || answer.of.i32!=21) {
+                result=-30;
+                gta_host_message(message, capacity,
+                    "WASI clock memory64 callback did not return EFAULT for unbound heap");
+            } else {
+                gta_host_message(message, capacity,
+                    "18 real GTA host functions linked; WASI clock callback correctly returns EFAULT before memory bind. No game instantiation.");
+            }
+            if(error) wasmtime_error_delete(error);
+            if(trap) wasm_trap_delete(trap);
+        }
+        if(clock_func.kind==WASMTIME_EXTERN_FUNC)
+            wasmtime_extern_delete(&clock_func);
     }
     wasmtime_store_delete(store);
 finish:

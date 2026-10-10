@@ -5,6 +5,7 @@
 #include "NativeHTTPFSManifestABI.h"
 #include "NativeTextHostABI.h"
 #include "NativeUserdataHostABI.h"
+#include "NativeWASIHostABI.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
